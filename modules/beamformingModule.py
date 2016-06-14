@@ -33,6 +33,26 @@ def processPol(corrMatrix):
     w = getWeights() 
     spectrum = np.dot(w.conj().T,np.dot(R,w))
     return spectrum
+
+def getCorrelationCube(dataVector):
+        num_chan = 40
+        # The data order in the 'cross_accum' buffer is ch1Xch1_freq1_real,
+        # ch1Xch1_freq1_imag, ch1Xch2_freq1_real... ch1Xch20_freq1_imag,
+        # ch2Xch1_freq1_real...ch2Xch20_freq1_imag, ch3Xch1_freq1_real...
+        # ch1Xch1_freq2_real, ch1Xch1_freq2_imag...ch20Xch20_freq2_imag,
+        # ch1Xch1_freq3_real...ch20Xch20_freqN_imag
+      
+        num_cor = 820.
+        num_freq = len(dataVector) / num_cor
+        ret_dat = np.zeros([num_freq, num_chan, num_chan], dtype=np.complex64)
+        offset = 0
+        for row in range(num_chan) :
+            for col in range(row, num_chan) :
+                ret_dat[:,row,col] = dataVector[offset::num_cor]
+                if row != col :
+                    ret_dat[:,col,row] = dataVector[offset::num_cor].conj()
+                offset += 1   
+
 ## Put 1D correlation array into 20x20 matrix (element 20,20 irrelevant)
 def unpackCorrelations(dat):
     xpol = [0,1,4,5,8,9,12,13,16,17,20,21,24,25,28,29,32,33,36,37]
@@ -62,8 +82,18 @@ def unpackCorrelations(dat):
 
     return xdat, ydat 
 
-def getSpectrum(data): ##data correlations in FISHFITS order for a single frequency channel
-    corrMatrix_X,corrMatrix_Y = unpackCorrelations(data)
-    xSpec = processPol(corrMatrix_X)
-    ySpec = processPol(corrMatrix_Y)
-    return xSpec, ySpec
+
+def getSpectralArray(fitsName):
+    dataVector = getRawCorrelations(fitsName)
+    corrCube = getCorrelationCube(dataVector)
+    corrShape = corrCube.shape
+    num_freq = corrShape[0]
+    spectrum_X = np.zeros([num_freq], dtype='float32')    
+    spectrum_Y = np.zeros([num_freq], dtype='float32')  
+    for z in range(0,num_freq):
+        dat = corrCube[z,:,:]
+        xdat, ydat = unpackCorrelations(dat)
+        spectrumArr_X[z] = processPol(xdat)
+        spectrumArr_Y[z] = processPol(ydat)
+    return spectrum_X,spectrum_Y
+        

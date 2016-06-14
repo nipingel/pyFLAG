@@ -44,4 +44,12 @@ for row in range(0,40,2):
            corrIdxMatrix[row+1,col+1] = subBlock[3]
            subColOffset+=1
     colOffset+=1
-print(corrIdxMatrix)
+
+##Now, we must append subsequent columns to get correct FISHFITS order (while decreasing the 
+##column index each time to avoid redundant correlation pairs. 
+mapVector = []
+strtOffset = 0
+for col in range(0,40):
+    mapVector.extend(np.real(corrIdxMatrix[strtOffset:40,col]))
+    strtOffset+=1
+np.savetxt('/Users/npingel/Desktop/Research/FLAG/pros/SpectralFiller/misc/gpuToNativeMap.dat',mapVector,fmt='%d',delimiter='\n')
