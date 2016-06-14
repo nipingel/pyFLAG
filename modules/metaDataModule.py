@@ -10,17 +10,20 @@ import datetime
 
 class MetaDataModule:
 
+    def __init__(self):
+        return
+
 ## returns scanLog binary table
-    def readScanLog_Data():
+    def readScanLog_Data(self):
         scanLogHduList = fits.open('ScanLog.fits')
         return scanLogHduList[1].data
     
     ##returns scanLog header
-    def readScanLog_Header():
+    def readScanLog_Header(self):
         scanLogHduList = fits.open('ScanLog.fits')
         return scanLogHduList[0].header
     
-    def getCurrentUTC():
+    def getCurrentUTC(self):
         time = datetime.datetime.utcnow()
         dateStr=str(time.year)
         dateStr+='-'+str(time.strftime('%m'))
@@ -31,12 +34,12 @@ class MetaDataModule:
         dateStr+=':'+str(time.strftime('%S'))
         return dateStr
         
-    def contstructPriHDUHeader():
+    def contstructPriHDUHeader(self):
         ## Collect header metadata from ScanLog
         priHeader=fits.Header()
-        currentUTC = getCurrentUTC()
+        currentUTC = self.getCurrentUTC()
         priHeader.set('DATE',currentUTC, 'date and time this HDU was created, UTC')
-        scanLogHeader = readScanLog_Header()
+        scanLogHeader = self.readScanLog_Header()
         origin = scanLogHeader['ORIGIN']
         priHeader.set('ORIGIN',origin,'origin of observation')
         telescope = scanLogHeader['TELESCOP']
@@ -56,26 +59,21 @@ class MetaDataModule:
         binHeader.set('BITPIX','BINTABLE', 'binary table extension')
         binHeader.set('NAXIS1',2, '2-dimensional binary table')
         ##TODO:Descriptive keywords about table properties: NAXIS1, NAXIS2, PCOUNT, GCOUNT, TFIELDS
-        binhdr['COMMENT'] = 'Start of SDFITS CORE keywords/columns.'
+        binHeader['COMMENT'] = 'Start of SDFITS CORE keywords/columns.'
         ##TODO:SDFITS CORE KEYWORDS
-        binhdr['COMMENT'] = 'End of SDFITS CORE keywords/columns.'
-        binhdr['COMMENT'] = 'Start of SDFITS DATA column and descriptive axes.'
+        binHeader['COMMENT'] = 'End of SDFITS CORE keywords/columns.'
+        binHeader['COMMENT'] = 'Start of SDFITS DATA column and descriptive axes.'
         ##TODO: SDFITS DATA KEYWORDS (including Beamformer specific)
-        binhdr['COMMENT'] = 'End of SDFITS DATA column and descriptive axes.'
-        binhdr['COMMENT'] = 'Start of SDFITS SHARED keywords/columns.'
+        binHeader['COMMENT'] = 'End of SDFITS DATA column and descriptive axes.'
+        binHeader['COMMENT'] = 'Start of SDFITS SHARED keywords/columns.'
         ##TODO: SDFITS SHARED KEYWORDS
-        binhdr['COMMENT'] = 'End of SDFITS SHARED keywords/columns.'
-        binhdr['COMMENT'] = 'Start of GBT-specific keywords/columns.'
+        binHeader['COMMENT'] = 'End of SDFITS SHARED keywords/columns.'
+        binHeader['COMMENT'] = 'Start of GBT-specific keywords/columns.'
         ##TODO: GBT-SPECIFIC KEYWORDS
-        binhdr['COMMENT'] = 'Feed offsets ARE included in the CRVAL2 and CRVAL3 columns.'
+        binHeader['COMMENT'] = 'Feed offsets ARE included in the CRVAL2 and CRVAL3 columns.'
         ##TODO: MORE GBT-SPECIFIC KEYWORDS
-        binhdr['COMMENT'] = 'End of GBT-specific keywords/columns.'
+        binHeader['COMMENT'] = 'End of GBT-specific keywords/columns.'
         binHeader.set('EXTNAME','SINGLE DISH', 'name of this binary table extension')
         return binHeader
     def constructBinTable():
-        
-        
-    
-    
-    
-    
+        return

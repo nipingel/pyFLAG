@@ -12,17 +12,48 @@ from astropy.io import fits
 import numpy as np
 import sys
 import os
-from modules.metaDataModule import MetaDataModule as md
-from modules.beamformingModule import BeamformingModule as bf
+import glob
+from modules.metaDataModule import MetaDataModule
+from modules.beamformingModule import BeamformingModule
+
+##TODO: Makeshift case code to sort beamformed channels to be contiguous
+options = {A : bankA,
+                B : bankB ,
+                C : bankC,
+                D : bankD,
+}
+ 
+def bankA():
+    print "You typed zero.\n"
+ 
+def bankB():
+    print "n is a perfect square\n"
+ 
+def bankC():
+    print "n is an even number\n"
+ 
+def bankD():
+    print "n is a prime number\n"
+    
 
 def main():
+    bf = BeamformingModule()
+    md = MetaDataModule()
+    
 ## change working directory to project dir assumed to be first and only command-line argument. 
     os.chdir(str(sys.argv[1]))    
     print('Changing working directory to: '+str(sys.argv[1]))
     print('Building Primary HDU...')
-    priHeader = md.constructPrimaryHeader()
-    #print(priHeader)
-    ##TODO:Decide on data processing algorithm 
+    priHeader = md.contstructPriHDUHeader
+##TODO:Decide on data processing algorithm     
+    for fitsName in glob.glob('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/*.fits'):    
+        dataBuff = np.zeros([25*20])   ##TODO: make mode independent     
+        print('Beamforming correlations in: '+fitsName[-25:])
+        xData,yData = bf.getSpectralArray(fitsName)
+        
+    
+        
+    
 
 #run main function
 if __name__=="__main__":
