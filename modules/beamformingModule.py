@@ -92,17 +92,20 @@ class BeamformingModule:
         
     def getSpectralArray(self,fitsName):
         dataArr = self.getRawCorrelations(fitsName)
+        dataVector=dataArr[0,:]
+        corrCube = self.getCorrelationCube(dataVector)
+        corrShape = corrCube.shape
+        num_freq = corrShape[0] ##TODO: get from header?
+        spectrumArr_X = np.zeros([len(dataArr[:,0]),num_freq], dtype='float32')    
+        spectrumArr_Y = np.zeros([len(dataArr[:,0]),num_freq], dtype='float32') 
         for ints in range(0,len(dataArr[:,0])):     
             dataVector=dataArr[ints,:]
             corrCube = self.getCorrelationCube(dataVector)
             corrShape = corrCube.shape
-            num_freq = corrShape[0]
-            spectrumArr_X = np.zeros([num_freq], dtype='float32')    
-            spectrumArr_Y = np.zeros([num_freq], dtype='float32')  
             for z in range(0,num_freq):
                 dat = corrCube[z,:,:]
                 xdat, ydat = self.unpackCorrelations(dat)
-                spectrumArr_X[z] = self.processPol(xdat,0) ##0 is XX
-                spectrumArr_Y[z] = self.processPol(ydat,1) ##1 is YY
-        return spectrumArr_Sort_X,spectrumArr_Sort_Y
+                spectrumArr_X[ints,z] = self.processPol(xdat,0) ##0 is XX
+                spectrumArr_Y[ints,z] = self.processPol(ydat,1) ##1 is YY
+        return spectrumArr_X,spectrumArr_Y,ints+1
         
