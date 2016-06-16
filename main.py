@@ -21,9 +21,7 @@ import matplotlib.pyplot as pyplot
 numGPU = 2
 numTotalThreads = numGPU*2
 
-##TODO: How to distinguish between GPU threads, e.g. threads from 1st GPU contianing channels 0-4,100-104, and 5-9,105-109
 ##TODO:Extend sorting from 4 FITS files to 20 FITS files.
-##TODO: how to reset the global data buffers?
 def bankA(dataBuff,data,ints):
     endChan = 0
     for i in range(0,25,5):
