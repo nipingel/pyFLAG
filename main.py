@@ -82,8 +82,8 @@ def main():
             banks.get(bank)(dataBuff_Y,yData[ints,:],ints)
         cnt+=1
         ##TODO:construct actual binTbl
-    print('finished')
-    
+        md.constuctBinTable()
+        
     
         
     

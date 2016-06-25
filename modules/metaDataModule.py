@@ -9,16 +9,77 @@ import numpy as np
 import datetime
 
 class MetaDataModule:
+    
+    ## parameter dictionary
+    stuff = {'XTENSION':'BINTABLE'
+              'BITPIX':8
+              'NAXIS':2
+              'NAXIS1':## TODO: width
+              'NAXIS2':## TODO: rows
+              'PCOUNT':0
+              'GCOUNT':1
+              'TFIELDS':##TODO: num of fields
+              'TTYPE1':'OBJECT'
+              'TFORM1':'32A'
+              'TUNIT1':''
+              'TELESCOP':'NRAO_GBT'
+              'TTYPE2':
+              'TFORM2':
+              'TUNIT2':
+              'TTYPE3':
+              'TFORM3':
+              'TUNIT3':
+              'TTYPE4':
+              'TFORM4':
+              'TUNIT4':
+              'TTYPE5':
+              'TFORM5':
+              'TUNIT5':
+              'TTYPE6':
+              'TFORM6':
+              'TUNIT6':
+              'COMMENT':
+              'COMMENT':
+              'TTYPE7':
+              'TFORM7':
+              'TUNIT7':
+              'TTYPE8':
+              'TFORM8':
+              'TUNIT8':
+              'TTYPE9':
+              'TFORM9':
+              'TUNIT9':
+              'TTYPE10':
+              'TFORM10':
+              'TUNIT10':
+              'TTYPE11':
+              'TFORM11':
+              'TUNIT11':
+              'TTYPE12':
+              'TFORM12':
+              'TUNIT12':
+              'TTYPE13':
+              'TFORM13':
+              'TUNIT13':
+              'TTYPE14':
+              'TFORM14':
+              'TUNIT14':
+              'TTYPE15':
+              'TFORM15':
+              'TUNIT15':
+              'TTYPE16':
+              'TFORM16':
+    }
 
     def __init__(self):
         return
-
-## returns scanLog binary table
+    
+    ## returns scanLog binary table
     def readScanLog_Data(self):
         scanLogHduList = fits.open('ScanLog.fits')
         return scanLogHduList[1].data
     
-    ##returns scanLog header
+    ## returns scanLog header
     def readScanLog_Header(self):
         scanLogHduList = fits.open('ScanLog.fits')
         return scanLogHduList[0].header
@@ -53,14 +114,22 @@ class MetaDataModule:
         priHeader.set('FITSVER','fits-bf','FITS format for BF')
         return priHeader   
 
-    def constuctBinTableHeader():    
+    def constuctBinTableHeader(self):    
         binHeader = fits.Header()
-        binHeader.set('XTENSION','BINTABLE', 'binary table extension')
+        keywordList = np.loadtxt('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/sdKeywords.txt',dtype='bytes')
+        keyWordArr = keywordList.astype(str)
+        
+        for keyIdx in range(0,len(keyWordArr)):
+            binHeader.set(keyWordArr[keyIdx],'BINTABLE', 'binary table extension')
+            binHeader.set(keyWordArr[])
         binHeader.set('BITPIX','BINTABLE', 'binary table extension')
         binHeader.set('NAXIS1',2, '2-dimensional binary table')
         ##TODO:Descriptive keywords about table properties: NAXIS1, NAXIS2, PCOUNT, GCOUNT, TFIELDS
         binHeader['COMMENT'] = 'Start of SDFITS CORE keywords/columns.'
         ##TODO:SDFITS CORE KEYWORDS
+        for keyIdx in range(0,len(keyWordArr)):
+            binHeader.set(keyWordArr[keyIdx],'BINTABLE', 'binary table extension')
+            binHeader.set(keyWordArr[])
         binHeader['COMMENT'] = 'End of SDFITS CORE keywords/columns.'
         binHeader['COMMENT'] = 'Start of SDFITS DATA column and descriptive axes.'
         ##TODO: SDFITS DATA KEYWORDS (including Beamformer specific)
@@ -75,5 +144,5 @@ class MetaDataModule:
         binHeader['COMMENT'] = 'End of GBT-specific keywords/columns.'
         binHeader.set('EXTNAME','SINGLE DISH', 'name of this binary table extension')
         return binHeader
-    def constructBinTable():
+    def constructBinTableData(self):
         return
