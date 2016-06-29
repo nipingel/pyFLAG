@@ -64,7 +64,7 @@ class MetaDataModule:
               'TUNIT14': '',
               'TTYPE15':'CRVAL2',
               'TFORM15': '1D',
-              'TUNIT15': 'deg'
+              'TUNIT15': 'deg',
               'TTYPE16': 'CTYPE3', ##TODO: comment
               'TFORM16':'4A',
               'TUNIT16':'',
@@ -73,7 +73,7 @@ class MetaDataModule:
               'TUNIT17':'deg',
               'CTYPE4':'STOKES', ##TODO: comment
               'TTYPE18':'CRVAL4', 
-              'TFORM18':'1I'
+              'TFORM18':'1I',
               'TUNIT18':'',
               'TTYPE19':'OBSERVER',##TODO: comment; find this
               'TFORM19':'32A',
@@ -89,8 +89,8 @@ class MetaDataModule:
               'TFORM22':'32A', 
               'TUNIT22':'',
               'TTYPE23':'FRONTEND', ##TODO comment; find this
-              'TFORM23':'16A'
-              'TUNIT23':
+              'TFORM23':'16A',
+              'TUNIT23':'',
               'BACKEND':'', ##TODO comment; define this 
               'TTYPE24':'TCAL', ##TODO comment; find this
               'TFORM24':'1E',
@@ -128,13 +128,106 @@ class MetaDataModule:
               'SITELONG':'', ## find and define this
               'SITELAT':'',## find and define this
               'SITEELEV':'',## find and define this
-              'TTYPE35':'RESTFREQ', ##comment; find this
+              'TTYPE35':'RESTFREQ', ##TODO: comment; find this
               'TFORM35':'1D'
               'TUNIT35':'Hz'
-              'TTYPE36':'FREQRES', ##comment; find this
-              'TFORM36':'1D'
-              'TUNIT36':'Hz'
-              
+              'TTYPE36':'FREQRES', ##TODO comment; find this
+              'TFORM36':'1D',
+              'TUNIT36':'Hz',
+              'TTYPE38':'RADESYS', ##TODO comment; find this. 
+              'TFORM38':'8A',
+              'TTYPE39':'TRGTLONG', ##TODO comment
+              'TFORM39':'1D',
+              'TUNIT39':'deg', 
+              'TTYPE40':'TRGTLAT', ##TODO comment
+              'TFORM40':'1D',
+              'TUNIT40':'deg',
+              'TTYPE41':'SAMPLER', ##TODO comment
+              'TFORM41':'12A',
+              'TUNIT41':'FEED', ##TODO comment  
+              'TTYPE42':'1I',
+              'TFORM42':'',
+              'TUNIT42':'',
+              'TTYPE43':'SRFEED', ##TODO:
+              'TFORM43':'1I',
+              'TUNIT43':'',
+              'TTYPE44':'FEEDXOFF', ##TODO:
+              'TFORM44':'1D',
+              'TUNIT44':'deg',
+              'TTYPE45':'FEEDEOFF', ##TODO:
+              'TFORM45': '1D',
+              'TUNIT45':'deg',
+              'TTYPE46':'SUBREF_STATE', ##TODO:
+              'TFORM46':'1I',
+              'TUNIT46':'',
+              'TTYPE47':'SIDEBAND', ##TODO:
+              'TFORM47':'1A',
+              'TUNIT47':'',
+              'TTYPE48':'PROCSEQN', ##TODO:
+              'TFORM48':'1I',
+              'TUNIT48':''
+              'TTYPE49':'PROCSIZE', ##TODO:
+              'TFORM49':'1I',
+              'TUNIT49':'',
+              'TTYPE50':'PROCSCAN', ##TODO:
+              'TFORM50':'16A',
+              'TUNIT50':'',
+              'TTYPE51':'PROCTYPE', ##TODO:
+              'TFORM51':'16A',
+              'TUNIT51':'',
+              'TTYPE52':'LASTON', ##TODO:
+              'TFORM52':'1J',
+              'TUNIT52':'',
+              'TTYPE53':'LASTOFF', ##TODO:
+              'TFORM53':'1J'
+              'TUNIT53':''
+              'TTYPE54':'TIMESTAMP', ##TODO:
+              'TFORM54':'22A',
+              'TUNIT54':'UTC', 
+              'TTYPE55':'QD_XEL', ##TODO:
+              'TFORM55':'1D',
+              'TUNIT55':'deg',
+              'TTYPE56':'QD_EL', ##TODO:
+              'TFORM56':'1D',
+              'TUNIT56':'deg',
+              'TTYPE57':'QD_BAD', ##TODO:
+              'TFORM57':'1I',
+              'TUNIT57':''
+              'TTYPE58':'QD_METHOD', ##TODO:
+              'TFORM58':'1A', 
+              'TUNIT58':'',
+              'TTYPE59':'VELOCITY' ##TODO:
+              'TFORM59':'1D', 
+              'TUNIT59':'m/s'
+              'TTYPE60':'ZEROCHAN', ##TODO:
+              'TFORM60':'1E',
+              'TUNIT60':''
+              'TTYPE61':'DOPFREQ', ## TODO:
+              'TFORM61':'1D', 
+              'TUNIT61':'Hz';, 
+              'TTYPE62':'SIG', ##TODO:
+              'TFORM62':'1A', 
+              'TUNIT62':'',
+              'TTYPE63':'CAL', ##TODO;
+              'TFORM63':'1A',
+              'TUNIT63':'',
+              'TTYPE64':'CALTYPE', ##TODO:
+              'TFORM64':'8A'
+              'TTYPE65':'TWARM', ##TODO:
+              'TFORM65':'1E', 
+              'TUNIT65':'K',
+              'TTYPE66':'TCOLD',
+              'TFORM66':'1E',
+              'TUNIT66':'K',
+              'TTYPE67':'CALPOSITION', ##TODO: 
+              'TFORM67':'16A' 
+              'TTYPE68':'IFNUM', ##TODO:
+              'TFORM68':'1I'
+              'TTYPE69':'PLNUM', ##TODO:
+              'TFORM69':'1I'
+              'TTYPE70':'FDNUM', ##TODO:
+              'TFORM70':'1I'
+              'EXTNAME':'SINGLE DISH', ##TODO:
               }
 
     def __init__(self):
