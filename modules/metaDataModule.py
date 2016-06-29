@@ -11,65 +11,131 @@ import datetime
 class MetaDataModule:
     
     ## parameter dictionary
-    stuff = {'XTENSION':'BINTABLE'
-              'BITPIX':8
-              'NAXIS':2
-              'NAXIS1':## TODO: width
-              'NAXIS2':## TODO: rows
-              'PCOUNT':0
-              'GCOUNT':1
-              'TFIELDS':##TODO: num of fields
-              'TTYPE1':'OBJECT'
-              'TFORM1':'32A'
-              'TUNIT1':''
-              'TELESCOP':'NRAO_GBT'
-              'TTYPE2':
-              'TFORM2':
-              'TUNIT2':
-              'TTYPE3':
-              'TFORM3':
-              'TUNIT3':
-              'TTYPE4':
-              'TFORM4':
-              'TUNIT4':
-              'TTYPE5':
-              'TFORM5':
-              'TUNIT5':
-              'TTYPE6':
-              'TFORM6':
-              'TUNIT6':
-              'COMMENT':
-              'COMMENT':
-              'TTYPE7':
-              'TFORM7':
-              'TUNIT7':
-              'TTYPE8':
-              'TFORM8':
-              'TUNIT8':
-              'TTYPE9':
-              'TFORM9':
-              'TUNIT9':
-              'TTYPE10':
-              'TFORM10':
-              'TUNIT10':
-              'TTYPE11':
-              'TFORM11':
-              'TUNIT11':
-              'TTYPE12':
-              'TFORM12':
-              'TUNIT12':
-              'TTYPE13':
-              'TFORM13':
-              'TUNIT13':
-              'TTYPE14':
-              'TFORM14':
-              'TUNIT14':
-              'TTYPE15':
-              'TFORM15':
-              'TUNIT15':
-              'TTYPE16':
-              'TFORM16':
-    }
+    stuff = {'XTENSION':'BINTABLE',
+              'BITPIX':8,
+              'NAXIS':2,
+              'NAXIS1': '',## TODO: width
+              'NAXIS2': '',## TODO: rows
+              'PCOUNT':0,
+              'GCOUNT':1,
+              'TFIELDS':'',##TODO: num of fields
+              'TTYPE1':'OBJECT', ##TODO: comment
+              'TFORM1':'32A',
+              'TUNIT1':'',
+              'TELESCOP':'NRAO_GBT', ##TODO: comment
+              'TTYPE2': 'BANDWID', ##TODO: coment
+              'TFORM2':'1D',
+              'TUNIT2': 'Hz',
+              'TTYPE3': 'DATE-OBS', ##TODO: comment
+              'TFORM3': '22A',
+              'TUNIT3': '',
+              'TTYPE4': 'DURATION', ##TODO: comment
+              'TFORM4':'1D',
+              'TUNIT4': 's',
+              'TTYPE5': 'EXPOSURE', ##TODO: comment
+              'TFORM5': '1D',
+              'TUNIT5': 's', 
+              'TTYPE6': 'TSYS', ##TODO: comment
+              'TFORM6': '1D',
+              'TUNIT6': 'K',
+              'TTYPE7': 'DATA', ##TODO: comment
+              'TFORM7':'8192E', ##TODO: comment;define this
+              'TUNIT7':'', 
+              'TTYPE8':'', ##TODO: comment and find dimesions of data array
+              'TFORM8': '16A', 
+              'TUNIT8': '', 
+              'TTYPE9':'TUNIT7',
+              'TFORM9':'6A',
+              'TUNIT9':'',
+              'TTYPE10':'CTYPE1', ##TODO: comment
+              'TFORM10':'8A', 
+              'TUNIT10':'Hz',
+              'TTYPE11':'CRVAL1',
+              'TFORM11': '1D',
+              'TUNIT11': 'Hz',
+              'TTYPE12': 'CRPIX1',                
+              'TFORM12': '1D',
+              'TUNIT12':'',
+              'TTYPE13':' CDELT1',
+              'TFORM13': '1D',
+              'TUNIT13': 'Hz',
+              'TTYPE14':'CTYPE2', ##TODO: comment
+              'TFORM14': '4A', 
+              'TUNIT14': '',
+              'TTYPE15':'CRVAL2',
+              'TFORM15': '1D',
+              'TUNIT15': 'deg'
+              'TTYPE16': 'CTYPE3', ##TODO: comment
+              'TFORM16':'4A',
+              'TUNIT16':'',
+              'TTYPE17':'CRVAL3', 
+              'TFORM17':'1D',
+              'TUNIT17':'deg',
+              'CTYPE4':'STOKES', ##TODO: comment
+              'TTYPE18':'CRVAL4', 
+              'TFORM18':'1I'
+              'TUNIT18':'',
+              'TTYPE19':'OBSERVER',##TODO: comment; find this
+              'TFORM19':'32A',
+              'TUNIT19':'',
+              'TTYPE20':'OBSID', ##TODO comment; find this
+              'TFORM20':'32A', 
+              'TUNIT20':'',
+              'PROJID':'', ## TODO: comment; find this
+              'TTYPE21':'SCAN',##TODO: comment; find this
+              'TFORM21':'1J',
+              'TUNIT21':'',
+              'TTYPE22':'OBSMODE', ##TODO comment; find this
+              'TFORM22':'32A', 
+              'TUNIT22':'',
+              'TTYPE23':'FRONTEND', ##TODO comment; find this
+              'TFORM23':'16A'
+              'TUNIT23':
+              'BACKEND':'', ##TODO comment; define this 
+              'TTYPE24':'TCAL', ##TODO comment; find this
+              'TFORM24':'1E',
+              'TUNIT24':'K', 
+              'TTYPE25':'VELDEF', ##TODO comment; find this 
+              'TFORM25':'8A', 
+              'TUNIT25':'', 
+              'TTYPE26':'VFRAME', ## TODO coment; find this
+              'TFORM26':'1D', '
+              'TUNIT26':'m/s',
+              'TTYPE27':'RVSYS', ## TODO comment; find this 
+              'TFORM27':'1D',
+              'TUNIT27':'m/s', 
+              'TTYPE28':'OBSFREQ', ##TODO comment; find this
+              'TFORM28':'1D',
+              'TUNIT28':'Hz',
+              'TTYPE29':'LST', ##TODO comment; find this
+              'TFORM29':'1D',
+              'TUNIT29':'s',
+              'TTYPE30':'AZIMUTH', ##TODO comment; find this
+              'TFORM30':'1D',
+              'TUNIT30':'deg',
+              'TTYPE31':'ELEVATIO', ##TODO comment; find this
+              'TFORM31':'1D',
+              'TUNIT31':'deg',
+              'TTYPE32':'TAMBIENT', ##TODO comment; find this
+              'TFORM32':'1D,
+              'TUNIT32':'K', 
+              'TTYPE33':'PRESSURE', ## TODO comment; find this
+              'TFORM33':'1D'
+              'TUNIT33':'mmHg', 
+              'TTYPE34':'HUMIDITY', ## TODO comment; find this
+              'TFORM34':'1D',
+              'TUNIT34':'',
+              'SITELONG':'', ## find and define this
+              'SITELAT':'',## find and define this
+              'SITEELEV':'',## find and define this
+              'TTYPE35':'RESTFREQ', ##comment; find this
+              'TFORM35':'1D'
+              'TUNIT35':'Hz'
+              'TTYPE36':'FREQRES', ##comment; find this
+              'TFORM36':'1D'
+              'TUNIT36':'Hz'
+              
+              }
 
     def __init__(self):
         return
