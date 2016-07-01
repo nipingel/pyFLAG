@@ -5,13 +5,39 @@ This module (i.e. class) will collate the required metadata to construc the prim
 @author: npingel
 """
 from astropy.io import fits
+import glob
+import os 
 import numpy as np
 import datetime
+import collections
+
+
 
 class MetaDataModule:
-    
-    ## parameter dictionary
-    stuff = {'XTENSION':'BINTABLE',
+
+
+    def __init__(self,fitsList,numRows):
+        self.fitsList = fitsList
+        self.numRows = numRows
+        self.Column = collections.namedtuple('Column',['param','valueArr','comment'])
+        self.cols = None
+        
+        def getGOFITSParam(self,param):
+            os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/GO/') ##TODO: run on flag03 
+            goHDU = fits.open(self.fitsList[0])
+            value = goHDU[0].header[param]
+            valueArr = np.full([self.numRows],value,dtype='object')
+            comment = self.commentDict[param]
+            self.Column.param = param
+            self.Column.valueArr = valueArr
+            self.Column.comment = comment
+            
+                
+        self.commentDict = {'OBJECT':'name of observer(s)',
+                            '':''
+              }
+        ##Parameter Dictionary
+        self.keyToParamDict = {'XTENSION':'BINTABLE',
               'BITPIX':8,
               'NAXIS':2,
               'NAXIS1': '',## TODO: width
@@ -19,7 +45,7 @@ class MetaDataModule:
               'PCOUNT':0,
               'GCOUNT':1,
               'TFIELDS':'',##TODO: num of fields
-              'TTYPE1':'OBJECT', ##TODO: comment
+              'TTYPE1':getGOFITSParam(self,'OBJECT'), ##TODO: comment
               'TFORM1':'32A',
               'TUNIT1':'',
               'TELESCOP':'NRAO_GBT', ##TODO: comment
@@ -99,7 +125,7 @@ class MetaDataModule:
               'TFORM25':'8A', 
               'TUNIT25':'', 
               'TTYPE26':'VFRAME', ## TODO coment; find this
-              'TFORM26':'1D', '
+              'TFORM26':'1D',
               'TUNIT26':'m/s',
               'TTYPE27':'RVSYS', ## TODO comment; find this 
               'TFORM27':'1D',
@@ -117,10 +143,10 @@ class MetaDataModule:
               'TFORM31':'1D',
               'TUNIT31':'deg',
               'TTYPE32':'TAMBIENT', ##TODO comment; find this
-              'TFORM32':'1D,
+              'TFORM32':'1D',
               'TUNIT32':'K', 
               'TTYPE33':'PRESSURE', ## TODO comment; find this
-              'TFORM33':'1D'
+              'TFORM33':'1D',
               'TUNIT33':'mmHg', 
               'TTYPE34':'HUMIDITY', ## TODO comment; find this
               'TFORM34':'1D',
@@ -129,8 +155,8 @@ class MetaDataModule:
               'SITELAT':'',## find and define this
               'SITEELEV':'',## find and define this
               'TTYPE35':'RESTFREQ', ##TODO: comment; find this
-              'TFORM35':'1D'
-              'TUNIT35':'Hz'
+              'TFORM35':'1D',
+              'TUNIT35':'Hz',
               'TTYPE36':'FREQRES', ##TODO comment; find this
               'TFORM36':'1D',
               'TUNIT36':'Hz',
@@ -165,7 +191,7 @@ class MetaDataModule:
               'TUNIT47':'',
               'TTYPE48':'PROCSEQN', ##TODO:
               'TFORM48':'1I',
-              'TUNIT48':''
+              'TUNIT48':'',
               'TTYPE49':'PROCSIZE', ##TODO:
               'TFORM49':'1I',
               'TUNIT49':'',
@@ -179,8 +205,8 @@ class MetaDataModule:
               'TFORM52':'1J',
               'TUNIT52':'',
               'TTYPE53':'LASTOFF', ##TODO:
-              'TFORM53':'1J'
-              'TUNIT53':''
+              'TFORM53':'1J',
+              'TUNIT53':'',
               'TTYPE54':'TIMESTAMP', ##TODO:
               'TFORM54':'22A',
               'TUNIT54':'UTC', 
@@ -192,19 +218,19 @@ class MetaDataModule:
               'TUNIT56':'deg',
               'TTYPE57':'QD_BAD', ##TODO:
               'TFORM57':'1I',
-              'TUNIT57':''
+              'TUNIT57':'',
               'TTYPE58':'QD_METHOD', ##TODO:
               'TFORM58':'1A', 
               'TUNIT58':'',
-              'TTYPE59':'VELOCITY' ##TODO:
+              'TTYPE59':'VELOCITY', ##TODO:
               'TFORM59':'1D', 
-              'TUNIT59':'m/s'
+              'TUNIT59':'m/s',
               'TTYPE60':'ZEROCHAN', ##TODO:
               'TFORM60':'1E',
-              'TUNIT60':''
+              'TUNIT60':'',
               'TTYPE61':'DOPFREQ', ## TODO:
               'TFORM61':'1D', 
-              'TUNIT61':'Hz';, 
+              'TUNIT61':'Hz', 
               'TTYPE62':'SIG', ##TODO:
               'TFORM62':'1A', 
               'TUNIT62':'',
@@ -212,7 +238,7 @@ class MetaDataModule:
               'TFORM63':'1A',
               'TUNIT63':'',
               'TTYPE64':'CALTYPE', ##TODO:
-              'TFORM64':'8A'
+              'TFORM64':'8A',
               'TTYPE65':'TWARM', ##TODO:
               'TFORM65':'1E', 
               'TUNIT65':'K',
@@ -220,24 +246,20 @@ class MetaDataModule:
               'TFORM66':'1E',
               'TUNIT66':'K',
               'TTYPE67':'CALPOSITION', ##TODO: 
-              'TFORM67':'16A' 
+              'TFORM67':'16A' ,
               'TTYPE68':'IFNUM', ##TODO:
-              'TFORM68':'1I'
+              'TFORM68':'1I',
               'TTYPE69':'PLNUM', ##TODO:
-              'TFORM69':'1I'
+              'TFORM69':'1I',
               'TTYPE70':'FDNUM', ##TODO:
-              'TFORM70':'1I'
+              'TFORM70':'1I',
               'EXTNAME':'SINGLE DISH', ##TODO:
-              }
-
-    def __init__(self):
-        return
-    
+              }   
     ## returns scanLog binary table
     def readScanLog_Data(self):
         scanLogHduList = fits.open('ScanLog.fits')
-        return scanLogHduList[1].data
-    
+        return scanLogHduList[1].data            
+                    
     ## returns scanLog header
     def readScanLog_Header(self):
         scanLogHduList = fits.open('ScanLog.fits')
@@ -274,21 +296,33 @@ class MetaDataModule:
         return priHeader   
 
     def constuctBinTableHeader(self):    
+        
+        
+        
         binHeader = fits.Header()
         keywordList = np.loadtxt('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/sdKeywords.txt',dtype='bytes')
         keyWordArr = keywordList.astype(str)
-        
-        for keyIdx in range(0,len(keyWordArr)):
-            binHeader.set(keyWordArr[keyIdx],'BINTABLE', 'binary table extension')
-            binHeader.set(keyWordArr[])
+
         binHeader.set('BITPIX','BINTABLE', 'binary table extension')
-        binHeader.set('NAXIS1',2, '2-dimensional binary table')
-        ##TODO:Descriptive keywords about table properties: NAXIS1, NAXIS2, PCOUNT, GCOUNT, TFIELDS
+        binHeader.set('NAXIS',2, '2-dimensional binary table')
+        binHeader.set('NAXIS1',33362,'width of table in bytes') ##TODO: update
+        binHeader.set('PCOUNT',0,'size of special data area')
+        binHeader.set('NAXIS2',1664, 'number of rows in table') ##TODO: update
+        binHeader.set('GCOUNT',1,'one data group (required keyword)')
+        binHeader.set('TFIELDS',70,'number of fields in each row') ##TODO: update
         binHeader['COMMENT'] = 'Start of SDFITS CORE keywords/columns.'
         ##TODO:SDFITS CORE KEYWORDS
         for keyIdx in range(0,len(keyWordArr)):
-            binHeader.set(keyWordArr[keyIdx],'BINTABLE', 'binary table extension')
-            binHeader.set(keyWordArr[])
+            keyword = keyWordArr[keyIdx]
+            self.keyToParamDict[keyword]
+            if self.Column.comment == '':
+                form = 
+            col = fits.Column(name=self.Column.param,array=self.Column.valueArr)
+            if keyIdx == 0:
+                self.cols = fits.ColDefs([col])
+            else:
+                self.cols.add_col(col)
+            
         binHeader['COMMENT'] = 'End of SDFITS CORE keywords/columns.'
         binHeader['COMMENT'] = 'Start of SDFITS DATA column and descriptive axes.'
         ##TODO: SDFITS DATA KEYWORDS (including Beamformer specific)

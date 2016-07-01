@@ -52,11 +52,29 @@ def bankD(dataBuff,data,ints):
         endChan = startChan+5       
         dataBuff[ints,startChan:endChan] = data[i:i+5]
         endChan+=95   
-    
 
+##function to determine number of objects observed in session
+def numObjs():        
+    goFits = glob.glob('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/GO/*.fits') ##TODO: change to work on flag03/lustre
+    objList = []
+    fitsList = []
+    itr = 0.
+    for goName in goFits:
+       goHDU = fits.open(goName)
+       if itr == 0:
+           objList.append(goHDU[0].header['OBJECT'])
+           fitsList.append([])
+           fitsList[-1].append(goName[-24:])
+           itr+=1
+       else:
+           obj = goHDU[0].header['OBJECT']
+           if objList[-1] != obj:
+               objList.append(goHDU[0].header['OBJECT']) 
+               fitsList.append([])
+           fitsList[-1].extend([goName[-24:]])
+    return objList, fitsList
 def main():
     bf = BeamformingModule()
-    md = MetaDataModule()
     banks = {"A" : bankA,
              "B" : bankB,
              "C" : bankC,
@@ -66,7 +84,7 @@ def main():
     os.chdir(str(sys.argv[1]))    
     print('Changing working directory to: '+str(sys.argv[1]))
     print('Building Primary HDU...')
-    priHeader = md.contstructPriHDUHeader   
+    #priHeader = md.contstructPriHDUHeader   
     fitsNames = glob.glob('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/*.fits')
     cnt = 0
     for file in fitsNames:
@@ -81,8 +99,13 @@ def main():
             banks.get(bank)(dataBuff_X,xData[ints,:],ints)
             banks.get(bank)(dataBuff_Y,yData[ints,:],ints)
         cnt+=1
-        ##TODO:construct actual binTbl
-        md.constuctBinTable()
+    ##TODO:construct actual binTbl
+    ##Get objects observed and their corresponding GO FITS file names.
+    objList,fitsList = numObjs()
+    numRows=10512 ##TODO: update and how to figure this out during data processing? Basically number of integrations*numPol
+    for objs in range(0,len(objList)):
+        md = MetaDataModule(fitsList[objs],numRows)
+        md.constuctBinTableHeader()
         
     
         
