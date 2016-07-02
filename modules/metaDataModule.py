@@ -12,53 +12,59 @@ import datetime
 import collections
 
 
-
 class MetaDataModule:
+    
+        
 
-
-    def __init__(self,fitsList,numRows):
+    def __init__(self,fitsList,numInts):
         self.fitsList = fitsList
-        self.numRows = numRows
+        self.numInts = numInts
         self.Column = collections.namedtuple('Column',['param','valueArr','comment'])
         self.cols = None
+
+        def getSMKey(self,param):
+            comment = self.commentDict[param]
+            value = 'None'       
+            self.Column.param = param
+            self.Column.valueArr = valueArr
+            self.Column.comment = comment
+            
         
         def getGOFITSParam(self,param):
             os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/GO/') ##TODO: run on flag03 
-            goHDU = fits.open(self.fitsList[0])
-            value = goHDU[0].header[param]
-            valueArr = np.full([self.numRows],value,dtype='object')
+            valueArr = np.empty([self.numInts*len(self.fitsList)], dtype='object')           
+            for file in range(0,len(self.fitsList)):            
+                goHDU = fits.open(fitsList[file])
+                value = goHDU[0].header[param]
+                idx = 0
+                for i in range(0,self.numInts):
+                    valueArr[(idx*self.numInts)+i] = value
+                    
             comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
             self.Column.comment = comment
             
                 
-        self.commentDict = {'OBJECT':'name of observer(s)',
+        self.commentDict = {'OBJECT':'name of source observed',
+                            'OBSERVER':'name of observer(s)',                            
                             '':''
               }
         ##Parameter Dictionary
         self.keyToParamDict = {'XTENSION':'BINTABLE',
-              'BITPIX':8,
-              'NAXIS':2,
-              'NAXIS1': '',## TODO: width
-              'NAXIS2': '',## TODO: rows
-              'PCOUNT':0,
-              'GCOUNT':1,
-              'TFIELDS':'',##TODO: num of fields
-              'TTYPE1':getGOFITSParam(self,'OBJECT'), ##TODO: comment
+              'TTYPE1':getGOFITSParam(self,'OBJECT'),
               'TFORM1':'32A',
               'TUNIT1':'',
-              'TELESCOP':'NRAO_GBT', ##TODO: comment
-              'TTYPE2': 'BANDWID', ##TODO: coment
+              'TTYPE2': 'BANDWID', ##TODO: get from shared memory
               'TFORM2':'1D',
               'TUNIT2': 'Hz',
-              'TTYPE3': 'DATE-OBS', ##TODO: comment
+              'TTYPE3': 'DATE-OBS', ##TODO: get from shared memory (MJD)
               'TFORM3': '22A',
               'TUNIT3': '',
-              'TTYPE4': 'DURATION', ##TODO: comment
+              'TTYPE4': 'DURATION', ##TODO: get from shared memory
               'TFORM4':'1D',
               'TUNIT4': 's',
-              'TTYPE5': 'EXPOSURE', ##TODO: comment
+              'TTYPE5': 'EXPOSURE', ##TODO: get from shared memory
               'TFORM5': '1D',
               'TUNIT5': 's', 
               'TTYPE6': 'TSYS', ##TODO: comment
@@ -101,7 +107,7 @@ class MetaDataModule:
               'TTYPE18':'CRVAL4', 
               'TFORM18':'1I',
               'TUNIT18':'',
-              'TTYPE19':'OBSERVER',##TODO: comment; find this
+              'TTYPE19':getGOFITSParam(self,'OBSERVER'),##TODO: comment; find this
               'TFORM19':'32A',
               'TUNIT19':'',
               'TTYPE20':'OBSID', ##TODO comment; find this
@@ -313,15 +319,18 @@ class MetaDataModule:
         binHeader['COMMENT'] = 'Start of SDFITS CORE keywords/columns.'
         ##TODO:SDFITS CORE KEYWORDS
         for keyIdx in range(0,len(keyWordArr)):
-            keyword = keyWordArr[keyIdx]
+            keyword = keyWordArr[keyIdx]         
             self.keyToParamDict[keyword]
-            if self.Column.comment == '':
-                form = 
-            col = fits.Column(name=self.Column.param,array=self.Column.valueArr)
-            if keyIdx == 0:
-                self.cols = fits.ColDefs([col])
-            else:
-                self.cols.add_col(col)
+            if keyword[0:5] != 'TFORM' and keyword[0:5] != 'TUNIT':
+                formKey = keyWordArr[keyIdx+1]
+                unitKey = keyWordArr[keyIdx+2]
+                form = self.keyToParamDict[formKey]
+                unit = self.keyToParamDict[unitKey]
+                col = fits.Column(name=self.Column.param,format=form,array=self.Column.valueArr,unit=unit)    
+                if keyIdx == 0:
+                    self.cols = fits.ColDefs([col])
+                else:
+                    self.cols.add_col(col)
             
         binHeader['COMMENT'] = 'End of SDFITS CORE keywords/columns.'
         binHeader['COMMENT'] = 'Start of SDFITS DATA column and descriptive axes.'

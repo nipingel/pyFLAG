@@ -102,9 +102,9 @@ def main():
     ##TODO:construct actual binTbl
     ##Get objects observed and their corresponding GO FITS file names.
     objList,fitsList = numObjs()
-    numRows=10512 ##TODO: update and how to figure this out during data processing? Basically number of integrations*numPol
+    numInts=50 ##TODO: update and how to figure this out during data processing? Basically number of integrations*numPol
     for objs in range(0,len(objList)):
-        md = MetaDataModule(fitsList[objs],numRows)
+        md = MetaDataModule(fitsList[objs],numInts)
         md.constuctBinTableHeader()
         
     
