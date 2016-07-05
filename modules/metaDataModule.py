@@ -22,37 +22,64 @@ class MetaDataModule:
         self.Column = collections.namedtuple('Column',['param','valueArr','comment'])
         self.cols = None
 
-        def getSMKey(self,param):
+        def getSMKey(self,param): ##TODO: get actual shared memory values
             comment = self.commentDict[param]
-            value = 'None'       
+            value = 0.
             self.Column.param = param
+            valueArr = np.full([self.numInts*len(self.fitsList)],value)         
             self.Column.valueArr = valueArr
+            """
+            for file in range(0,len(self.fitsList)):            
+                HDU = fits.open(fitsList[file])
+                value = goHDU[0].header[param]
+                idx = 0
+                for i in range(0,self.numInts):
+                    valueArr[(idx*self.numInts)+i] = value
+            """
             self.Column.comment = comment
             
         
         def getGOFITSParam(self,param):
             os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/GO/') ##TODO: run on flag03 
-            valueArr = np.empty([self.numInts*len(self.fitsList)], dtype='object')           
+            valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')           
+            idx = 0            
             for file in range(0,len(self.fitsList)):            
                 goHDU = fits.open(fitsList[file])
                 value = goHDU[0].header[param]
-                idx = 0
                 for i in range(0,self.numInts):
                     valueArr[(idx*self.numInts)+i] = value
+                idx+=1
                     
             comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
             self.Column.comment = comment
             
+            
                 
         self.commentDict = {'OBJECT':'name of source observed',
                             'OBSERVER':'name of observer(s)',                            
-                            '':''
+                            'BANDWID':'bandwidth',
+                            'DATE-OBS':'date and time of observation start',
+                            'DURATION':'total integration duration in seconds',
+                            'EXPOSURE':'effective int time (excludes blanking) in secs',
+                            'OBSID':'observation description',
+                            'SCAN':'scan number',
+                            'RESTFRQ':'rest frequency at band center'
               }
+        self.funcDict = {'OBJECT':getGOFITSParam,
+                         'BANDWID':getSMKey,
+                         'DATE-OBS':getSMKey,
+                         'DURATION':getSMKey,
+                         'EXPOSURE':getSMKey,
+                         'OBSERVER':getGOFITSParam,
+                         'OBSID':getGOFITSParam,
+                         'SCAN':getGOFITSParam,
+                         'RESTFRQ':getGOFITSParam,
+                         }
         ##Parameter Dictionary
         self.keyToParamDict = {'XTENSION':'BINTABLE',
-              'TTYPE1':getGOFITSParam(self,'OBJECT'),
+              'TTYPE1':'OBJECT',
               'TFORM1':'32A',
               'TUNIT1':'',
               'TTYPE2': 'BANDWID', ##TODO: get from shared memory
@@ -107,17 +134,17 @@ class MetaDataModule:
               'TTYPE18':'CRVAL4', 
               'TFORM18':'1I',
               'TUNIT18':'',
-              'TTYPE19':getGOFITSParam(self,'OBSERVER'),##TODO: comment; find this
+              'TTYPE19':'OBSERVER',
               'TFORM19':'32A',
               'TUNIT19':'',
-              'TTYPE20':'OBSID', ##TODO comment; find this
+              'TTYPE20':'OBSID',
               'TFORM20':'32A', 
               'TUNIT20':'',
               'PROJID':'', ## TODO: comment; find this
-              'TTYPE21':'SCAN',##TODO: comment; find this
+              'TTYPE21':'SCAN',
               'TFORM21':'1J',
               'TUNIT21':'',
-              'TTYPE22':'OBSMODE', ##TODO comment; find this
+              'TTYPE22':'OBSMODE', ##TODO comment; depends if there is noise injection?
               'TFORM22':'32A', 
               'TUNIT22':'',
               'TTYPE23':'FRONTEND', ##TODO comment; find this
@@ -160,7 +187,7 @@ class MetaDataModule:
               'SITELONG':'', ## find and define this
               'SITELAT':'',## find and define this
               'SITEELEV':'',## find and define this
-              'TTYPE35':'RESTFREQ', ##TODO: comment; find this
+              'TTYPE35':'RESTFRQ',
               'TFORM35':'1D',
               'TUNIT35':'Hz',
               'TTYPE36':'FREQRES', ##TODO comment; find this
@@ -320,8 +347,10 @@ class MetaDataModule:
         ##TODO:SDFITS CORE KEYWORDS
         for keyIdx in range(0,len(keyWordArr)):
             keyword = keyWordArr[keyIdx]         
-            self.keyToParamDict[keyword]
             if keyword[0:5] != 'TFORM' and keyword[0:5] != 'TUNIT':
+                param = self.keyToParamDict[keyword]
+                self.funcDict[param](self,param)  
+                print(self.Column.valueArr)
                 formKey = keyWordArr[keyIdx+1]
                 unitKey = keyWordArr[keyIdx+2]
                 form = self.keyToParamDict[formKey]
