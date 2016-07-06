@@ -38,11 +38,15 @@ class MetaDataModule:
             """
             self.Column.comment = comment
             
-        
+        ##TODO: error handling (e.g. keyword not found)
         def getGOFITSParam(self,param):
             os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/GO/') ##TODO: run on flag03 
             valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')           
-            idx = 0            
+            idx = 0  
+            if param == 'TRGTLONG':
+                param = 'RA'
+            if param == 'TRGTLAT':
+                param = 'DEC'
             for file in range(0,len(self.fitsList)):            
                 goHDU = fits.open(fitsList[file])
                 value = goHDU[0].header[param]
@@ -56,26 +60,62 @@ class MetaDataModule:
             self.Column.comment = comment
             
             
-                
+        def getTsys(self,param):
+            valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')           
+            idx = 0
+            for file in range(0,len(self.fitsList)):            
+                for i in range(0,self.numInts):
+                    valueArr[(idx*self.numInts)+i] = 1.0
+                idx+=1
+                    
+            comment = self.commentDict[param]
+            self.Column.param = param
+            self.Column.valueArr = valueArr
+            self.Column.comment = comment
         self.commentDict = {'OBJECT':'name of source observed',
                             'OBSERVER':'name of observer(s)',                            
                             'BANDWID':'bandwidth',
                             'DATE-OBS':'date and time of observation start',
                             'DURATION':'total integration duration in seconds',
                             'EXPOSURE':'effective int time (excludes blanking) in secs',
+                            'TSYS':'system temperature in Kelvin',                            
                             'OBSID':'observation description',
                             'SCAN':'scan number',
-                            'RESTFRQ':'rest frequency at band center'
+                            'RESTFRQ':'rest frequency at band center',
+                            'EQUINOX':'equinox of selected coordinate reference frame',
+                            'RADESYS':'Equitorial coordinate system name',
+                            'TRGTLONG':'target longitude in coord. ref. frame',
+                            'TRGTLAT':'target latitude in coord. ref. frame',
+                            'PROCSEQN':'scan sequence number',
+                            'PROCSIZE':'number of scans in procedure',
+                            'PROCSCAN':'scan\'s role in the procedure',
+                            'PROCTYPE':'type of the procedure',
+                            'LASTON':'last \'on\' for position switching',
+                            'LASTOFF':'last \'off\' for position switching',
+                            'VELOCITY':'line velocity in rest frame'
+                            
               }
         self.funcDict = {'OBJECT':getGOFITSParam,
                          'BANDWID':getSMKey,
                          'DATE-OBS':getSMKey,
                          'DURATION':getSMKey,
                          'EXPOSURE':getSMKey,
+                         'TSYS':getTsys,
                          'OBSERVER':getGOFITSParam,
                          'OBSID':getGOFITSParam,
                          'SCAN':getGOFITSParam,
                          'RESTFRQ':getGOFITSParam,
+                         'EQUINOX':getGOFITSParam,
+                         'RADESYS':getGOFITSParam,
+                         'TRGTLONG':getGOFITSParam,
+                         'TRGTLAT':getGOFITSParam,
+                         'PROCSEQN':getGOFITSParam,
+                         'PROCSIZE':getGOFITSParam,
+                         'PROCSCAN':getGOFITSParam,
+                         'PROCTYPE':getGOFITSParam,
+                         'LASTON':getGOFITSParam,
+                         'LASTOFF':getGOFITSParam,
+                         'VELOCITY':getGOFITSParam,
                          }
         ##Parameter Dictionary
         self.keyToParamDict = {'XTENSION':'BINTABLE',
@@ -94,7 +134,7 @@ class MetaDataModule:
               'TTYPE5': 'EXPOSURE', ##TODO: get from shared memory
               'TFORM5': '1D',
               'TUNIT5': 's', 
-              'TTYPE6': 'TSYS', ##TODO: comment
+              'TTYPE6': 'TSYS', 
               'TFORM6': '1D',
               'TUNIT6': 'K',
               'TTYPE7': 'DATA', ##TODO: comment
@@ -103,7 +143,7 @@ class MetaDataModule:
               'TTYPE8':'', ##TODO: comment and find dimesions of data array
               'TFORM8': '16A', 
               'TUNIT8': '', 
-              'TTYPE9':'TUNIT7',
+              'TTYPE9':'TUNIT7', ##TODO: 
               'TFORM9':'6A',
               'TUNIT9':'',
               'TTYPE10':'CTYPE1', ##TODO: comment
@@ -193,12 +233,15 @@ class MetaDataModule:
               'TTYPE36':'FREQRES', ##TODO comment; find this
               'TFORM36':'1D',
               'TUNIT36':'Hz',
-              'TTYPE38':'RADESYS', ##TODO comment; find this. 
+              'TTYPE37':'EQUINOX',
+              'TFORM37':'1D',
+              'TUNIT37':'',
+              'TTYPE38':'RADESYS', 
               'TFORM38':'8A',
-              'TTYPE39':'TRGTLONG', ##TODO comment
+              'TTYPE39':'TRGTLONG',
               'TFORM39':'1D',
               'TUNIT39':'deg', 
-              'TTYPE40':'TRGTLAT', ##TODO comment
+              'TTYPE40':'TRGTLAT',
               'TFORM40':'1D',
               'TUNIT40':'deg',
               'TTYPE41':'SAMPLER', ##TODO comment
@@ -222,22 +265,22 @@ class MetaDataModule:
               'TTYPE47':'SIDEBAND', ##TODO:
               'TFORM47':'1A',
               'TUNIT47':'',
-              'TTYPE48':'PROCSEQN', ##TODO:
+              'TTYPE48':'PROCSEQN',
               'TFORM48':'1I',
               'TUNIT48':'',
-              'TTYPE49':'PROCSIZE', ##TODO:
+              'TTYPE49':'PROCSIZE',
               'TFORM49':'1I',
               'TUNIT49':'',
-              'TTYPE50':'PROCSCAN', ##TODO:
+              'TTYPE50':'PROCSCAN',
               'TFORM50':'16A',
               'TUNIT50':'',
-              'TTYPE51':'PROCTYPE', ##TODO:
+              'TTYPE51':'PROCTYPE',
               'TFORM51':'16A',
               'TUNIT51':'',
-              'TTYPE52':'LASTON', ##TODO:
+              'TTYPE52':'LASTON',
               'TFORM52':'1J',
               'TUNIT52':'',
-              'TTYPE53':'LASTOFF', ##TODO:
+              'TTYPE53':'LASTOFF',
               'TFORM53':'1J',
               'TUNIT53':'',
               'TTYPE54':'TIMESTAMP', ##TODO:
@@ -255,7 +298,7 @@ class MetaDataModule:
               'TTYPE58':'QD_METHOD', ##TODO:
               'TFORM58':'1A', 
               'TUNIT58':'',
-              'TTYPE59':'VELOCITY', ##TODO:
+              'TTYPE59':'VELOCITY',
               'TFORM59':'1D', 
               'TUNIT59':'m/s',
               'TTYPE60':'ZEROCHAN', ##TODO:
@@ -360,6 +403,7 @@ class MetaDataModule:
                     self.cols = fits.ColDefs([col])
                 else:
                     self.cols.add_col(col)
+        
             
         binHeader['COMMENT'] = 'End of SDFITS CORE keywords/columns.'
         binHeader['COMMENT'] = 'Start of SDFITS DATA column and descriptive axes.'
