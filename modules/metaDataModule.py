@@ -58,9 +58,50 @@ class MetaDataModule:
             self.Column.param = param
             self.Column.valueArr = valueArr
             self.Column.comment = comment
+        
+        def getAntFITSParam(self,param):
+            os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/Antenna/') ##TODO: run on flag03 
+            valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')           
+            idx = 0  
+            for file in range(0,len(self.fitsList)):            
+                goHDU = fits.open(fitsList[file])
+                if param == 'PRESSURE':
+                    param = 'AMBPRESS'
+                elif param == 'TAMBIENT':
+                    param = 'AMBTEMP'
+                elif param == 'HUMIDITY':
+                    param = 'AMBHUMID'
+                value = antHDU[0].header[param]
+                if param == 'PRESSURE':
+                    value=value*0.75006375541921                 
+                elif param == 'TAMBIENT':
+                    value+=273.0
+                for i in range(0,self.numInts):
+                    valueArr[(idx*self.numInts)+i] = value
+                idx+=1
+                    
+            comment = self.commentDict[param]
+            self.Column.param = param
+            self.Column.valueArr = valueArr
+            self.Column.comment = comment
             
-            
-        def getTsys(self,param):
+        def getRcvrFITSParam(self,param):
+            os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/Rcvr1_2/') ##TODO: run on flag03 
+            valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')           
+            idx = 0 
+            RcvrHDU = fits.open('2005_05_27_00:00:00.fits')
+            for file in range(0,len(self.fitsList)):            
+                value = RcvrHDU[0].header[param]               
+                for i in range(0,self.numInts):
+                    valueArr[(idx*self.numInts)+i] = value
+                idx+=1
+                    
+            comment = self.commentDict[param]
+            self.Column.param = param
+            self.Column.valueArr = valueArr
+            self.Column.comment = comment    
+       
+       def getTsys(self,param):
             valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')           
             idx = 0
             for file in range(0,len(self.fitsList)):            
@@ -92,7 +133,11 @@ class MetaDataModule:
                             'PROCTYPE':'type of the procedure',
                             'LASTON':'last \'on\' for position switching',
                             'LASTOFF':'last \'off\' for position switching',
-                            'VELOCITY':'line velocity in rest frame'
+                            'VELOCITY':'line velocity in rest frame',
+                            'FRONTEND':'frontend device',
+                            'TAMBIENT':'ambient temperature',
+                            'PRESSURE':'ambient pressure',
+                            'HUMIDITY':'relative humidity'
                             
               }
         self.funcDict = {'OBJECT':getGOFITSParam,
@@ -116,6 +161,10 @@ class MetaDataModule:
                          'LASTON':getGOFITSParam,
                          'LASTOFF':getGOFITSParam,
                          'VELOCITY':getGOFITSParam,
+                         'FRONTEND':getRcvrFITSParam,
+                         'TAMBIENT':getAntFITSParam,
+                         'PRESSURE':getAntFITSParam,
+                         'HUMIDITY':getAntFITSParam,
                          }
         ##Parameter Dictionary
         self.keyToParamDict = {'XTENSION':'BINTABLE',
@@ -187,7 +236,7 @@ class MetaDataModule:
               'TTYPE22':'OBSMODE', ##TODO comment; depends if there is noise injection?
               'TFORM22':'32A', 
               'TUNIT22':'',
-              'TTYPE23':'FRONTEND', ##TODO comment; find this
+              'TTYPE23':'FRONTEND',
               'TFORM23':'16A',
               'TUNIT23':'',
               'BACKEND':'', ##TODO comment; define this 
@@ -215,7 +264,7 @@ class MetaDataModule:
               'TTYPE31':'ELEVATIO', ##TODO comment; find this
               'TFORM31':'1D',
               'TUNIT31':'deg',
-              'TTYPE32':'TAMBIENT', ##TODO comment; find this
+              'TTYPE32':'TAMBIENT',
               'TFORM32':'1D',
               'TUNIT32':'K', 
               'TTYPE33':'PRESSURE', ## TODO comment; find this
