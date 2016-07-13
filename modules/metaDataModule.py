@@ -63,23 +63,52 @@ class MetaDataModule:
             os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/Antenna/') ##TODO: run on flag03 
             valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')           
             idx = 0  
+            valueIdx = 0            
+            repeat = True
             for file in range(0,len(self.fitsList)):            
-                goHDU = fits.open(fitsList[file])
-                if param == 'PRESSURE':
-                    param = 'AMBPRESS'
+                antHDU = fits.open(fitsList[file])
+                if param == 'DMJD':
+                    valueArr[(valueIdx*self.numInts):(valueIdx*self.numInts)+self.numInts] = antHdu[2].data['DMJD']
+                    repeat = False
+                elif param == 'AZIMUTH':
+                    ##TODO:interpolation?
+                    mntAz = antHDU[2].data['MNT_AZ']                    
+                    intSamples = int(len(mntAz)/self.numInts)  
+                    intCnt = 0
+                    for ints in range(0,len(mntAz),intSamples):
+                        azSamps = mntAz[ints:ints+intSamples]
+                        aveVal = np.mean(azSamps)
+                        valueArr[(valueIdx*self.numInts)+intCnt] = aveVal
+                        intCnt+=1
+                    repeat = False
+                elif param == 'ELEVATIO':
+                    ##TODO:interpolation?
+                    mntEl = antHDU[2].data['MNT_EL']                    
+                    intSamples = int(len(mntEl)/self.numInts)  
+                    intCnt = 0
+                    for ints in range(0,len(mntEl),intSamples):
+                        elSamps = mntEl[ints:ints+intSamples]
+                        aveVal = np.mean(elSamps)
+                        valueArr[(valueIdx*self.numInts)+intCnt] = aveVal
+                        intCnt+=1
+                    repeat = False
                 elif param == 'TAMBIENT':
                     param = 'AMBTEMP'
                 elif param == 'HUMIDITY':
                     param = 'AMBHUMID'
-                value = antHDU[0].header[param]
+                elif param == 'DATE-OBS':
+                    value = antHDU[0].header['DATE-OBS']
+                elif param == 'PRESSURE':
+                    value = antHDU[0].header['AMBPRESS']
                 if param == 'PRESSURE':
                     value=value*0.75006375541921                 
                 elif param == 'TAMBIENT':
                     value+=273.0
-                for i in range(0,self.numInts):
-                    valueArr[(idx*self.numInts)+i] = value
-                idx+=1
-                    
+                if repeat == 'True':
+                    for i in range(0,self.numInts):
+                        valueArr[(idx*self.numInts)+i] = value
+                        idx+=1
+                valueIdx+=1   
             comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
@@ -101,18 +130,14 @@ class MetaDataModule:
             self.Column.valueArr = valueArr
             self.Column.comment = comment    
        
-       def getTsys(self,param):
-            valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')           
-            idx = 0
-            for file in range(0,len(self.fitsList)):            
-                for i in range(0,self.numInts):
-                    valueArr[(idx*self.numInts)+i] = 1.0
-                idx+=1
-                    
+        def getTsys(self,param):
+            valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')           
+            valueArr.fill(1.0)
             comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
             self.Column.comment = comment
+        
         self.commentDict = {'OBJECT':'name of source observed',
                             'OBSERVER':'name of observer(s)',                            
                             'BANDWID':'bandwidth',
@@ -165,6 +190,7 @@ class MetaDataModule:
                          'TAMBIENT':getAntFITSParam,
                          'PRESSURE':getAntFITSParam,
                          'HUMIDITY':getAntFITSParam,
+                         'DATE-OBS':getAntFITSParam,
                          }
         ##Parameter Dictionary
         self.keyToParamDict = {'XTENSION':'BINTABLE',
@@ -258,24 +284,21 @@ class MetaDataModule:
               'TTYPE29':'LST', ##TODO comment; find this
               'TFORM29':'1D',
               'TUNIT29':'s',
-              'TTYPE30':'AZIMUTH', ##TODO comment; find this
+              'TTYPE30':'AZIMUTH',
               'TFORM30':'1D',
               'TUNIT30':'deg',
-              'TTYPE31':'ELEVATIO', ##TODO comment; find this
+              'TTYPE31':'ELEVATIO', 
               'TFORM31':'1D',
               'TUNIT31':'deg',
               'TTYPE32':'TAMBIENT',
               'TFORM32':'1D',
               'TUNIT32':'K', 
-              'TTYPE33':'PRESSURE', ## TODO comment; find this
+              'TTYPE33':'PRESSURE',
               'TFORM33':'1D',
               'TUNIT33':'mmHg', 
-              'TTYPE34':'HUMIDITY', ## TODO comment; find this
+              'TTYPE34':'HUMIDITY',
               'TFORM34':'1D',
               'TUNIT34':'',
-              'SITELONG':'', ## find and define this
-              'SITELAT':'',## find and define this
-              'SITEELEV':'',## find and define this
               'TTYPE35':'RESTFRQ',
               'TFORM35':'1D',
               'TUNIT35':'Hz',
@@ -467,6 +490,11 @@ class MetaDataModule:
         ##TODO: MORE GBT-SPECIFIC KEYWORDS
         binHeader['COMMENT'] = 'End of GBT-specific keywords/columns.'
         binHeader.set('EXTNAME','SINGLE DISH', 'name of this binary table extension')
+        
+        ##TODO:
+        #'SITELONG':getAntFits, ## find and define this
+        #'SITELAT':getAntFits,## find and define this
+        #'SITEELEV':getAntFits,## find and define this        
         return binHeader
     def constructBinTableData(self):
         return
