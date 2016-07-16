@@ -23,20 +23,22 @@ class MetaDataModule:
         self.cols = None
 
         def getSMKey(self,param): ##TODO: get actual shared memory values
-            comment = self.commentDict[param]
-            value = 0.
-            self.Column.param = param
-            valueArr = np.full([self.numInts*len(self.fitsList)],value)         
-            self.Column.valueArr = valueArr
-            """
+
+            valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')         
+            if param == 'DURATION':
+                param = 'SCANLEN'
+            elif param == 'EXPOSURE':
+                param = 'ACTSTI'
             for file in range(0,len(self.fitsList)):            
-                HDU = fits.open(fitsList[file])
-                value = goHDU[0].header[param]
+                corHDU = fits.open(fitsList[file])
+                value = corHDU[0].header[param]
                 idx = 0
                 for i in range(0,self.numInts):
                     valueArr[(idx*self.numInts)+i] = value
-            """
+            comment = self.commentDict[param]            
+            self.Column.param = param            
             self.Column.comment = comment
+            self.Column.valueArr = valueArr
             
         ##TODO: error handling (e.g. keyword not found)
         def getGOFITSParam(self,param):
@@ -45,11 +47,15 @@ class MetaDataModule:
             idx = 0  
             if param == 'TRGTLONG':
                 param = 'RA'
-            if param == 'TRGTLAT':
+            elif param == 'TRGTLAT':
                 param = 'DEC'
+                
             for file in range(0,len(self.fitsList)):            
-                goHDU = fits.open(fitsList[file])
+                goHDU = fits.open(fitsList[file])                
                 value = goHDU[0].header[param]
+                if param  == 'TIMESTAMP':
+                    valStr = fitsList[file]
+                    value = valStr[:-6] 
                 for i in range(0,self.numInts):
                     valueArr[(idx*self.numInts)+i] = value
                 idx+=1
@@ -96,8 +102,6 @@ class MetaDataModule:
                     param = 'AMBTEMP'
                 elif param == 'HUMIDITY':
                     param = 'AMBHUMID'
-                elif param == 'DATE-OBS':
-                    value = antHDU[0].header['DATE-OBS']
                 elif param == 'PRESSURE':
                     value = antHDU[0].header['AMBPRESS']
                 if param == 'PRESSURE':
@@ -130,9 +134,19 @@ class MetaDataModule:
             self.Column.valueArr = valueArr
             self.Column.comment = comment    
        
-        def getTsys(self,param):
-            valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')           
-            valueArr.fill(1.0)
+        def getArbParam(self,param):           
+            if param == 'TSYS':    
+                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')                
+                valueArr.fill(1.0)
+            elif param == 'ZEROCHAN' or param =='TWARM' or param =='TCOLD':
+                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')                
+                valueArr.fill(np.nan)
+            elif param == 'FDNUM' or param == 'IFNUM':
+                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='int16')                 
+                valueArr.fill(0.0)
+            elif param == 'SIG':
+                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s1')                
+                valueArr.fill('T')
             comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
@@ -162,15 +176,24 @@ class MetaDataModule:
                             'FRONTEND':'frontend device',
                             'TAMBIENT':'ambient temperature',
                             'PRESSURE':'ambient pressure',
-                            'HUMIDITY':'relative humidity'
+                            'HUMIDITY':'relative humidity',
+                            'TIMESTAMP':'date and time of scan start',
+                            'AZIMUTH':'azimuth',
+                            'ELEVATIO':'elevation',
+                            'ZEROCHAN':'zero channel',
+                            'SIG':'signal is true; reference is false',
+                            'TWARM':'4mm RX ambient load temp (K)',
+                            'TCOLD':'4mm RX ambient cold temp (K)',
+                            'FDNUM':'feed number',
+                            'IFNUM':'Spectral window (IF) number'
                             
               }
         self.funcDict = {'OBJECT':getGOFITSParam,
-                         'BANDWID':getSMKey,
+                        # 'BANDWID':getBW,
                          'DATE-OBS':getSMKey,
                          'DURATION':getSMKey,
                          'EXPOSURE':getSMKey,
-                         'TSYS':getTsys,
+                         'TSYS':getArbParam,
                          'OBSERVER':getGOFITSParam,
                          'OBSID':getGOFITSParam,
                          'SCAN':getGOFITSParam,
@@ -191,22 +214,31 @@ class MetaDataModule:
                          'PRESSURE':getAntFITSParam,
                          'HUMIDITY':getAntFITSParam,
                          'DATE-OBS':getAntFITSParam,
+                         'TIMESTAMP':getAntFITSParam,
+                         'AZIMUTH':getAntFITSParam,
+                         'ELEVATIO':getAntFITSParam,
+                         'ZEROCHAN':getArbParam,
+                         'SIG':getArbParam,
+                         'TWARM':getArbParam,
+                         'TCOLD':getArbParam,
+                         'FDNUM':getArbParam,
+                         'IFNUM':getArbParam
                          }
         ##Parameter Dictionary
         self.keyToParamDict = {'XTENSION':'BINTABLE',
               'TTYPE1':'OBJECT',
               'TFORM1':'32A',
               'TUNIT1':'',
-              'TTYPE2': 'BANDWID', ##TODO: get from shared memory
+              'TTYPE2': 'BANDWID', ##TODO: get from shared memory. BANDWID can be hardcoded based on COV/MODENAME
               'TFORM2':'1D',
               'TUNIT2': 'Hz',
-              'TTYPE3': 'DATE-OBS', ##TODO: get from shared memory (MJD)
+              'TTYPE3': 'DATE-OBS',
               'TFORM3': '22A',
               'TUNIT3': '',
-              'TTYPE4': 'DURATION', ##TODO: get from shared memory
+              'TTYPE4': 'DURATION',
               'TFORM4':'1D',
               'TUNIT4': 's',
-              'TTYPE5': 'EXPOSURE', ##TODO: get from shared memory
+              'TTYPE5': 'EXPOSURE',
               'TFORM5': '1D',
               'TUNIT5': 's', 
               'TTYPE6': 'TSYS', 
@@ -302,7 +334,7 @@ class MetaDataModule:
               'TTYPE35':'RESTFRQ',
               'TFORM35':'1D',
               'TUNIT35':'Hz',
-              'TTYPE36':'FREQRES', ##TODO comment; find this
+              'TTYPE36':'FREQRES', ##TODO hard code based on COVMODE/MODENAME
               'TFORM36':'1D',
               'TUNIT36':'Hz',
               'TTYPE37':'EQUINOX',
@@ -355,7 +387,7 @@ class MetaDataModule:
               'TTYPE53':'LASTOFF',
               'TFORM53':'1J',
               'TUNIT53':'',
-              'TTYPE54':'TIMESTAMP', ##TODO:
+              'TTYPE54':'TIMESTAMP',
               'TFORM54':'22A',
               'TUNIT54':'UTC', 
               'TTYPE55':'QD_XEL', ##TODO:
@@ -373,13 +405,13 @@ class MetaDataModule:
               'TTYPE59':'VELOCITY',
               'TFORM59':'1D', 
               'TUNIT59':'m/s',
-              'TTYPE60':'ZEROCHAN', ##TODO:
+              'TTYPE60':'ZEROCHAN',
               'TFORM60':'1E',
               'TUNIT60':'',
               'TTYPE61':'DOPFREQ', ## TODO:
               'TFORM61':'1D', 
               'TUNIT61':'Hz', 
-              'TTYPE62':'SIG', ##TODO:
+              'TTYPE62':'SIG',
               'TFORM62':'1A', 
               'TUNIT62':'',
               'TTYPE63':'CAL', ##TODO;
@@ -387,7 +419,7 @@ class MetaDataModule:
               'TUNIT63':'',
               'TTYPE64':'CALTYPE', ##TODO:
               'TFORM64':'8A',
-              'TTYPE65':'TWARM', ##TODO:
+              'TTYPE65':'TWARM',
               'TFORM65':'1E', 
               'TUNIT65':'K',
               'TTYPE66':'TCOLD',
@@ -395,11 +427,11 @@ class MetaDataModule:
               'TUNIT66':'K',
               'TTYPE67':'CALPOSITION', ##TODO: 
               'TFORM67':'16A' ,
-              'TTYPE68':'IFNUM', ##TODO:
+              'TTYPE68':'IFNUM',
               'TFORM68':'1I',
-              'TTYPE69':'PLNUM', ##TODO:
+              'TTYPE69':'PLNUM', ##TODO: XX=1; YY=0
               'TFORM69':'1I',
-              'TTYPE70':'FDNUM', ##TODO:
+              'TTYPE70':'FDNUM',
               'TFORM70':'1I',
               'EXTNAME':'SINGLE DISH', ##TODO:
               }   
