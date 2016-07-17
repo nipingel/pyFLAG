@@ -24,18 +24,32 @@ class BeamformingModule:
         return corrData
     ##TODO:
     ##What is the format of the weight files?        
-    def getWeights():
-        return    
+    def getWeights(self,numChans):
+        hdu = fits.open('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/Sim2Data/weight.fits')
+        xWeights = np.zeros([numChans,19,7], dtype='complex64') 
+        yWeights = np.zeros([numChans,19,7], dtype='complex64')  
+        for i in range(0,7):
+            polStr = 'X'
+            data = hdu[1].data['Beam'+np.str(i)+polStr]
+            offset = 0
+            for chan in range(0,numChans):
+                weightPairs = data[(offset*chan):(offset*chan)+38]                 
+                xWeights[chan,:,i].real = weightPairs[0:len(weightPairs):2]
+                xWeights[chan,:,i].imag = weightPairs[1:len(weightPairs):2]
+            polStr = 'Y'
+            data = hdu[1].data['Beam'+np.str(i)+polStr]
+            offset = 0
+            for chan in range(0,numChans):
+                weightPairs = data[(offset*chan):(offset*chan)+38]                 
+                yWeights[chan,:,i].real = weightPairs[0:len(weightPairs):2]
+                yWeights[chan,:,i].imag = weightPairs[1:len(weightPairs):2]
+        return xWeights,yWeights
     
-    def processPol(self,corrMatrix,pol):
+    def processPol(self,corrMatrix,pol,w):
         R = np.copy(corrMatrix[0:19, 0:19]) ##drop empty data stream
         Reval, Revec = np.linalg.eig(R)
         
-        aomega = Revec[:,Reval==max(Reval)] ##TODO: should this be here?
         
-        ##TODO:
-        ##where do we read weights from?
-        w = np.ones([19])
         spectrum = np.dot(w.conj().T,np.dot(R,w))
         return spectrum
         
@@ -90,7 +104,7 @@ class BeamformingModule:
         return xdat, ydat 
     
         
-    def getSpectralArray(self,fitsName):
+    def getSpectralArray(self,fitsName,beam):
         dataArr = self.getRawCorrelations(fitsName)
         dataVector=dataArr[0,:]
         corrCube = self.getCorrelationCube(dataVector)
@@ -98,6 +112,7 @@ class BeamformingModule:
         num_freq = corrShape[0] ##TODO: get from header?
         spectrumArr_X = np.zeros([len(dataArr[:,0]),num_freq], dtype='float32')    
         spectrumArr_Y = np.zeros([len(dataArr[:,0]),num_freq], dtype='float32') 
+        xWeight,yWeight = self.getWeights(num_freq)
         for ints in range(0,len(dataArr[:,0])):     
             dataVector=dataArr[ints,:]
             corrCube = self.getCorrelationCube(dataVector)
@@ -105,7 +120,7 @@ class BeamformingModule:
             for z in range(0,num_freq):
                 dat = corrCube[z,:,:]
                 xdat, ydat = self.unpackCorrelations(dat)
-                spectrumArr_X[ints,z] = self.processPol(xdat,0) ##0 is XX
-                spectrumArr_Y[ints,z] = self.processPol(ydat,1) ##1 is YY
+                spectrumArr_X[ints,z] = self.processPol(xdat,0,xWeight[z,:,beam]) ##0 is XX
+                spectrumArr_Y[ints,z] = self.processPol(ydat,1,yWeight[z,:,beam]) ##1 is YY
         return spectrumArr_X,spectrumArr_Y,ints+1
         

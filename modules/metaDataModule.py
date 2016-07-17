@@ -16,9 +16,11 @@ class MetaDataModule:
     
         
 
-    def __init__(self,fitsList,numInts):
+    def __init__(self,fitsList,numInts,dataBuff_X,dataBuff_Y):
         self.fitsList = fitsList
         self.numInts = numInts
+        self.dataBuff_X = dataBuff_X
+        self.dataBuff_Y= dataBuff_Y
         self.Column = collections.namedtuple('Column',['param','valueArr','comment'])
         self.cols = None
 
@@ -147,7 +149,21 @@ class MetaDataModule:
             elif param == 'SIG':
                 valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s1')                
                 valueArr.fill('T')
+            elif param == 'TUNIT7':
+                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s6')                
+                valueArr.fill('counts')
             comment = self.commentDict[param]
+            self.Column.param = param
+            self.Column.valueArr = valueArr
+            self.Column.comment = comment
+        
+        def getDataParam(self,param):
+            if param = 'TDIM7':
+                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')
+                numChans = np.float(len(self.dataBuff_X[0,:,0]))
+                valueArr.fill(numChans)
+            if param = 'DATA':
+                
             self.Column.param = param
             self.Column.valueArr = valueArr
             self.Column.comment = comment
@@ -185,7 +201,10 @@ class MetaDataModule:
                             'TWARM':'4mm RX ambient load temp (K)',
                             'TCOLD':'4mm RX ambient cold temp (K)',
                             'FDNUM':'feed number',
-                            'IFNUM':'Spectral window (IF) number'
+                            'IFNUM':'Spectral window (IF) number',
+                            'TUNIT7':'',
+                            'TDIM7':'data dimensions of the array',
+                            
                             
               }
         self.funcDict = {'OBJECT':getGOFITSParam,
@@ -222,7 +241,9 @@ class MetaDataModule:
                          'TWARM':getArbParam,
                          'TCOLD':getArbParam,
                          'FDNUM':getArbParam,
-                         'IFNUM':getArbParam
+                         'IFNUM':getArbParam,
+                         'TUNIT7':getArbParam,
+                         'TDIM7':getDataParam,
                          }
         ##Parameter Dictionary
         self.keyToParamDict = {'XTENSION':'BINTABLE',
@@ -247,10 +268,10 @@ class MetaDataModule:
               'TTYPE7': 'DATA', ##TODO: comment
               'TFORM7':'8192E', ##TODO: comment;define this
               'TUNIT7':'', 
-              'TTYPE8':'', ##TODO: comment and find dimesions of data array
+              'TTYPE8':'TDIM7',
               'TFORM8': '16A', 
               'TUNIT8': '', 
-              'TTYPE9':'TUNIT7', ##TODO: 
+              'TTYPE9':'TUNIT7', 
               'TFORM9':'6A',
               'TUNIT9':'',
               'TTYPE10':'CTYPE1', ##TODO: comment
