@@ -16,11 +16,12 @@ class MetaDataModule:
     
         
 
-    def __init__(self,fitsList,numInts,dataBuff_X,dataBuff_Y):
+    def __init__(self,fitsList,numInts,dataBuff_X,dataBuff_Y,beamNum):
         self.fitsList = fitsList
         self.numInts = numInts
         self.dataBuff_X = dataBuff_X
-        self.dataBuff_Y= dataBuff_Y
+        self.dataBuff_Y = dataBuff_Y
+        self.beamNum = beamNum 
         self.Column = collections.namedtuple('Column',['param','valueArr','comment'])
         self.cols = None
 
@@ -31,6 +32,8 @@ class MetaDataModule:
                 param = 'SCANLEN'
             elif param == 'EXPOSURE':
                 param = 'ACTSTI'
+            elif param == 'OBSMODE':
+                param = 'MODENAME'
             for file in range(0,len(self.fitsList)):            
                 corHDU = fits.open(fitsList[file])
                 value = corHDU[0].header[param]
@@ -50,8 +53,7 @@ class MetaDataModule:
             if param == 'TRGTLONG':
                 param = 'RA'
             elif param == 'TRGTLAT':
-                param = 'DEC'
-                
+                param = 'DEC'                                                                     
             for file in range(0,len(self.fitsList)):            
                 goHDU = fits.open(fitsList[file])                
                 value = goHDU[0].header[param]
@@ -76,7 +78,7 @@ class MetaDataModule:
             for file in range(0,len(self.fitsList)):            
                 antHDU = fits.open(fitsList[file])
                 if param == 'DMJD':
-                    valueArr[(valueIdx*self.numInts):(valueIdx*self.numInts)+self.numInts] = antHdu[2].data['DMJD']
+                    valueArr[(valueIdx*self.numInts):(valueIdx*self.numInts)+self.numInts] = antHDU[2].data['DMJD']
                     repeat = False
                 elif param == 'AZIMUTH':
                     ##TODO:interpolation?
@@ -137,7 +139,7 @@ class MetaDataModule:
             self.Column.comment = comment    
        
         def getArbParam(self,param):           
-            if param == 'TSYS':    
+            if param == 'TSYS' or param == 'TCAL':    
                 valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')                
                 valueArr.fill(1.0)
             elif param == 'ZEROCHAN' or param =='TWARM' or param =='TCOLD':
@@ -152,18 +154,43 @@ class MetaDataModule:
             elif param == 'TUNIT7':
                 valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s6')                
                 valueArr.fill('counts')
+            elif param == 'CTYPE1':
+                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s8')                
+                valueArr.fill('FREQ-OBS')
             comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
             self.Column.comment = comment
         
         def getDataParam(self,param):
-            if param = 'TDIM7':
+            if param == 'DATA':
+                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
+                valueArr[::2] = self.dataBuff_Y
+                valueArr[1::2] = self.dataBuff_X            
+            elif param == 'TDIM7':
                 valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')
                 numChans = np.float(len(self.dataBuff_X[0,:,0]))
                 valueArr.fill(numChans)
-            if param = 'DATA':
-                
+            elif param == 'PLNUM':
+                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='int16')
+                valueArr[::2] = 0
+                valueArr[1::2] = 1
+            comment = self.commentDict[param]
+            self.Column.param = param
+            self.Column.valueArr = valueArr
+            self.Column.comment = comment
+        def getLOParam(self,param):
+            if param == 'VELDEF':
+                valueArr = valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s8')
+            os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/LO1A/') ##TODO: run on flag3/GB
+            for file in range(0,len(self.fitsList)):            
+                loHDU = fits.open('2005_05_27_00:00:00.fits'                
+                value = loHDU[2].header[param]               
+                for i in range(0,self.numInts):
+                    valueArr[(idx*self.numInts)+i] = value
+                idx+=1
+                    
+            comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
             self.Column.comment = comment
@@ -204,6 +231,12 @@ class MetaDataModule:
                             'IFNUM':'Spectral window (IF) number',
                             'TUNIT7':'',
                             'TDIM7':'data dimensions of the array',
+                            'CTYPE1':'first data axis is frequency-like',
+                            'DATA':'actual data',
+                            'PLNUM':'Polarization number',
+                            'OBSMODE':'observing mode',
+                            'TCAL':'always 1.0',
+                            'VELDEF':'velocity definition and frame'
                             
                             
               }
@@ -244,6 +277,12 @@ class MetaDataModule:
                          'IFNUM':getArbParam,
                          'TUNIT7':getArbParam,
                          'TDIM7':getDataParam,
+                         'CTYPE1':getArbParam,
+                         'DATA':getDataParam,
+                         'PLNUM':getDataParam,
+                         'OBSMODE':getSMKey,
+                         'TCAL':getArbParam,
+                         'VELDEF':getLOFITSParam
                          }
         ##Parameter Dictionary
         self.keyToParamDict = {'XTENSION':'BINTABLE',
@@ -265,8 +304,8 @@ class MetaDataModule:
               'TTYPE6': 'TSYS', 
               'TFORM6': '1D',
               'TUNIT6': 'K',
-              'TTYPE7': 'DATA', ##TODO: comment
-              'TFORM7':'8192E', ##TODO: comment;define this
+              'TTYPE7': 'DATA', 
+              'TFORM7':'',
               'TUNIT7':'', 
               'TTYPE8':'TDIM7',
               'TFORM8': '16A', 
@@ -274,16 +313,16 @@ class MetaDataModule:
               'TTYPE9':'TUNIT7', 
               'TFORM9':'6A',
               'TUNIT9':'',
-              'TTYPE10':'CTYPE1', ##TODO: comment
+              'TTYPE10':'CTYPE1',
               'TFORM10':'8A', 
               'TUNIT10':'Hz',
-              'TTYPE11':'CRVAL1',
+              'TTYPE11':'CRVAL1',##TODO
               'TFORM11': '1D',
               'TUNIT11': 'Hz',
-              'TTYPE12': 'CRPIX1',                
+              'TTYPE12': 'CRPIX1',##TODO                
               'TFORM12': '1D',
               'TUNIT12':'',
-              'TTYPE13':' CDELT1',
+              'TTYPE13':' CDELT1', ##TODO
               'TFORM13': '1D',
               'TUNIT13': 'Hz',
               'TTYPE14':'CTYPE2', ##TODO: comment
@@ -308,21 +347,19 @@ class MetaDataModule:
               'TTYPE20':'OBSID',
               'TFORM20':'32A', 
               'TUNIT20':'',
-              'PROJID':'', ## TODO: comment; find this
               'TTYPE21':'SCAN',
               'TFORM21':'1J',
               'TUNIT21':'',
-              'TTYPE22':'OBSMODE', ##TODO comment; depends if there is noise injection?
+              'TTYPE22':'OBSMODE',
               'TFORM22':'32A', 
               'TUNIT22':'',
               'TTYPE23':'FRONTEND',
               'TFORM23':'16A',
               'TUNIT23':'',
-              'BACKEND':'', ##TODO comment; define this 
-              'TTYPE24':'TCAL', ##TODO comment; find this
+              'TTYPE24':'TCAL',
               'TFORM24':'1E',
               'TUNIT24':'K', 
-              'TTYPE25':'VELDEF', ##TODO comment; find this 
+              'TTYPE25':'VELDEF',
               'TFORM25':'8A', 
               'TUNIT25':'', 
               'TTYPE26':'VFRAME', ## TODO coment; find this
@@ -450,11 +487,10 @@ class MetaDataModule:
               'TFORM67':'16A' ,
               'TTYPE68':'IFNUM',
               'TFORM68':'1I',
-              'TTYPE69':'PLNUM', ##TODO: XX=1; YY=0
+              'TTYPE69':'PLNUM',
               'TFORM69':'1I',
               'TTYPE70':'FDNUM',
               'TFORM70':'1I',
-              'EXTNAME':'SINGLE DISH', ##TODO:
               }   
     ## returns scanLog binary table
     def readScanLog_Data(self):
@@ -522,6 +558,8 @@ class MetaDataModule:
                 formKey = keyWordArr[keyIdx+1]
                 unitKey = keyWordArr[keyIdx+2]
                 form = self.keyToParamDict[formKey]
+                if formKey == 'TFORM7':
+                    form = np.str(len(self.valueArr))+'E'
                 unit = self.keyToParamDict[unitKey]
                 col = fits.Column(name=self.Column.param,format=form,array=self.Column.valueArr,unit=unit)    
                 if keyIdx == 0:
@@ -541,6 +579,8 @@ class MetaDataModule:
         ##TODO: GBT-SPECIFIC KEYWORDS
         binHeader['COMMENT'] = 'Feed offsets ARE included in the CRVAL2 and CRVAL3 columns.'
         ##TODO: MORE GBT-SPECIFIC KEYWORDS
+        ## TODO: comment; find this 'PROJID'
+        ##TODO: 'BACKEND'
         binHeader['COMMENT'] = 'End of GBT-specific keywords/columns.'
         binHeader.set('EXTNAME','SINGLE DISH', 'name of this binary table extension')
         

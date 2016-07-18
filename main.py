@@ -22,35 +22,35 @@ numGPU = 2
 numTotalThreads = numGPU*2
 
 ##TODO:Extend sorting from 4 FITS files to 20 FITS files.
-def bankA(dataBuff,data,ints,beam):
+def bankA(dataBuff,data,ints):
     endChan = 0
     for i in range(0,25,5):
         startChan = endChan
         endChan = startChan+5       
-        dataBuff[ints,startChan:endChan,beam] = data[i:i+5]
+        dataBuff[ints,startChan:endChan] = data[i:i+5]
         endChan+=95
-def bankB(dataBuff,data,ints,beam):
+def bankB(dataBuff,data,ints):
     endChan = 5
     for i in range(0,25,5):
         startChan = endChan
         endChan = startChan+5       
-        dataBuff[ints,startChan:endChan,beam] = data[i:i+5]
+        dataBuff[ints,startChan:endChan] = data[i:i+5]
         endChan+=95
  
-def bankC(dataBuff,data,ints,beam):
+def bankC(dataBuff,data,ints):
     endChan = 10
     for i in range(0,25,5):
         startChan = endChan
         endChan = startChan+5       
-        dataBuff[ints,startChan:endChan,beam] = data[i:i+5]
+        dataBuff[ints,startChan:endChan] = data[i:i+5]
         endChan+=95 
  
-def bankD(dataBuff,data,ints,beam):
+def bankD(dataBuff,data,ints):
     endChan = 15
     for i in range(0,25,5):
         startChan = endChan
         endChan = startChan+5       
-        dataBuff[ints,startChan:endChan,beam] = data[i:i+5]
+        dataBuff[ints,startChan:endChan] = data[i:i+5]
         endChan+=95   
 
 ##function to determine number of objects observed in session
@@ -88,24 +88,30 @@ def main():
     fitsNames = glob.glob('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/*.fits')
     objList,fitsList = numObjs()    
     for objs in range(0,len(objList)):
-        cnt = 0
-        numInts =  10        
-        file = fitsList[objs]
-        numInts = 10 ##TODO: grab number of integrations from header?         
-        for beam in range(0,7):         
-            print('Beamforming correlations in: '+file[-25:]+', Beam: '+np.str(beam)) 
-            if cnt % numTotalThreads == 0:
-                dataBuff_X = np.zeros([numInts,25*20,7])   ##TODO: make mode independent  
-                dataBuff_Y = np.zeros([numInts,25*20,7])        
-            xData,yData,nints = bf.getSpectralArray(file,beam)
-            bank = file[-6]
-            bank = bank[0]##TODO: grab from header?        
-            for ints in range(0,nints):
-                banks.get(bank)(dataBuff_X,xData[ints,:],ints,beam)
-                banks.get(bank)(dataBuff_Y,yData[ints,:],ints,beam)
-        cnt+=1
-        md = MetaDataModule(fitsList[objs],numInts,dataBuff_X,dataBuff_Y)
-        md.constuctBinTableHeader()
+        numInts = 10 ##TODO: grab number of integrations from header?          
+        fileList = fitsList[objs]
+        for beam in range(0,7):
+            globalDataBuff_X = np.zeros([len(fileList[0]),numInts,25*20])
+            globalDataBuff_Y = np.zeros([len(fileList[0]),numInts,25*20]) 
+            cnt = 0
+            fileIdx = 0
+            for file in fileList:        
+                print('Beamforming correlations in: '+file[-25:]+', Beam: '+np.str(beam)) 
+                if cnt % numTotalThreads == 0:
+                    dataBuff_X = np.zeros([numInts,25*20])   ##TODO: make mode independent  
+                    dataBuff_Y = np.zeros([numInts,25*20])        
+                xData,yData,nints = bf.getSpectralArray(file,beam)
+                bank = file[-6]
+                bank = bank[0]##TODO: grab from header?        
+                for ints in range(0,nints):
+                    banks.get(bank)(dataBuff_X,xData[ints,:],ints)
+                    banks.get(bank)(dataBuff_Y,yData[ints,:],ints)
+                cnt+=1
+                fileIdx+=1
+                globalDataBuff_X[fileIdx,:,:] = dataBuff_X
+                globalDataBuff_Y[fileIdx,:,:] = dataBuff_Y
+            md = MetaDataModule(fitsList[objs],numInts,globalDataBuff_X,globalDataBuff_Y,beam)
+            md.constuctBinTableHeader()
         
     freqChans = np.linspace(1,500,500)
     
