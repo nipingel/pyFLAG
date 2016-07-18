@@ -148,7 +148,7 @@ class MetaDataModule:
             elif param == 'FDNUM' or param == 'IFNUM':
                 valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='int16')                 
                 valueArr.fill(0.0)
-            elif param == 'SIG':
+            elif param == 'SIG' or param == 'CAL' or param == 'CALTYPE':
                 valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s1')                
                 valueArr.fill('T')
             elif param == 'TUNIT7':
@@ -179,15 +179,27 @@ class MetaDataModule:
             self.Column.param = param
             self.Column.valueArr = valueArr
             self.Column.comment = comment
-        def getLOParam(self,param):
+        def getLOFITSParam(self,param):
+            repeat = True            
             if param == 'VELDEF':
-                valueArr = valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s8')
+                valueArr = valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')            
+                tblNum = 2
+            elif param == 'VFRAME' or param == 'RVSYS':
+                valueArr = valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')            
+                tblNum = 3
+                repeat == False
             os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/LO1A/') ##TODO: run on flag3/GB
+            idx=0            
             for file in range(0,len(self.fitsList)):            
-                loHDU = fits.open('2005_05_27_00:00:00.fits'                
-                value = loHDU[2].header[param]               
-                for i in range(0,self.numInts):
-                    valueArr[(idx*self.numInts)+i] = value
+                loHDU = fits.open(fitsList[file])       
+                if repeat == True:        
+                    value = loHDU[tblNum].header[param]
+                    valueArr.fill(value)                    
+                else:
+                    for i in range(0,self.numInts):
+                        valueCol = loHDU[tblNum].data[param]                       
+                        value = valueCol[len(valueCol)/2] ##get val corresponding to middle DMJD
+                        valueArr[(idx*self.numInts)+i] = value
                 idx+=1
                     
             comment = self.commentDict[param]
@@ -236,7 +248,13 @@ class MetaDataModule:
                             'PLNUM':'Polarization number',
                             'OBSMODE':'observing mode',
                             'TCAL':'always 1.0',
-                            'VELDEF':'velocity definition and frame'
+                            'VELDEF':'velocity definition and frame',
+                            'VFRAME':'radial velocity of the reference frame',
+                            'RVSYS':'radial velocity, Vsource - Vtelescope',
+                            'CAL':'No noise diode; always \'T\'',
+                            'CALTYPE':'No noise diode; always \'T\'',
+                            'CALPOSITION':'No noise diode; always \'T\''
+                            
                             
                             
               }
@@ -282,7 +300,12 @@ class MetaDataModule:
                          'PLNUM':getDataParam,
                          'OBSMODE':getSMKey,
                          'TCAL':getArbParam,
-                         'VELDEF':getLOFITSParam
+                         'VELDEF':getLOFITSParam,
+                         'VFRAME':getLOFITSParam,
+                         'VRSYS':getLOFITSParam,
+                         'CAL':getArbParam,
+                         'CALTYPE':getArbParam,
+                         'CALPOSITION':getArbParam,
                          }
         ##Parameter Dictionary
         self.keyToParamDict = {'XTENSION':'BINTABLE',
@@ -292,7 +315,7 @@ class MetaDataModule:
               'TTYPE2': 'BANDWID', ##TODO: get from shared memory. BANDWID can be hardcoded based on COV/MODENAME
               'TFORM2':'1D',
               'TUNIT2': 'Hz',
-              'TTYPE3': 'DATE-OBS',
+              'TTYPE3': 'DATE-OBS',##TODO: FIX SO PER INTEGRATION
               'TFORM3': '22A',
               'TUNIT3': '',
               'TTYPE4': 'DURATION',
@@ -362,10 +385,10 @@ class MetaDataModule:
               'TTYPE25':'VELDEF',
               'TFORM25':'8A', 
               'TUNIT25':'', 
-              'TTYPE26':'VFRAME', ## TODO coment; find this
+              'TTYPE26':'VFRAME',
               'TFORM26':'1D',
               'TUNIT26':'m/s',
-              'TTYPE27':'RVSYS', ## TODO comment; find this 
+              'TTYPE27':'RVSYS',
               'TFORM27':'1D',
               'TUNIT27':'m/s', 
               'TTYPE28':'OBSFREQ', ##TODO comment; find this
@@ -472,10 +495,10 @@ class MetaDataModule:
               'TTYPE62':'SIG',
               'TFORM62':'1A', 
               'TUNIT62':'',
-              'TTYPE63':'CAL', ##TODO;
+              'TTYPE63':'CAL',
               'TFORM63':'1A',
               'TUNIT63':'',
-              'TTYPE64':'CALTYPE', ##TODO:
+              'TTYPE64':'CALTYPE',
               'TFORM64':'8A',
               'TTYPE65':'TWARM',
               'TFORM65':'1E', 
@@ -483,7 +506,7 @@ class MetaDataModule:
               'TTYPE66':'TCOLD',
               'TFORM66':'1E',
               'TUNIT66':'K',
-              'TTYPE67':'CALPOSITION', ##TODO: 
+              'TTYPE67':'CALPOSITION',
               'TFORM67':'16A' ,
               'TTYPE68':'IFNUM',
               'TFORM68':'1I',
