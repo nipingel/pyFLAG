@@ -142,7 +142,13 @@ class MetaDataModule:
             if param == 'TSYS' or param == 'TCAL':    
                 valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')                
                 valueArr.fill(1.0)
-            elif param == 'ZEROCHAN' or param =='TWARM' or param =='TCOLD':
+            if param == 'BEAM':    
+                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')                
+                valueArr.fill(self.beamNum)
+            elif param == 'FEED' or 'SUBREF_STATE' or 'QD_BAD':    
+                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='int16')                
+                valueArr.fill(1)
+            elif param == 'ZEROCHAN' or param =='TWARM' or param =='TCOLD' or param == 'QD_XEL' or param == 'QD_EL':
                 valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')                
                 valueArr.fill(np.nan)
             elif param == 'FDNUM' or param == 'IFNUM':
@@ -151,12 +157,22 @@ class MetaDataModule:
             elif param == 'SIG' or param == 'CAL' or param == 'CALTYPE':
                 valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s1')                
                 valueArr.fill('T')
+            elif param == 'QD_METHOD':
+                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s1')                
+                valueArr.fill('C')
             elif param == 'TUNIT7':
                 valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s6')                
                 valueArr.fill('counts')
             elif param == 'CTYPE1':
                 valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s8')                
                 valueArr.fill('FREQ-OBS')
+            elif param == 'SRFEED':
+                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='int16')
+                valueArr.fill(0)
+            elif param == 'SIDEBAND':
+                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s1')
+                valueArr.fill('L')
+            
             comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
@@ -182,10 +198,10 @@ class MetaDataModule:
         def getLOFITSParam(self,param):
             repeat = True            
             if param == 'VELDEF':
-                valueArr = valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')            
+                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')            
                 tblNum = 2
             elif param == 'VFRAME' or param == 'RVSYS':
-                valueArr = valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')            
+                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')            
                 tblNum = 3
                 repeat == False
             os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/LO1A/') ##TODO: run on flag3/GB
@@ -201,11 +217,29 @@ class MetaDataModule:
                         value = valueCol[len(valueCol)/2] ##get val corresponding to middle DMJD
                         valueArr[(idx*self.numInts)+i] = value
                 idx+=1
-                    
+               
             comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
             self.Column.comment = comment
+        
+        def getBeamOffsets(self,param):
+            hdu = fits.open('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/Sim2Data/weight.fits')
+            if param == 'FEEDXOFF':
+                beamOff_Az = hdu[1].data['BeamOff_AZ']
+                value = beamOff_Az[self.beamName]
+            else:
+                beamOff_El = hdu[1].data['BeamOff_EL']
+                value = beamOff_El[self.beamName]
+            valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')
+            valueArr.fill(value)
+            
+            comment = self.commentDict[param]
+            self.Column.param = param
+            self.Column.valueArr = valueArr
+            self.Column.comment = comment
+                
+            
         
         self.commentDict = {'OBJECT':'name of source observed',
                             'OBSERVER':'name of observer(s)',                            
@@ -253,8 +287,18 @@ class MetaDataModule:
                             'RVSYS':'radial velocity, Vsource - Vtelescope',
                             'CAL':'No noise diode; always \'T\'',
                             'CALTYPE':'No noise diode; always \'T\'',
-                            'CALPOSITION':'No noise diode; always \'T\''
-                            
+                            'CALPOSITION':'No noise diode; always \'T\'',
+                            'FEED':'(signal) feed number; always 1 for PAF',
+                            'SAMPLER':'Sampler ID; always A1_0 for FLAG',
+                            'SRFEED':'reference feed number',
+                            'FEEDXOFF':'Beam Offset in crossEl from boresight [arcmin]',
+                            'FEEDEOFF':'Beam Offset in El from boresight [arcmin]',
+                            'SUBREF_STATE':'Subreflector position when nodding',
+                            'SIDEBAND':'Resulting sideband; Always L for PAF',
+                            'QD_XEL':'QuadrantDetector cross-elevation offset ',
+                            'QD_EL':'QuadrantDetector elevation offset',
+                            'QD_BAD':'QuadrantDetector flag: 0=good,1=bad',
+                            'QD_METHOD':'Quad. Det. method A,B,C. Blank indicates none.'
                             
                             
               }
@@ -306,6 +350,18 @@ class MetaDataModule:
                          'CAL':getArbParam,
                          'CALTYPE':getArbParam,
                          'CALPOSITION':getArbParam,
+                         'FEED':getArbParam,
+                         'SAMPLER':getArbParam,
+                         'SRFEED':getArbParam,
+                         'FEEDXOFF':getBeamOffsets,
+                         'FEEDEOFF':getBeamOffsets,
+                         'SUBREF_STATE':getArbParam,
+                         'SIDEBAND':getArbParam, 
+                         'QD_XEL':getArbParam,
+                         'QD_EL':getArbParam,
+                         'QD_BAD':getArbParam,
+                         'QD_METHOD':getArbParam
+                         
                          }
         ##Parameter Dictionary
         self.keyToParamDict = {'XTENSION':'BINTABLE',
@@ -429,25 +485,25 @@ class MetaDataModule:
               'TTYPE40':'TRGTLAT',
               'TFORM40':'1D',
               'TUNIT40':'deg',
-              'TTYPE41':'SAMPLER', ##TODO comment
+              'TTYPE41':'SAMPLER',
               'TFORM41':'12A',
-              'TUNIT41':'FEED', ##TODO comment  
-              'TTYPE42':'1I',
-              'TFORM42':'',
+              'TUNIT41':'',  
+              'TTYPE42':'FEED',
+              'TFORM42':'1I',
               'TUNIT42':'',
-              'TTYPE43':'SRFEED', ##TODO:
+              'TTYPE43':'SRFEED',
               'TFORM43':'1I',
               'TUNIT43':'',
-              'TTYPE44':'FEEDXOFF', ##TODO:
+              'TTYPE44':'FEEDXOFF', 
               'TFORM44':'1D',
               'TUNIT44':'deg',
-              'TTYPE45':'FEEDEOFF', ##TODO:
+              'TTYPE45':'FEEDEOFF', 
               'TFORM45': '1D',
               'TUNIT45':'deg',
-              'TTYPE46':'SUBREF_STATE', ##TODO:
+              'TTYPE46':'SUBREF_STATE', 
               'TFORM46':'1I',
               'TUNIT46':'',
-              'TTYPE47':'SIDEBAND', ##TODO:
+              'TTYPE47':'SIDEBAND',
               'TFORM47':'1A',
               'TUNIT47':'',
               'TTYPE48':'PROCSEQN',
@@ -471,16 +527,16 @@ class MetaDataModule:
               'TTYPE54':'TIMESTAMP',
               'TFORM54':'22A',
               'TUNIT54':'UTC', 
-              'TTYPE55':'QD_XEL', ##TODO:
+              'TTYPE55':'QD_XEL',
               'TFORM55':'1D',
               'TUNIT55':'deg',
-              'TTYPE56':'QD_EL', ##TODO:
+              'TTYPE56':'QD_EL', 
               'TFORM56':'1D',
               'TUNIT56':'deg',
-              'TTYPE57':'QD_BAD', ##TODO:
+              'TTYPE57':'QD_BAD',
               'TFORM57':'1I',
               'TUNIT57':'',
-              'TTYPE58':'QD_METHOD', ##TODO:
+              'TTYPE58':'QD_METHOD', 
               'TFORM58':'1A', 
               'TUNIT58':'',
               'TTYPE59':'VELOCITY',
@@ -558,7 +614,7 @@ class MetaDataModule:
     def constuctBinTableHeader(self):    
         
         
-        
+
         binHeader = fits.Header()
         keywordList = np.loadtxt('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/sdKeywords.txt',dtype='bytes')
         keyWordArr = keywordList.astype(str)
