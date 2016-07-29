@@ -195,15 +195,20 @@ class MetaDataModule:
             self.Column.param = param
             self.Column.valueArr = valueArr
             self.Column.comment = comment
+        
         def getLOFITSParam(self,param):
             repeat = True            
             if param == 'VELDEF':
-                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')            
+                valueArr = np.zeros([self.numInts*len(self.fitsList)],dtype='float32')            
                 tblNum = 2
             elif param == 'VFRAME' or param == 'RVSYS':
-                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')            
+                valueArr = np.zeros([self.numInts*len(self.fitsList)],dtype='float32')            
                 tblNum = 3
                 repeat == False
+            elif param == 'CRVAL1' or 'OBSFREQ':
+                valueArr = np.zeros([self.numInts*len(self.fitsList)],dtype='float32')
+                param = 'LO1FREQ'
+                tblNum = 3
             os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/LO1A/') ##TODO: run on flag3/GB
             idx=0            
             for file in range(0,len(self.fitsList)):            
@@ -298,12 +303,15 @@ class MetaDataModule:
                             'QD_XEL':'QuadrantDetector cross-elevation offset ',
                             'QD_EL':'QuadrantDetector elevation offset',
                             'QD_BAD':'QuadrantDetector flag: 0=good,1=bad',
-                            'QD_METHOD':'Quad. Det. method A,B,C. Blank indicates none.'
-                            
+                            'QD_METHOD':'Quad. Det. method A,B,C. Blank indicates none.',
+                            'CRVAL1':'',            
+                            'OBSFREQ':'observed center frequency'
                             
               }
         self.funcDict = {'OBJECT':getGOFITSParam,
                         # 'BANDWID':getBW,
+                         'CTYPE1':getArbParam,
+                         'CRVAL1':getLOFITSParam,
                          'DATE-OBS':getSMKey,
                          'DURATION':getSMKey,
                          'EXPOSURE':getSMKey,
@@ -339,13 +347,13 @@ class MetaDataModule:
                          'IFNUM':getArbParam,
                          'TUNIT7':getArbParam,
                          'TDIM7':getDataParam,
-                         'CTYPE1':getArbParam,
                          'DATA':getDataParam,
                          'PLNUM':getDataParam,
                          'OBSMODE':getSMKey,
                          'TCAL':getArbParam,
                          'VELDEF':getLOFITSParam,
                          'VFRAME':getLOFITSParam,
+                         'OBSFREQ':getLOFITSParam,
                          'VRSYS':getLOFITSParam,
                          'CAL':getArbParam,
                          'CALTYPE':getArbParam,
@@ -395,7 +403,7 @@ class MetaDataModule:
               'TTYPE10':'CTYPE1',
               'TFORM10':'8A', 
               'TUNIT10':'Hz',
-              'TTYPE11':'CRVAL1',##TODO
+              'TTYPE11':'CRVAL1',
               'TFORM11': '1D',
               'TUNIT11': 'Hz',
               'TTYPE12': 'CRPIX1',##TODO                
@@ -416,7 +424,6 @@ class MetaDataModule:
               'TTYPE17':'CRVAL3', 
               'TFORM17':'1D',
               'TUNIT17':'deg',
-              'CTYPE4':'STOKES', ##TODO: comment
               'TTYPE18':'CRVAL4', 
               'TFORM18':'1I',
               'TUNIT18':'',
@@ -447,7 +454,7 @@ class MetaDataModule:
               'TTYPE27':'RVSYS',
               'TFORM27':'1D',
               'TUNIT27':'m/s', 
-              'TTYPE28':'OBSFREQ', ##TODO comment; find this
+              'TTYPE28':'OBSFREQ',
               'TFORM28':'1D',
               'TUNIT28':'Hz',
               'TTYPE29':'LST', ##TODO comment; find this
@@ -659,6 +666,7 @@ class MetaDataModule:
         binHeader['COMMENT'] = 'Feed offsets ARE included in the CRVAL2 and CRVAL3 columns.'
         ##TODO: MORE GBT-SPECIFIC KEYWORDS
         ## TODO: comment; find this 'PROJID'
+        ##TODO: 'CTYPE4':'STOKES', ##TODO: comment
         ##TODO: 'BACKEND'
         binHeader['COMMENT'] = 'End of GBT-specific keywords/columns.'
         binHeader.set('EXTNAME','SINGLE DISH', 'name of this binary table extension')
