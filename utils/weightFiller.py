@@ -9,7 +9,7 @@ import struct
 import numpy as np
 from astropy.io import fits
 
-with open('/Users/npingel/Desktop/weights.bin', 'rb') as f:
+with open('/Users/npingel/Desktop/Research/FLAG/data/2016_07_25_04:32:35_xid3_weights.bin', 'rb') as f:
     data=f.read()
 ##array to hold weights
 weightArr = np.zeros([14,19*25*2],dtype='float32')
@@ -67,4 +67,4 @@ col16 = fits.Column(name='BeamOff_EL', format='1E', array=offSetArr[1,:])
 cols = fits.ColDefs([col1, col2,col3,col4,col5,col6,col7,col8,col9,col10,col11,col12,col13,col14,col15,col16])
 tbhdu = fits.new_table(cols)
 thdulist = fits.HDUList([prihdu, tbhdu])
-thdulist.writeto('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/weight.fits')
+thdulist.writeto('/Users/npingel/Desktop/Research/FLAG/data/2016_07_25_04:32:35_xid3_weights.fits')

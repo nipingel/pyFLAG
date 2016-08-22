@@ -5,6 +5,7 @@ This module (i.e. class) will collate the required metadata to construc the prim
 @author: npingel
 """
 from astropy.io import fits
+from astropy.time import Time
 import glob
 import os 
 import numpy as np
@@ -25,21 +26,42 @@ class MetaDataModule:
         self.Column = collections.namedtuple('Column',['param','valueArr','comment'])
         self.cols = None
 
-        def getSMKey(self,param): ##TODO: get actual shared memory values
+        def getSMKey(self,param,singleVal = False): ##TODO: get actual shared memory values
 
             valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')         
             if param == 'DURATION':
                 param = 'SCANLEN'
             elif param == 'EXPOSURE':
                 param = 'ACTSTI'
-            elif param == 'OBSMODE':
-                param = 'MODENAME'
-            for file in range(0,len(self.fitsList)):            
-                corHDU = fits.open(fitsList[file])
+            elif param == 'OBSMODE' and singleVal == True:
+                param = 'COVMODE'
+                corHDU = fits.open(fitsList[0])
                 value = corHDU[0].header[param]
-                idx = 0
-                for i in range(0,self.numInts):
-                    valueArr[(idx*self.numInts)+i] = value
+                return value
+            elif param == 'OBSMODE':
+                param = 'COVMODE'
+            elif param == 'LST':
+                param1 = 'DATE-OBS'
+                param2 = 'SCANLEN'
+                for file in range(0,len(self.fitsList)):            
+                    corHDU = fits.open(fitsList[file])
+                    dateTime = corHDU[0].header[param1]
+                    scanLen = corHDU[0].header[param2]
+                    dateTimeObj = Time(dateTime,format='isot',scale='utc')   
+                    scanLen = scanLen/(24*3600.)
+                    idx = 0
+                    newTime = scanLen+dateTimeObj.jd
+                    newTime = Time(newTime,format='isot', scale='utc')
+                    value = newTime.isot
+                    for i in range(0,self.numInts):
+                        valueArr[(idx*self.numInts)+i] = value
+            else:
+                for file in range(0,len(self.fitsList)):            
+                    corHDU = fits.open(fitsList[file])
+                    value = corHDU[0].header[param]
+                    idx = 0
+                    for i in range(0,self.numInts):
+                        valueArr[(idx*self.numInts)+i] = value
             comment = self.commentDict[param]            
             self.Column.param = param            
             self.Column.comment = comment
@@ -51,13 +73,31 @@ class MetaDataModule:
             valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')           
             idx = 0  
             if param == 'TRGTLONG':
-                param = 'RA'
+                paramLook = 'RA'
             elif param == 'TRGTLAT':
-                param = 'DEC'                                                                     
+                paramLook = 'DEC'           
+            elif param == 'CTYPE2' or param == 'CTYPE3':
+                paramLook = 'COORDSYS'
             for file in range(0,len(self.fitsList)):            
                 goHDU = fits.open(fitsList[file])                
-                value = goHDU[0].header[param]
-                if param  == 'TIMESTAMP':
+                value = goHDU[0].header[paramLook]
+                if value == 'GALACTIC' and param == 'CTYPE2':
+                    value = 'GLON'
+                elif value == 'GALACTIC' and param == 'CTYPE3':
+                    value = 'GLAT'
+                elif value == 'RADEC' and param == 'CTYPE2':
+                    value = 'RA'
+                elif value == 'RADEC' and param == 'CTYPE3':
+                    value = 'DEC'
+                elif value == 'HADEC' and param == 'CTYPE2':
+                    value = 'HA'
+                elif value == 'HADEC' and param == 'CTYPE3':
+                    value = 'DEC'
+                elif value == 'AZEL' and param == 'CTYPE2':
+                    value = 'AZ'
+                elif value == 'AZEL' and param == 'CTYPE3':
+                    value = 'EL'    
+                elif param  == 'TIMESTAMP':
                     valStr = fitsList[file]
                     value = valStr[:-6] 
                 for i in range(0,self.numInts):
@@ -139,7 +179,7 @@ class MetaDataModule:
             self.Column.comment = comment    
        
         def getArbParam(self,param):           
-            if param == 'TSYS' or param == 'TCAL':    
+            if param == 'TSYS' or param == 'TCAL' or param == 'DOPFREQ':    
                 valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')                
                 valueArr.fill(1.0)
             if param == 'BEAM':    
@@ -244,7 +284,32 @@ class MetaDataModule:
             self.Column.valueArr = valueArr
             self.Column.comment = comment
                 
-            
+        
+        def getModeDepParams(self,param):
+            if param == 'CDELT1' or param == 'FREQRES':
+                modeName = getSMKey(self,param,singleVal = True)
+                if modeName == 'PAF_CAL':
+                    value = 303.18*1000.
+                    valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')
+                    valueArr.fill(value)      
+            elif param == 'CRPIX1':
+                modeName = getSMKey(self,param,singleVal = True)
+                if modeName == 'PAF_CAL':
+                    value = 500/2.
+                    valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')
+                    valueArr.fill(value)  
+            elif param == 'BANDWID':
+                modeName = getSMKey(self,param,singleVal = True)
+                if modeName == 'PAF_CAL':
+                    value = 303.18*500*1000.
+                    valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')
+                    valueArr.fill(value) 
+            comment = self.commentDict[param]
+            self.Column.param = param
+            self.Column.valueArr = valueArr
+            self.Column.comment = comment
+                
+                
         
         self.commentDict = {'OBJECT':'name of source observed',
                             'OBSERVER':'name of observer(s)',                            
@@ -305,7 +370,13 @@ class MetaDataModule:
                             'QD_BAD':'QuadrantDetector flag: 0=good,1=bad',
                             'QD_METHOD':'Quad. Det. method A,B,C. Blank indicates none.',
                             'CRVAL1':'',            
-                            'OBSFREQ':'observed center frequency'
+                            'OBSFREQ':'observed center frequency', 
+                            'DOPFREQ':'Doppler tracked frequency', 
+                            'FREQRES':'frequency resolution', 
+                            'LST': 'local sidereal time (LST)', 
+                            'CTYPE2':'second axis is longitude-like',
+                            'CTYPE3': 'third axis is latitude-like',
+                            'BANDWID':'bandwidth'
                             
               }
         self.funcDict = {'OBJECT':getGOFITSParam,
@@ -335,7 +406,6 @@ class MetaDataModule:
                          'TAMBIENT':getAntFITSParam,
                          'PRESSURE':getAntFITSParam,
                          'HUMIDITY':getAntFITSParam,
-                         'DATE-OBS':getAntFITSParam,
                          'TIMESTAMP':getAntFITSParam,
                          'AZIMUTH':getAntFITSParam,
                          'ELEVATIO':getAntFITSParam,
@@ -368,15 +438,21 @@ class MetaDataModule:
                          'QD_XEL':getArbParam,
                          'QD_EL':getArbParam,
                          'QD_BAD':getArbParam,
-                         'QD_METHOD':getArbParam
-                         
+                         'QD_METHOD':getArbParam,
+                         'DOPFREQ':getArbParam, 
+                         'FREQRES':getModeDepParams, 
+                         'LST': getSMKey,
+                         'CTYPE2':getGOFITSParam,
+                         'CTYPE3':getGOFITSParam,
+                         'CRPIX1':getModeDepParams,
+                         'BANDWID':getModeDepParams
                          }
         ##Parameter Dictionary
         self.keyToParamDict = {'XTENSION':'BINTABLE',
               'TTYPE1':'OBJECT',
               'TFORM1':'32A',
               'TUNIT1':'',
-              'TTYPE2': 'BANDWID', ##TODO: get from shared memory. BANDWID can be hardcoded based on COV/MODENAME
+              'TTYPE2': 'BANDWID', ##TODO: finish with other modes
               'TFORM2':'1D',
               'TUNIT2': 'Hz',
               'TTYPE3': 'DATE-OBS',##TODO: FIX SO PER INTEGRATION
@@ -406,19 +482,19 @@ class MetaDataModule:
               'TTYPE11':'CRVAL1',
               'TFORM11': '1D',
               'TUNIT11': 'Hz',
-              'TTYPE12': 'CRPIX1',##TODO                
+              'TTYPE12': 'CRPIX1',             
               'TFORM12': '1D',
               'TUNIT12':'',
-              'TTYPE13':' CDELT1', ##TODO
+              'TTYPE13':' CDELT1',
               'TFORM13': '1D',
               'TUNIT13': 'Hz',
-              'TTYPE14':'CTYPE2', ##TODO: comment
+              'TTYPE14':'CTYPE2', 
               'TFORM14': '4A', 
               'TUNIT14': '',
               'TTYPE15':'CRVAL2',
               'TFORM15': '1D',
               'TUNIT15': 'deg',
-              'TTYPE16': 'CTYPE3', ##TODO: comment
+              'TTYPE16': 'CTYPE3', 
               'TFORM16':'4A',
               'TUNIT16':'',
               'TTYPE17':'CRVAL3', 
@@ -457,7 +533,7 @@ class MetaDataModule:
               'TTYPE28':'OBSFREQ',
               'TFORM28':'1D',
               'TUNIT28':'Hz',
-              'TTYPE29':'LST', ##TODO comment; find this
+              'TTYPE29':'LST',
               'TFORM29':'1D',
               'TUNIT29':'s',
               'TTYPE30':'AZIMUTH',
@@ -478,7 +554,7 @@ class MetaDataModule:
               'TTYPE35':'RESTFRQ',
               'TFORM35':'1D',
               'TUNIT35':'Hz',
-              'TTYPE36':'FREQRES', ##TODO hard code based on COVMODE/MODENAME
+              'TTYPE36':'FREQRES', ##TODO finish other COVMODES (Currently only PAF_CAL)
               'TFORM36':'1D',
               'TUNIT36':'Hz',
               'TTYPE37':'EQUINOX',
@@ -552,7 +628,7 @@ class MetaDataModule:
               'TTYPE60':'ZEROCHAN',
               'TFORM60':'1E',
               'TUNIT60':'',
-              'TTYPE61':'DOPFREQ', ## TODO:
+              'TTYPE61':'DOPFREQ', ## TODO only set to 0.0 for now; needs method for final production code. 
               'TFORM61':'1D', 
               'TUNIT61':'Hz', 
               'TTYPE62':'SIG',

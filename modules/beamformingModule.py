@@ -16,16 +16,15 @@ import glob
 class BeamformingModule:
     
     def __init__ (self):
-        return
+        self.mapVector = np.loadtxt('/Users/npingel/Desktop/Research/FLAG/pros/SpectralFiller/misc/gpuToNativeMap.dat', dtype='int')
     
     def getRawCorrelations(self,fitsName):
         hdu = fits.open(fitsName)
         corrData = hdu[1].data.field('DATA')
-        return corrData
-    ##TODO:
-    ##What is the format of the weight files?        
-    def getWeights(self,numChans):
-        hdu = fits.open('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/Sim2Data/weight.fits')
+        return corrData      
+    def getWeights(self,numChans,xid):
+        hdu = fits.open('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Weights/2016_07_25_04:32:35_xid'+np.str(xid)+'_weights.fits')
+        ##TODO: make above line more general        
         xWeights = np.zeros([numChans,19,7], dtype='complex64') 
         yWeights = np.zeros([numChans,19,7], dtype='complex64')  
         for i in range(0,7):
@@ -55,24 +54,32 @@ class BeamformingModule:
         
     
     def getCorrelationCube(self,dataVector):
-            num_chan = 40
+           ##Reorder to FISHIFITS
+           newDataVector= np.zeros([820*25], dtype='complex64') ##make mode dependent 
+           FITS_strt_idx = 0 
+           for i in range(0,52800,2112): ##make mode dependent
+               singleChanData = dataVector[i:i+2112]
+               for z in range(0,len(self.mapVector)):
+                   newDataVector[z+FITS_strt_idx] = singleChanData[self.mapVector[z]]
+               FITS_strt_idx+=820   
+           num_chan = 40
             # The data order in the 'cross_accum' buffer is ch1Xch1_freq1_real,
             # ch1Xch1_freq1_imag, ch1Xch2_freq1_real... ch1Xch20_freq1_imag,
             # ch2Xch1_freq1_real...ch2Xch20_freq1_imag, ch3Xch1_freq1_real...
             # ch1Xch1_freq2_real, ch1Xch1_freq2_imag...ch20Xch20_freq2_imag,
             # ch1Xch1_freq3_real...ch20Xch20_freqN_imag
           
-            num_cor = 820.
-            num_freq = len(dataVector) / num_cor
-            ret_dat = np.zeros([num_freq, num_chan, num_chan], dtype=np.complex64)
-            offset = 0
-            for row in range(num_chan) :
-                for col in range(row, num_chan) :
-                    ret_dat[:,row,col] = dataVector[offset::num_cor]
-                    if row != col :
-                        ret_dat[:,col,row] = dataVector[offset::num_cor].conj()
-                    offset += 1   
-            return ret_dat
+           num_cor = 820.
+           num_freq = len(newDataVector) / num_cor
+           ret_dat = np.zeros([num_freq, num_chan, num_chan], dtype=np.complex64)
+           offset = 0                
+           for col in range(num_chan) :
+               for row in range(col, num_chan) :
+                   ret_dat[:,row,col] = newDataVector[offset::num_cor]
+                   if row != col :
+                       ret_dat[:,col,row] = newDataVector[offset::num_cor].conj()
+                   offset += 1   
+           return ret_dat
     
     ## Put 1D correlation array into 20x20 matrix (element 20,20 irrelevant)
     def unpackCorrelations(self,dat):
@@ -102,9 +109,8 @@ class BeamformingModule:
              ydat[dipind2, dipind1] = dat[polind2, polind1]
     
         return xdat, ydat 
-    
         
-    def getSpectralArray(self,fitsName,beam):
+    def getSpectralArray(self,fitsName,beam,xid):
         dataArr = self.getRawCorrelations(fitsName)
         dataVector=dataArr[0,:]
         corrCube = self.getCorrelationCube(dataVector)
@@ -112,7 +118,7 @@ class BeamformingModule:
         num_freq = corrShape[0] ##TODO: get from header?
         spectrumArr_X = np.zeros([len(dataArr[:,0]),num_freq], dtype='float32')    
         spectrumArr_Y = np.zeros([len(dataArr[:,0]),num_freq], dtype='float32') 
-        xWeight,yWeight = self.getWeights(num_freq)
+        xWeight,yWeight = self.getWeights(num_freq,xid)
         for ints in range(0,len(dataArr[:,0])):     
             dataVector=dataArr[ints,:]
             corrCube = self.getCorrelationCube(dataVector)

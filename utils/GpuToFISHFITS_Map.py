@@ -13,8 +13,8 @@ from astropy.io import fits
 import matplotlib.pyplot as plt
 ###RAW OUTPUT
 print("reading in FITS")
-#hdu = fits.open('/Users/npingel/Desktop/Research/data/FLAG/simData/2016_07_25_02:37:42A_WhiteNoise.fits')
-hdu = fits.open('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_507/TGBT16A_507_01/data/2016_07_25_04:32:35A.fits')
+hdu = fits.open('/Users/npingel/Desktop/Research/data/FLAG/simData/2016_07_25_02:37:42A_WhiteNoise.fits')
+#hdu = fits.open('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_507/TGBT16A_507_01/data/2016_07_25_04:32:35A.fits')
 print("FITS read in")
 
 ##Get row
@@ -56,6 +56,8 @@ for row in range(0,40,2):
            subColOffset+=1
     colOffset+=1
 
+for i in range(0,40):
+    print(corrIdxMatrix[i,i].real)
 ##Now, we must append subsequent columns to get correct FISHFITS order (while decreasing the 
 ##column index each time to avoid redundant correlation pairs. 
 mapVector = []
@@ -88,8 +90,9 @@ R = corrMatrix+corrMatrix.conj().T-np.diag(corrMatrix)
 data= hdu[1].data['DATA']
 frstRow = data[:,2112]
 plt.figure()
-#plt.imshow(abs(R))
-plt.plot(frstRow)
+plt.imshow(abs(R))
+plt.colorbar()
+#plt.plot(frstRow)
 plt.show()
 
 """

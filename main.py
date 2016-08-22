@@ -55,7 +55,7 @@ def bankD(dataBuff,data,ints):
 
 ##function to determine number of objects observed in session
 def numObjs():        
-    goFits = glob.glob('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/GO/*.fits') ##TODO: change to work on flag03/lustre
+    goFits = glob.glob('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/GO/*.fits') ##TODO: change to work on flag03/lustre
     objList = []
     fitsList = []
     itr = 0.
@@ -85,14 +85,16 @@ def main():
     print('Changing working directory to: '+str(sys.argv[1]))
     print('Building Primary HDU...')
     #priHeader = md.contstructPriHDUHeader   
-    fitsNames = glob.glob('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/*.fits')
+    os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData/')
     objList,fitsList = numObjs()    
-    for objs in range(0,len(objList)):
-        numInts = 10 ##TODO: grab number of integrations from header?          
-        fileList = fitsList[objs]
+    ##TODO: put back in: for objs in range(0,len(objList)):
+    for objs in range(1,2):
+        numInts =4806 ##TODO: grab number of integrations from header?          
+        fileList = fitsList[objs]  
+        fileList = ['2016_07_29_10:46:06A.fits','2016_07_29_10:46:06B.fits','2016_07_29_10:46:06C.fits','2016_07_29_10:46:06D.fits'] ##TODO: make general
         for beam in range(0,7):
-            globalDataBuff_X = np.zeros([len(fileList[0]),numInts,25*20])
-            globalDataBuff_Y = np.zeros([len(fileList[0]),numInts,25*20]) 
+            globalDataBuff_X = np.zeros([len(fileList[0]),numInts,25*20]) ##TODO: make general based on CovMode
+            globalDataBuff_Y = np.zeros([len(fileList[0]),numInts,25*20]) ##TODO: make general based on CovMode
             cnt = 0
             fileIdx = 0
             for file in fileList:        
@@ -100,9 +102,17 @@ def main():
                 if cnt % numTotalThreads == 0:
                     dataBuff_X = np.zeros([numInts,25*20])   ##TODO: make mode independent  
                     dataBuff_Y = np.zeros([numInts,25*20])        
-                xData,yData,nints = bf.getSpectralArray(file,beam)
                 bank = file[-6]
-                bank = bank[0]##TODO: grab from header?        
+                bank = bank[0]##TODO: grab from header? 
+                if bank == 'A':
+                    xid = 0
+                elif bank == 'B':
+                    xid = 3
+                elif bank == 'C':
+                    xid = 1
+                elif bank == 'D':
+                    xid = 2
+                xData,yData,nints = bf.getSpectralArray(file,beam,xid)       
                 for ints in range(0,nints):
                     banks.get(bank)(dataBuff_X,xData[ints,:],ints)
                     banks.get(bank)(dataBuff_Y,yData[ints,:],ints)
