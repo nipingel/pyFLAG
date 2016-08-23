@@ -8,18 +8,19 @@ Created on Thu Jul  7 21:15:01 2016
 import struct
 import numpy as np
 from astropy.io import fits
+import matplotlib.pyplot as plt
 
 with open('/Users/npingel/Desktop/Research/FLAG/data/2016_07_25_04:32:35_xid3_weights.bin', 'rb') as f:
     data=f.read()
 ##array to hold weights
-weightArr = np.zeros([14,19*25*2],dtype='float32')
+weightArr = np.zeros([14,64*25*2],dtype='float32')
 ##bytes(float)*totalElements*freqChan*totBeam*pol*pair
 totBytes = 4*64*25*2*7*2
 bytesInBeam = 4*64*25*2
 for beam in range(0,14):
     weightIdx = 0
     for chunk in range(0,bytesInBeam,512):
-        for idx in range(0,152,4):
+        for idx in range(0,256,4):
             absIdx = (beam*bytesInBeam)+chunk+idx 
             weightArr[beam,weightIdx] = struct.unpack('f',data[absIdx:absIdx+4])[0]
             weightIdx+=1
@@ -35,6 +36,8 @@ charStartByte = 179200+(14*4)
 calibFilename = struct.unpack('64c',data[charStartByte:charStartByte+64])
 beamformMethod = struct.unpack('64c',data[charStartByte+64:charStartByte+128])
 xEngineID = struct.unpack('Q',data[-8:])[0]
+
+plt.plot(weightArr[7,:])
 
 ##Create FITS file
 prihdr = fits.Header()
