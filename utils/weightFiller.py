@@ -37,8 +37,6 @@ calibFilename = struct.unpack('64c',data[charStartByte:charStartByte+64])
 beamformMethod = struct.unpack('64c',data[charStartByte+64:charStartByte+128])
 xEngineID = struct.unpack('Q',data[-8:])[0]
 
-plt.plot(weightArr[7,:])
-
 ##Create FITS file
 prihdr = fits.Header()
 ##TODO: add header parameters
