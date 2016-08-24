@@ -8,9 +8,8 @@ Created on Thu Jul  7 21:15:01 2016
 import struct
 import numpy as np
 from astropy.io import fits
-import matplotlib.pyplot as plt
 
-with open('/Users/npingel/Desktop/Research/FLAG/data/2016_07_25_04:32:35_xid3_weights.bin', 'rb') as f:
+with open('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Weights/2016_07_25_04:32:35_xid3_weights.bin', 'rb') as f:
     data=f.read()
 ##array to hold weights
 weightArr = np.zeros([14,64*25*2],dtype='float32')
@@ -18,12 +17,11 @@ weightArr = np.zeros([14,64*25*2],dtype='float32')
 totBytes = 4*64*25*2*7*2
 bytesInBeam = 4*64*25*2
 for beam in range(0,14):
-    weightIdx = 0
-    for chunk in range(0,bytesInBeam,512):
-        for idx in range(0,256,4):
-            absIdx = (beam*bytesInBeam)+chunk+idx 
-            weightArr[beam,weightIdx] = struct.unpack('f',data[absIdx:absIdx+4])[0]
-            weightIdx+=1
+    weightIdx = 0 
+    for idx in range(0,bytesInBeam,4):
+        absIdx = (beam*bytesInBeam)+idx 
+        weightArr[beam,weightIdx] = struct.unpack('f',data[absIdx:absIdx+4])[0]
+        weightIdx+=1
 ##Metadata
 startByte = 179200
 offSetArr = np.zeros([2,7],dtype='float32')
@@ -68,4 +66,4 @@ col16 = fits.Column(name='BeamOff_EL', format='1E', array=offSetArr[1,:])
 cols = fits.ColDefs([col1, col2,col3,col4,col5,col6,col7,col8,col9,col10,col11,col12,col13,col14,col15,col16])
 tbhdu = fits.new_table(cols)
 thdulist = fits.HDUList([prihdu, tbhdu])
-thdulist.writeto('/Users/npingel/Desktop/Research/FLAG/data/2016_07_25_04:32:35_xid3_weights.fits')
+thdulist.writeto('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Weights/2016_07_25_04:32:35_xid3_weights.fits')

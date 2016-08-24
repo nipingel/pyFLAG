@@ -10,13 +10,21 @@ each individual beam
 ##imports
 from astropy.io import fits
 import numpy as np
-import os
-import glob
+import sys
 
 class BeamformingModule:
     
     def __init__ (self):
         self.mapVector = np.loadtxt('/Users/npingel/Desktop/Research/FLAG/pros/SpectralFiller/misc/gpuToNativeMap.dat', dtype='int')
+
+    def progressBar(self,value, endvalue, beam,bar_length=20):
+
+        percent = float(value) / endvalue
+        arrow = '-' * int(round(percent * bar_length)-1) + '>'
+        spaces = ' ' * (bar_length - len(arrow))
+
+        sys.stdout.write("\rPercent of integrations filled in beam "+np.str(beam)+": [{0}] {1}%".format(arrow + spaces, int(round(percent * 100))))
+        sys.stdout.flush()    
     
     def getRawCorrelations(self,fitsName):
         hdu = fits.open(fitsName)
@@ -25,30 +33,26 @@ class BeamformingModule:
     def getWeights(self,numChans,xid):
         hdu = fits.open('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Weights/2016_07_25_04:32:35_xid'+np.str(xid)+'_weights.fits')
         ##TODO: make above line more general        
-        xWeights = np.zeros([numChans,19,7], dtype='complex64') 
-        yWeights = np.zeros([numChans,19,7], dtype='complex64')  
+        xWeights = np.zeros([numChans,40,7], dtype='complex64') 
+        yWeights = np.zeros([numChans,40,7], dtype='complex64')  
         for i in range(0,7):
             polStr = 'X'
             data = hdu[1].data['Beam'+np.str(i)+polStr]
-            offset = 0
+            totalElemInChan = 64*2
             for chan in range(0,numChans):
-                weightPairs = data[(offset*chan):(offset*chan)+38]                 
+                weightPairs = data[(totalElemInChan*chan):(totalElemInChan*chan)+80]                 
                 xWeights[chan,:,i].real = weightPairs[0:len(weightPairs):2]
                 xWeights[chan,:,i].imag = weightPairs[1:len(weightPairs):2]
             polStr = 'Y'
             data = hdu[1].data['Beam'+np.str(i)+polStr]
-            offset = 0
             for chan in range(0,numChans):
-                weightPairs = data[(offset*chan):(offset*chan)+38]                 
+                weightPairs = data[(totalElemInChan*chan):(totalElemInChan*chan)+80]                 
                 yWeights[chan,:,i].real = weightPairs[0:len(weightPairs):2]
                 yWeights[chan,:,i].imag = weightPairs[1:len(weightPairs):2]
         return xWeights,yWeights
     
     def processPol(self,corrMatrix,pol,w):
-        R = np.copy(corrMatrix[0:19, 0:19]) ##drop empty data stream
-        Reval, Revec = np.linalg.eig(R)
-        
-        
+        R = corrMatrix
         spectrum = np.dot(w.conj().T,np.dot(R,w))
         return spectrum
         
@@ -62,15 +66,14 @@ class BeamformingModule:
                for z in range(0,len(self.mapVector)):
                    newDataVector[z+FITS_strt_idx] = singleChanData[self.mapVector[z]]
                FITS_strt_idx+=820   
-           num_chan = 40
             # The data order in the 'cross_accum' buffer is ch1Xch1_freq1_real,
             # ch1Xch1_freq1_imag, ch1Xch2_freq1_real... ch1Xch20_freq1_imag,
             # ch2Xch1_freq1_real...ch2Xch20_freq1_imag, ch3Xch1_freq1_real...
             # ch1Xch1_freq2_real, ch1Xch1_freq2_imag...ch20Xch20_freq2_imag,
             # ch1Xch1_freq3_real...ch20Xch20_freqN_imag
-          
-           num_cor = 820.
-           num_freq = len(newDataVector) / num_cor
+           num_chan = 40
+           num_cor = 820
+           num_freq = int(len(newDataVector) / num_cor)
            ret_dat = np.zeros([num_freq, num_chan, num_chan], dtype=np.complex64)
            offset = 0                
            for col in range(num_chan) :
@@ -81,8 +84,10 @@ class BeamformingModule:
                    offset += 1   
            return ret_dat
     
+    ##TODO:Remove?    
     ## Put 1D correlation array into 20x20 matrix (element 20,20 irrelevant)
     def unpackCorrelations(self,dat):
+        """        
         xpol = [0,1,4,5,8,9,12,13,16,17,20,21,24,25,28,29,32,33,36,37]
         xdip = [1,11,2,12,3,13,4,14,5,15,6,16,7,17,8,18,9,19,10,20]
      
@@ -107,7 +112,11 @@ class BeamformingModule:
              polind2 = ypol[cnt2]
              ydat[dipind1, dipind2] = dat[polind1, polind2]
              ydat[dipind2, dipind1] = dat[polind2, polind1]
-    
+        """
+        xdat = np.empty_like(dat[0:20,0:20])
+        ydat = np.empty_like(dat[0:20,0:20])
+        xdat = dat[0:19]
+        ydat = dat[20:39]
         return xdat, ydat 
         
     def getSpectralArray(self,fitsName,beam,xid):
@@ -119,14 +128,14 @@ class BeamformingModule:
         spectrumArr_X = np.zeros([len(dataArr[:,0]),num_freq], dtype='float32')    
         spectrumArr_Y = np.zeros([len(dataArr[:,0]),num_freq], dtype='float32') 
         xWeight,yWeight = self.getWeights(num_freq,xid)
-        for ints in range(0,len(dataArr[:,0])):     
+        for ints in range(0,len(dataArr[:,0])):   
+            self.progressBar(ints,len(dataArr[:,0]),beam)            
             dataVector=dataArr[ints,:]
             corrCube = self.getCorrelationCube(dataVector)
             corrShape = corrCube.shape
             for z in range(0,num_freq):
                 dat = corrCube[z,:,:]
-                xdat, ydat = self.unpackCorrelations(dat)
-                spectrumArr_X[ints,z] = self.processPol(xdat,0,xWeight[z,:,beam]) ##0 is XX
-                spectrumArr_Y[ints,z] = self.processPol(ydat,1,yWeight[z,:,beam]) ##1 is YY
-        return spectrumArr_X,spectrumArr_Y,ints+1
+                spectrumArr_X[ints,z] = np.real(self.processPol(dat,0,xWeight[z,:,beam])) ##0 is XX
+                spectrumArr_Y[ints,z] = np.real(self.processPol(dat,1,yWeight[z,:,beam])) ##1 is YY
+        return spectrumArr_X,spectrumArr_Y,ints+1 ##TODO: why return ints?
         

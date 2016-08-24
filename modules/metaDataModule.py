@@ -17,20 +17,22 @@ class MetaDataModule:
     
         
 
-    def __init__(self,fitsList,numInts,dataBuff_X,dataBuff_Y,beamNum):
+    def __init__(self,fitsList,numInts,dataBuff_X,dataBuff_Y,beamNum,intLen,numThreads):
         self.fitsList = fitsList
         self.numInts = numInts
         self.dataBuff_X = dataBuff_X
         self.dataBuff_Y = dataBuff_Y
         self.beamNum = beamNum 
+        self.intLen = intLen
+        self.numThreads = numThreads
         self.Column = collections.namedtuple('Column',['param','valueArr','comment'])
         self.cols = None
-
+##TODO: check to make sure len(fitsList) / numThreads = 1in all methods
         def getSMKey(self,param,singleVal = False): ##TODO: get actual shared memory values
 
-            valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')         
+            valueArr = np.empty([self.numInts*len(self.fitsList)/self.numThreads],dtype='object')         
             if param == 'DURATION':
-                param = 'SCANLEN'
+                param = 'REQSTI'
             elif param == 'EXPOSURE':
                 param = 'ACTSTI'
             elif param == 'OBSMODE' and singleVal == True:
@@ -39,29 +41,31 @@ class MetaDataModule:
                 value = corHDU[0].header[param]
                 return value
             elif param == 'OBSMODE':
-                param = 'COVMODE'
-            elif param == 'LST':
+                param = 'COVMODE'                    
+            elif param == 'LST' or param == 'DATE-OBS':
                 param1 = 'DATE-OBS'
-                param2 = 'SCANLEN'
-                for file in range(0,len(self.fitsList)):            
+                param2 = 'REQSTI'
+                for file in range(0,len(self.fitsList)/self.numThreads):            
                     corHDU = fits.open(fitsList[file])
                     dateTime = corHDU[0].header[param1]
-                    scanLen = corHDU[0].header[param2]
+                    intLen = corHDU[0].header[param2]
                     dateTimeObj = Time(dateTime,format='isot',scale='utc')   
-                    scanLen = scanLen/(24*3600.)
+                    intLen = intLen/(24*3600.)
                     idx = 0
-                    newTime = scanLen+dateTimeObj.jd
-                    newTime = Time(newTime,format='isot', scale='utc')
-                    value = newTime.isot
                     for i in range(0,self.numInts):
+                        newTime = ((idx*self.numInts)+i)*intLen+dateTimeObj.jd
+                        newTime = Time(newTime,format='isot', scale='utc')
+                        value = newTime.isot
                         valueArr[(idx*self.numInts)+i] = value
+                    idx+=1
             else:
-                for file in range(0,len(self.fitsList)):            
+                for file in range(0,len(self.fitsList)/self.numThreads):            
                     corHDU = fits.open(fitsList[file])
                     value = corHDU[0].header[param]
                     idx = 0
                     for i in range(0,self.numInts):
                         valueArr[(idx*self.numInts)+i] = value
+                    idx+=1
             comment = self.commentDict[param]            
             self.Column.param = param            
             self.Column.comment = comment
@@ -111,37 +115,76 @@ class MetaDataModule:
         
         def getAntFITSParam(self,param):
             os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/Antenna/') ##TODO: run on flag03 
-            valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')           
+            valueArr = np.empty([self.numInts*len(self.fitsList)/self.numThreads],dtype='object')           
             idx = 0  
             valueIdx = 0            
             repeat = True
-            for file in range(0,len(self.fitsList)):            
+            for file in range(0,len(self.fitsList)/self.numThreads):            
                 antHDU = fits.open(fitsList[file])
                 if param == 'DMJD':
                     valueArr[(valueIdx*self.numInts):(valueIdx*self.numInts)+self.numInts] = antHDU[2].data['DMJD']
                     repeat = False
+                elif param == 'CRVAL2':
+                    maj = antHDU[2].data['MAJOR']
+                    samplesPerInt = len(maj)/self.numInts
+                    remainder, integer = np.modf(samplesPerInt)
+                    skip = int(integer)
+                    intCnt = 0
+                    for i in range(0,len(maj),skip):
+                        firstSampBin = maj[i:(i+skip)]
+                        nextSampBin = maj[(i+skip):(i+skip)+skip]
+                        interpSamp = firstSampBin[-1]+(nextSampBin[0] - firstSampBin[-1])*remainder
+                        finalBin = np.hstack((firstSampBin,interpSamp))
+                        meanVal = np.mean(finalBin)
+                        valueArr[intCnt] = meanVal
+                        intCnt+=1
+                        repeat = False
+                elif param == 'CRVAL3':
+                    minor = antHDU[2].data['MINOR']
+                    samplesPerInt = len(minor)/self.numInts
+                    remainder, integer = np.modf(samplesPerInt)
+                    skip = int(integer)
+                    intCnt = 0
+                    for i in range(0,len(minor),skip):
+                        firstSampBin = minor[i:(i+skip)]
+                        nextSampBin = minor[(i+skip):(i+skip)+skip]
+                        interpSamp = firstSampBin[-1]+(nextSampBin[0] - firstSampBin[-1])*remainder
+                        finalBin = np.hstack((firstSampBin,interpSamp))
+                        meanVal = np.mean(finalBin)
+                        valueArr[intCnt] = meanVal
+                        intCnt+=1
+                        repeat = False
+                
                 elif param == 'AZIMUTH':
-                    ##TODO:interpolation?
-                    mntAz = antHDU[2].data['MNT_AZ']                    
-                    intSamples = int(len(mntAz)/self.numInts)  
+                    az = antHDU[2].data['MNT_AZ']
+                    samplesPerInt = len(az)/self.numInts
+                    remainder, integer = np.modf(samplesPerInt)
+                    skip = int(integer)
                     intCnt = 0
-                    for ints in range(0,len(mntAz),intSamples):
-                        azSamps = mntAz[ints:ints+intSamples]
-                        aveVal = np.mean(azSamps)
-                        valueArr[(valueIdx*self.numInts)+intCnt] = aveVal
+                    for i in range(0,len(az),skip):
+                        firstSampBin = az[i:(i+skip)]
+                        nextSampBin = az[(i+skip):(i+skip)+skip]
+                        interpSamp = firstSampBin[-1]+(nextSampBin[0] - firstSampBin[-1])*remainder
+                        finalBin = np.hstack((firstSampBin,interpSamp))
+                        meanVal = np.mean(finalBin)
+                        valueArr[intCnt] = meanVal
                         intCnt+=1
-                    repeat = False
+                        repeat = False
                 elif param == 'ELEVATIO':
-                    ##TODO:interpolation?
-                    mntEl = antHDU[2].data['MNT_EL']                    
-                    intSamples = int(len(mntEl)/self.numInts)  
+                    el = antHDU[2].data['MNT_EL']
+                    samplesPerInt = len(el)/self.numInts
+                    remainder, integer = np.modf(samplesPerInt)
+                    skip = int(integer)
                     intCnt = 0
-                    for ints in range(0,len(mntEl),intSamples):
-                        elSamps = mntEl[ints:ints+intSamples]
-                        aveVal = np.mean(elSamps)
-                        valueArr[(valueIdx*self.numInts)+intCnt] = aveVal
+                    for i in range(0,len(el),skip):
+                        firstSampBin = el[i:(i+skip)]
+                        nextSampBin = el[(i+skip):(i+skip)+skip]
+                        interpSamp = firstSampBin[-1]+(nextSampBin[0] - firstSampBin[-1])*remainder
+                        finalBin = np.hstack((firstSampBin,interpSamp))
+                        meanVal = np.mean(finalBin)
+                        valueArr[intCnt] = meanVal
                         intCnt+=1
-                    repeat = False
+                        repeat = False
                 elif param == 'TAMBIENT':
                     param = 'AMBTEMP'
                 elif param == 'HUMIDITY':
@@ -380,7 +423,6 @@ class MetaDataModule:
                             
               }
         self.funcDict = {'OBJECT':getGOFITSParam,
-                        # 'BANDWID':getBW,
                          'CTYPE1':getArbParam,
                          'CRVAL1':getLOFITSParam,
                          'DATE-OBS':getSMKey,
@@ -455,7 +497,7 @@ class MetaDataModule:
               'TTYPE2': 'BANDWID', ##TODO: finish with other modes
               'TFORM2':'1D',
               'TUNIT2': 'Hz',
-              'TTYPE3': 'DATE-OBS',##TODO: FIX SO PER INTEGRATION
+              'TTYPE3': 'DATE-OBS',
               'TFORM3': '22A',
               'TUNIT3': '',
               'TTYPE4': 'DURATION',
@@ -494,7 +536,7 @@ class MetaDataModule:
               'TTYPE15':'CRVAL2',
               'TFORM15': '1D',
               'TUNIT15': 'deg',
-              'TTYPE16': 'CTYPE3', 
+              'TTYPE16': 'CTYPE3',
               'TFORM16':'4A',
               'TUNIT16':'',
               'TTYPE17':'CRVAL3', 
@@ -533,7 +575,7 @@ class MetaDataModule:
               'TTYPE28':'OBSFREQ',
               'TFORM28':'1D',
               'TUNIT28':'Hz',
-              'TTYPE29':'LST',
+              'TTYPE29':'LST', ##TODO: FIX SO PER INTEGRATION AND ACTUALLY CONVERT TO LST!!
               'TFORM29':'1D',
               'TUNIT29':'s',
               'TTYPE30':'AZIMUTH',
@@ -716,7 +758,6 @@ class MetaDataModule:
             if keyword[0:5] != 'TFORM' and keyword[0:5] != 'TUNIT':
                 param = self.keyToParamDict[keyword]
                 self.funcDict[param](self,param)  
-                print(self.Column.valueArr)
                 formKey = keyWordArr[keyIdx+1]
                 unitKey = keyWordArr[keyIdx+2]
                 form = self.keyToParamDict[formKey]
