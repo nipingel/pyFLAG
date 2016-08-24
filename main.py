@@ -134,7 +134,7 @@ intLen = .25 ##seconds
 numInts = 4806
 globalDataBuff_Y = hdu[0].data
 fileList = ['2016_07_29_10:46:06A.fits','2016_07_29_10:46:06B.fits','2016_07_29_10:46:06C.fits','2016_07_29_10:46:06D.fits']
-md = MetaDataModule(fileList,numInts,globalDataBuff_X,globalDataBuff_Y,beam,intLen,numTotalThreads)
+md = MetaDataModule(fileList[0],numInts,globalDataBuff_X,globalDataBuff_Y,beam,intLen,numTotalThreads) ##TODO: slice list every numThread to select relevant FITS files
 md.constuctBinTableHeader()
 """    
     freqChans = np.linspace(1,500,500)

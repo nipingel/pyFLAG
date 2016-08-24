@@ -17,8 +17,12 @@ class MetaDataModule:
     
         
 
-    def __init__(self,fitsList,numInts,dataBuff_X,dataBuff_Y,beamNum,intLen,numThreads):
-        self.fitsList = fitsList
+    def __init__(self,fitsList,numInts,dataBuff_X,dataBuff_Y,beamNum,intLen,numThreads):        
+        self.fitsList = [fitsList]     
+        for i in range(0,len(self.fitsList)):
+            self.fitsList[i] = self.fitsList[i][:-7] + "4" + self.fitsList[i][-5:]           
+        print(self.fitsList)
+        ##TODO: remove for production
         self.numInts = numInts
         self.dataBuff_X = dataBuff_X
         self.dataBuff_Y = dataBuff_Y
@@ -27,6 +31,7 @@ class MetaDataModule:
         self.numThreads = numThreads
         self.Column = collections.namedtuple('Column',['param','valueArr','comment'])
         self.cols = None
+
 ##TODO: check to make sure len(fitsList) / numThreads = 1in all methods
         def getSMKey(self,param,singleVal = False): ##TODO: get actual shared memory values
 
@@ -73,22 +78,29 @@ class MetaDataModule:
             
         ##TODO: error handling (e.g. keyword not found)
         def getGOFITSParam(self,param):
-            os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/GO/') ##TODO: run on flag03 
-            valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')           
+            os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/GO') ##TODO: run on flag03          
             idx = 0  
+            valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object') 
+            repeat = True            
             if param == 'TRGTLONG':
                 paramLook = 'RA'
             elif param == 'TRGTLAT':
                 paramLook = 'DEC'           
             elif param == 'CTYPE2' or param == 'CTYPE3':
                 paramLook = 'COORDSYS'
+            else:
+                paramLook = param
             for file in range(0,len(self.fitsList)):            
-                goHDU = fits.open(fitsList[file])                
+                goHDU = fits.open(self.fitsList[file])                
                 value = goHDU[0].header[paramLook]
                 if value == 'GALACTIC' and param == 'CTYPE2':
-                    value = 'GLON'
+                    value = 'GLON'      
+                    valueArr.fill(value)
+                    repeat = False
                 elif value == 'GALACTIC' and param == 'CTYPE3':
                     value = 'GLAT'
+                    valueArr.fill(value)
+                    repeat = False
                 elif value == 'RADEC' and param == 'CTYPE2':
                     value = 'RA'
                 elif value == 'RADEC' and param == 'CTYPE3':
@@ -104,8 +116,9 @@ class MetaDataModule:
                 elif param  == 'TIMESTAMP':
                     valStr = fitsList[file]
                     value = valStr[:-6] 
-                for i in range(0,self.numInts):
-                    valueArr[(idx*self.numInts)+i] = value
+                elif repeat == True:
+                    for i in range(0,self.numInts):
+                        valueArr[(idx*self.numInts)+i] = value
                 idx+=1
                     
             comment = self.commentDict[param]
