@@ -24,6 +24,10 @@ class MetaDataModule:
         print(self.fitsList)
         ##TODO: remove above for production
         self.dataFitsList = dataFitsList
+        os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData') ##TODO: run on flag3
+        hdu = fits.open(dataFitsList[0])
+        dmjd = hdu[1].data['DMJD']
+        self.dmjd = dmjd
         self.numInts = numInts
         self.dataBuff_X = dataBuff_X
         self.dataBuff_Y = dataBuff_Y
@@ -37,18 +41,17 @@ class MetaDataModule:
 ##TODO: check to make sure len(fitsList) / numThreads = 1in all methods
         def getSMKey(self,param,singleVal = False): ##TODO: get actual shared memory values
             os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData') ##TODO: run on flag03
-            valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='object')    
             ##TODO: remove for production
             repeat = False
             if param == 'DURATION':
                 paramLook = 'REQSTI'
-                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')
+                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
                 repeat = True
             elif param == 'EXPOSURE':
-                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')
+                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
                 paramLook = 'ACTSTI'
                 repeat = True
-            elif param == 'OBSMODE' or param == 'BANDWID' or param == 'CRPIX1' and singleVal == True:
+            elif param == 'OBSMODE' or param == 'BANDWID' or param == 'CRPIX1' or param == 'CDELT1' and singleVal == True:
                 paramLook = 'COVMODE'
                 corHDU = fits.open(dataFitsList[0])
                 value = corHDU[0].header[paramLook]
@@ -61,21 +64,27 @@ class MetaDataModule:
                 for file in range(0,len(self.fitsList)):            
                     corHDU = fits.open(dataFitsList[file])
                     dateTime = corHDU[0].header[param1]
+                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(dateTime))
                     intLen = corHDU[0].header[param2]
                     dateTimeObj = Time(dateTime,format='isot',scale='utc')   
                     intLen = np.float(intLen)/(24*3600.)
                     idx = 0
-                    for i in range(0,self.numInts):
+                    for i in range(0,2*self.numInts,2):
                         newTime = ((idx*self.numInts)+i)*intLen+dateTimeObj.jd
                         newTime = Time(newTime,format='jd', scale='utc')
                         value = newTime.fits
                         value = value[:-9] ##drop erroneus digits
                         valueArr[(idx*self.numInts)+i] = value
+                        valueArr[(idx*self.numInts)+i+1] = value
                     idx+=1
             if repeat == True:
+                corHDU = fits.open(dataFitsList[file])
+                value = corHDU[0].header[paramLook]
+                valueArr[:] =   np.float(value)
                 for file in range(0,len(self.fitsList)):            
                     corHDU = fits.open(dataFitsList[file])
                     value = corHDU[0].header[paramLook]
+                    valueArr[:] =   np.float(value)           
                     idx = 0
                     for i in range(0,self.numInts):
                         valueArr[(idx*self.numInts)+i] = np.float(value)
@@ -88,8 +97,7 @@ class MetaDataModule:
         ##TODO: error handling (e.g. keyword not found)
         def getGOFITSParam(self,param):
             os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/GO') ##TODO: run on flag03          
-            idx = 0  
-            repeat = True            
+            idx = 0          
             if param == 'TRGTLONG':
                 paramLook = 'RA'
             elif param == 'TRGTLAT':
@@ -102,33 +110,43 @@ class MetaDataModule:
                 goHDU = fits.open(self.fitsList[file])                
                 value = goHDU[0].header[paramLook]
                 if value == 'GALACTIC' and param == 'CTYPE2':
-                    value = 'GLON'      
-                    valueArr.fill(value)
-                    repeat = False
+                    valStr = 'GLON'
+                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
                 elif value == 'GALACTIC' and param == 'CTYPE3':
-                    value = 'GLAT'
-                    valueArr.fill(value)
-                    repeat = False
+                    valStr = 'GLAT'
+                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
                 elif value == 'RADEC' and param == 'CTYPE2':
-                    value = 'RA'
+                    valStr = 'RA'
+                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
                 elif value == 'RADEC' and param == 'CTYPE3':
-                    value = 'DEC'
+                    valStr = 'DEC'
+                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
                 elif value == 'HADEC' and param == 'CTYPE2':
-                    value = 'HA'
+                    valStr = 'HA'
+                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
                 elif value == 'HADEC' and param == 'CTYPE3':
-                    value = 'DEC'
+                    valStr = 'DEC'
+                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
                 elif value == 'AZEL' and param == 'CTYPE2':
-                    value = 'AZ'
+                    valStr = 'AZ'
+                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
                 elif value == 'AZEL' and param == 'CTYPE3':
-                    value = 'EL'    
+                    valStr = 'EL'
+                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                 
                 elif param  == 'TIMESTAMP':
                     valStr = self.dataFitsList[file]
                     value = valStr[:-6] 
                 elif param =='OBJECT':
-                    valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='a32') 
-                elif repeat == True:
-                    for i in range(0,self.numInts):
-                        valueArr[(idx*self.numInts)+i] = value
+                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(value))                
+                elif param == 'OBSERVER':
+                    valStr = value
+                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
+                elif param == 'OBSID':
+                    valStr = 'unknown'
+                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
+                    valueArr[:] = valStr
+                valueArr[(idx*self.numInts):(idx*self.numInts)+self.numInts:2] = value
+                valueArr[(idx*self.numInts)+1:(idx*self.numInts)+self.numInts:2] = value
                 idx+=1
                     
             comment = self.commentDict[param]
@@ -137,77 +155,44 @@ class MetaDataModule:
             self.Column.comment = comment
         
         def getAntFITSParam(self,param):
-            os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/Antenna/') ##TODO: run on flag03 
-            valueArr = np.empty([self.numInts*len(self.fitsList)/self.numThreads],dtype='object')           
+            os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Antenna') ##TODO: run on flag03         
             idx = 0  
             valueIdx = 0            
             repeat = True
-            for file in range(0,len(self.fitsList)/self.numThreads):            
-                antHDU = fits.open(fitsList[file])
+            for file in range(0,len(self.fitsList)):            
+                antHDU = fits.open(self.fitsList[file])
+                antDMJD = antHDU[2].data['DMJD']
                 if param == 'DMJD':
                     valueArr[(valueIdx*self.numInts):(valueIdx*self.numInts)+self.numInts] = antHDU[2].data['DMJD']
                     repeat = False
                 elif param == 'CRVAL2':
+                    valueArr = np.empty([self.numInts*2*len(self.fitsList)],dtype='float32') 
                     maj = antHDU[2].data['MAJOR']
-                    samplesPerInt = len(maj)/self.numInts
-                    remainder, integer = np.modf(samplesPerInt)
-                    skip = int(integer)
-                    intCnt = 0
-                    for i in range(0,len(maj),skip):
-                        firstSampBin = maj[i:(i+skip)]
-                        nextSampBin = maj[(i+skip):(i+skip)+skip]
-                        interpSamp = firstSampBin[-1]+(nextSampBin[0] - firstSampBin[-1])*remainder
-                        finalBin = np.hstack((firstSampBin,interpSamp))
-                        meanVal = np.mean(finalBin)
-                        valueArr[intCnt] = meanVal
-                        intCnt+=1
-                        repeat = False
+                    majInterp = np.interp(self.dmjd,antDMJD,maj)
+                    valueArr[0::2] = majInterp
+                    valueArr[1::2] = majInterp
+                    repeat = False
                 elif param == 'CRVAL3':
+                    valueArr = np.empty([self.numInts*2*len(self.fitsList)],dtype='float32') 
                     minor = antHDU[2].data['MINOR']
-                    samplesPerInt = len(minor)/self.numInts
-                    remainder, integer = np.modf(samplesPerInt)
-                    skip = int(integer)
-                    intCnt = 0
-                    for i in range(0,len(minor),skip):
-                        firstSampBin = minor[i:(i+skip)]
-                        nextSampBin = minor[(i+skip):(i+skip)+skip]
-                        interpSamp = firstSampBin[-1]+(nextSampBin[0] - firstSampBin[-1])*remainder
-                        finalBin = np.hstack((firstSampBin,interpSamp))
-                        meanVal = np.mean(finalBin)
-                        valueArr[intCnt] = meanVal
-                        intCnt+=1
-                        repeat = False
-                
+                    minorInterp = np.interp(self.dmjd,antDMJD,minor)
+                    valueArr[0::2] = minorInterp
+                    valueArr[1::2] = minorInterp
+                    repeat = False
                 elif param == 'AZIMUTH':
-                    az = antHDU[2].data['MNT_AZ']
-                    samplesPerInt = len(az)/self.numInts
-                    remainder, integer = np.modf(samplesPerInt)
-                    skip = int(integer)
-                    intCnt = 0
-                    for i in range(0,len(az),skip):
-                        firstSampBin = az[i:(i+skip)]
-                        nextSampBin = az[(i+skip):(i+skip)+skip]
-                        interpSamp = firstSampBin[-1]+(nextSampBin[0] - firstSampBin[-1])*remainder
-                        finalBin = np.hstack((firstSampBin,interpSamp))
-                        meanVal = np.mean(finalBin)
-                        valueArr[intCnt] = meanVal
-                        intCnt+=1
-                        repeat = False
+                    valueArr = np.empty([self.numInts*2*len(self.fitsList)],dtype='float32') 
+                    az = antHDU[2].data['AZIMUTH']
+                    azInterp = np.interp(self.dmjd,antDMJD,az)
+                    valueArr[0::2] = azInterp
+                    valueArr[1::2] = azInterp
+                    repeat = False
                 elif param == 'ELEVATIO':
-                    el = antHDU[2].data['MNT_EL']
-                    samplesPerInt = len(el)/self.numInts
-                    remainder, integer = np.modf(samplesPerInt)
-                    skip = int(integer)
-                    intCnt = 0
-                    for i in range(0,len(el),skip):
-                        firstSampBin = el[i:(i+skip)]
-                        nextSampBin = el[(i+skip):(i+skip)+skip]
-                        interpSamp = firstSampBin[-1]+(nextSampBin[0] - firstSampBin[-1])*remainder
-                        finalBin = np.hstack((firstSampBin,interpSamp))
-                        meanVal = np.mean(finalBin)
-                        valueArr[intCnt] = meanVal
-                        intCnt+=1
-                        repeat = False
+                    valueArr = np.empty([self.numInts*2*len(self.fitsList)],dtype='float32') 
+                    el = antHDU[2].data['AZIMUTH']
+                    elInterp = np.interp(self.dmjd,antDMJD,el)
+                    valueArr[0::2] = elInterp
+                    valueArr[1::2] = elInterp
+                    repeat = False
                 elif param == 'TAMBIENT':
                     param = 'AMBTEMP'
                 elif param == 'HUMIDITY':
@@ -246,25 +231,25 @@ class MetaDataModule:
        
         def getArbParam(self,param):           
             if param == 'TSYS' or param == 'TCAL' or param == 'DOPFREQ':    
-                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')                
+                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')                
                 valueArr.fill(1.0)
             elif param == 'BEAM':    
                 valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')                
                 valueArr.fill(self.beamNum)
-            elif param == 'FEED' or param == 'SUBREF_STATE' or param == 'QD_BAD':    
-                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='int16')                
+            elif param == 'FEED' or param == 'SUBREF_STATE' or param == 'QD_BAD' or param == 'CRVAL4':    
+                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='int16')                
                 valueArr.fill(1)
             elif param == 'ZEROCHAN' or param =='TWARM' or param =='TCOLD' or param == 'QD_XEL' or param == 'QD_EL':
-                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')                
+                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')                
                 valueArr.fill(np.nan)
             elif param == 'FDNUM' or param == 'IFNUM':
-                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='int16')                 
+                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='int16')                 
                 valueArr.fill(0.0)
             elif param == 'SIG' or param == 'CAL' or param == 'CALTYPE':
-                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s1')                
+                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='s1')                
                 valueArr.fill('T')
             elif param == 'QD_METHOD':
-                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='s1')                
+                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='s1')                
                 valueArr.fill('C')
             elif param == 'TUNIT7':
                 valStr = 'counts'
@@ -372,8 +357,13 @@ class MetaDataModule:
                 modeName = getSMKey(self,param,singleVal = True)
                 if modeName == 'PAF_CAL':
                     value = 303.18*500*1000.
-                    valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')
-                    valueArr.fill(value) 
+                    valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
+            idx = 0
+            for file in range(0,len(self.fitsList)):
+                valueArr[(idx*self.numInts):(idx*self.numInts)+self.numInts:2] = value
+                valueArr[(idx*self.numInts)+1:(idx*self.numInts)+self.numInts:2] = value
+                idx+=1
+                    
             comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
@@ -448,7 +438,11 @@ class MetaDataModule:
                             'CTYPE3': 'third axis is latitude-like',
                             'BANDWID':'bandwidth',
                             'CRVAL1':'',
-                            'CRPIX1':''
+                            'CRPIX1':'',
+                            'CDELT1':'',
+                            'CRVAL2':'',
+                            'CRVAL3':'',
+                            'CRVAL4':''
                             
               }
         self.funcDict = {'OBJECT':getGOFITSParam,
@@ -516,7 +510,11 @@ class MetaDataModule:
                          'CTYPE2':getGOFITSParam,
                          'CTYPE3':getGOFITSParam,
                          'CRPIX1':getModeDepParams,
-                         'BANDWID':getModeDepParams
+                         'CDELT1':getModeDepParams,
+                         'BANDWID':getModeDepParams,
+                         'CRVAL2':getAntFITSParam,
+                         'CRVAL3':getAntFITSParam,
+                         'CRVAL4':getArbParam
                          }
         ##Parameter Dictionary
         self.keyToParamDict = {'XTENSION':'BINTABLE',
@@ -786,7 +784,7 @@ class MetaDataModule:
             keyword = keyWordArr[keyIdx]         
             if keyword[0:5] != 'TFORM' and keyword[0:5] != 'TUNIT':
                 param = self.keyToParamDict[keyword]
-                self.funcDict[param](self,param)  
+                self.funcDict[param.strip()](self,param.strip())  
                 formKey = keyWordArr[keyIdx+1]
                 unitKey = keyWordArr[keyIdx+2]
                 form = self.keyToParamDict[formKey]
