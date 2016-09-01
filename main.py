@@ -81,17 +81,17 @@ def main():
              "D" : xid2,
              }
 ##TODO: include intLen parameter
-"""
 ## change working directory to project dir assumed to be first and only command-line argument. 
+    pwd = os.getcwd()
     os.chdir(str(sys.argv[1]))    
     print('Changing working directory to: '+str(sys.argv[1]))
-    print('Building Primary HDU...')
-    #priHeader = md.contstructPriHDUHeader   
-    os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData/')
+    print('Building Primary HDU...')  
+    #os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData/') 
     objList,fitsList = numObjs()    
     ##TODO: put back in: for objs in range(0,len(objList)):
     for objs in range(1,2):
-        numInts =4806 ##TODO: grab number of integrations from header?          
+        numInts =4806 ##TODO: grab number of integrations from header?    
+        intLen = .25 ##seconds
         fileList = fitsList[objs]  
         fileList = ['2016_07_29_10:46:06A.fits','2016_07_29_10:46:06B.fits','2016_07_29_10:46:06C.fits','2016_07_29_10:46:06D.fits'] ##TODO: make general
         for beam in range(0,7): ##TODO: change back to 7 
@@ -122,32 +122,15 @@ def main():
                 globalDataBuff_X[fileIdx,:,:] = dataBuff_X
                 globalDataBuff_Y[fileIdx,:,:] = dataBuff_Y
                 cnt+=1
-                ##TODO:REMOVE ONCE METADATA MODULE IS TESTED
-            fits.writeto('/Users/npingel/Desktop/BFSpec_NGC6946_beam'+np.str(beam)+'_X.fits',globalDataBuff_X)
-            fits.writeto('/Users/npingel/Desktop/BFSpec_NGC6946_beam'+np.str(beam)+'_Y.fits',globalDataBuff_Y)
-"""
-hdu = fits.open('/Users/npingel/Desktop/BFSpec_NGC6946_beam0_X.fits')
-globalDataBuff_X = hdu[0].data
-hdu = fits.open('/Users/npingel/Desktop/BFSpec_NGC6946_beam0_Y.fits')
-beam = 0
-intLen = .25 ##seconds
-numInts = 4806
-globalDataBuff_Y = hdu[0].data
-fileList = ['2016_07_29_10:46:06A.fits','2016_07_29_10:46:06B.fits','2016_07_29_10:46:06C.fits','2016_07_29_10:46:06D.fits']
-md = MetaDataModule(fileList[0],fileList,numInts,globalDataBuff_X,globalDataBuff_Y,beam,intLen,numTotalThreads) ##TODO: slice list every numThread to select relevant FITS files
-md.constuctBinTableHeader()
-"""    
-    freqChans = np.linspace(1,500,500)
+
+            fileList = ['2016_07_29_10:46:06A.fits','2016_07_29_10:46:06B.fits','2016_07_29_10:46:06C.fits','2016_07_29_10:46:06D.fits']
+            md = MetaDataModule(fileList[0],fileList,numInts,globalDataBuff_X,globalDataBuff_Y,beam,intLen,numTotalThreads) ##TODO: slice list every numThread to select relevant FITS files
+            thduList = md.constuctBinTableHeader()
+            fileName = fileList[0]
+            fileName = fileName[:-6]
+            thduList.writeto(pwd+'/'+fileName+'_Beam'+str(beam))
     
     
-    pyplot.ylabel('Flux Density [Jy]', fontsize=18)
-    pyplot.xlabel('Freq. Channels', fontsize=18)
-    pyplot.title('Time Ave BF Spectrum of NGC4646 (Beam 0)', fontsize=18)
-    #pyplot.plot(freqChans,np.mean(dataBuff_X, axis=0), color='red', label='X-Pol',linewidth=1.5)
-    pyplot.plot(freqChans,np.mean(dataBuff_Y, axis=0), color='blue', label='Y-Pol',linewidth=1.5)
-    pyplot.legend(loc=0,prop={'size':14},fontsize='large')
-    pyplot.savefig('/Users/npingel/Desktop/AveBFSpec_NGC6946_Beam0.pdf', bbox_inches='tight')
-    pyplot.show()
     ##TODO:construct actual binTbl
     ##Get objects observed and their corresponding GO FITS file names.
 #    objList,fitsList = numObjs()
@@ -155,11 +138,8 @@ md.constuctBinTableHeader()
 #    for objs in range(0,len(objList)):
 #        md = MetaDataModule(fitsList[objs],numInts)
        #md.constuctBinTableHeader()
-"""        
+       
     
-        
-    
-
 #run main function
 if __name__=="__main__":
     main()

@@ -6,7 +6,6 @@ This module (i.e. class) will collate the required metadata to construc the prim
 """
 from astropy.io import fits
 from astropy.time import Time
-import glob
 import os 
 import numpy as np
 import datetime
@@ -203,10 +202,7 @@ class MetaDataModule:
             for file in range(0,len(self.fitsList)):            
                 antHDU = fits.open(self.fitsList[file])
                 antDMJD = antHDU[2].data['DMJD']
-                if param == 'DMJD':
-                    valueArr[(valueIdx*self.numInts):(valueIdx*self.numInts)+self.numInts] = antHDU[2].data['DMJD']
-                    repeat = False
-                elif param == 'CRVAL2':
+                if param == 'CRVAL2':
                     valueArr = np.empty([self.numInts*2*len(self.fitsList)],dtype='float32') 
                     maj = antHDU[2].data['MAJOR']
                     majInterp = np.interp(self.dmjd,antDMJD,maj)
@@ -388,7 +384,8 @@ class MetaDataModule:
             self.Column.comment = comment
         
         def getBeamOffsets(self,param):
-            hdu = fits.open('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Weights/2016_07_25_04:32:35_xid0_weights.fits') ##TODO: work on flag3
+            os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Weights/')            
+            hdu = fits.open('2016_07_25_04:32:35_xid0_weights.fits') ##TODO: work on flag3
             if param == 'FEEDXOFF':
                 beamOff_Az = hdu[1].data['BeamOff_AZ']
                 value = beamOff_Az[self.beamNum]
@@ -396,7 +393,7 @@ class MetaDataModule:
                 beamOff_El = hdu[1].data['BeamOff_EL']
                 value = beamOff_El[self.beamNum]
             valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
-            valueArr.fill(value/60.) ##arcmin to deg
+            valueArr.fill(value) 
             
             comment = self.commentDict[param]
             self.Column.param = param
@@ -430,9 +427,8 @@ class MetaDataModule:
             self.Column.param = param
             self.Column.valueArr = valueArr
             self.Column.comment = comment
-                
-                
         
+                
         self.commentDict = {'OBJECT':'name of source observed',
                             'OBSERVER':'name of observer(s)',                            
                             'BANDWID':'bandwidth',
@@ -698,6 +694,7 @@ class MetaDataModule:
               'TUNIT37':'',
               'TTYPE38':'RADESYS', 
               'TFORM38':'8A',
+              'TUNIT38':'',
               'TTYPE39':'TRGTLONG',
               'TFORM39':'1D',
               'TUNIT39':'deg', 
@@ -783,24 +780,18 @@ class MetaDataModule:
               'TFORM66':'1E',
               'TUNIT66':'K',
               'TTYPE67':'CALPOSITION',
-              'TFORM67':'16A' ,
+              'TFORM67':'16A',
+              'TUNIT67':'',
               'TTYPE68':'IFNUM',
               'TFORM68':'1I',
+              'TUNIT68':'',
               'TTYPE69':'PLNUM',
               'TFORM69':'1I',
+              'TUNIT69':'',
               'TTYPE70':'FDNUM',
               'TFORM70':'1I',
               'TUNIT70':''
               }   
-    ## returns scanLog binary table
-    def readScanLog_Data(self):
-        scanLogHduList = fits.open('ScanLog.fits')
-        return scanLogHduList[1].data            
-                    
-    ## returns scanLog header
-    def readScanLog_Header(self):
-        scanLogHduList = fits.open('ScanLog.fits')
-        return scanLogHduList[0].header
     
     def getCurrentUTC(self):
         time = datetime.datetime.utcnow()
@@ -841,66 +832,77 @@ class MetaDataModule:
         sys.stdout.write("\rPercent of FITS table for  beam "+np.str(beam)+": [{0}] {1}%".format(arrow + spaces, int(round(percent * 100))))
         sys.stdout.flush()     
     
+    def getProjId(self):
+        os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03')
+        hdu = fits.open('ScanLog.fits')
+        return hdu[0].header['PROJID']
+    
     def constuctBinTableHeader(self):    
         
-        
-
+        prihdu = self.construcPriHDUHeader()        
         binHeader = fits.Header()
         keywordList = np.loadtxt('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/sdKeywords.txt',dtype='bytes')
         keyWordArr = keywordList.astype(str)
-
-        binHeader.set('BITPIX','BINTABLE', 'binary table extension')
-        binHeader.set('NAXIS',2, '2-dimensional binary table')
-        binHeader.set('NAXIS1',33362,'width of table in bytes') ##TODO: update
-        binHeader.set('PCOUNT',0,'size of special data area')
-        binHeader.set('NAXIS2',1664, 'number of rows in table') ##TODO: update
-        binHeader.set('GCOUNT',1,'one data group (required keyword)')
-        binHeader.set('TFIELDS',70,'number of fields in each row') ##TODO: update
-        binHeader['COMMENT'] = 'Start of SDFITS CORE keywords/columns.'
+        commentList = []
+        paramList = []
+        
         ##TODO:SDFITS CORE KEYWORDS
-        for keyIdx in range(0,len(keyWordArr)):
+        for keyIdx in range(0,len(keyWordArr),3):
             keyword = keyWordArr[keyIdx]         
-            if keyword[0:5] != 'TFORM' and keyword[0:5] != 'TUNIT':
-                param = self.keyToParamDict[keyword]
-                self.progressBar(keyIdx, len(keyWordArr),self.beamNum)
-                self.funcDict[param.strip()](self,param.strip())  
-                formKey = keyWordArr[keyIdx+1]
-                unitKey = keyWordArr[keyIdx+2]
-                form = self.keyToParamDict[formKey]
-                if formKey == 'TFORM7':
-                    form = np.str(len(self.Column.valueArr[0,:]))+'E'
-                unit = self.keyToParamDict[unitKey]
-                col = fits.Column(name=self.Column.param,format=form,array=self.Column.valueArr,unit=unit)    
-                if keyIdx == 0:
-                    self.cols = fits.ColDefs([col])
-                else:
-                    self.cols.add_col(col)
-                
+            #if keyword[0:5] != 'TFORM' and keyword[0:5] != 'TUNIT':
+            param = self.keyToParamDict[keyword]
+            self.progressBar(keyIdx, len(keyWordArr),self.beamNum)
+            self.funcDict[param.strip()](self,param.strip())  
+            formKey = keyWordArr[keyIdx+1]
+            unitKey = keyWordArr[keyIdx+2]
+            form = self.keyToParamDict[formKey]
+            if formKey == 'TFORM7':
+                form = np.str(len(self.Column.valueArr[0,:]))+'E'
+            unit = self.keyToParamDict[unitKey]
+            col = fits.Column(name=self.Column.param,format=form,array=self.Column.valueArr,unit=unit)
+            if keyIdx == 0:
+                self.cols = fits.ColDefs([col])
+            else:
+                self.cols.add_col(col)
+            commentList.append(self.Column.comment)
+            paramList.append(self.Column.param)
+        ##make preliminary table HDU     
+        tblHdu = fits.BinTableHDU.from_columns(self.cols, header = binHeader)
         
-            
-        tblHdu = fits.BinTableHDU.from_columns(self.cols)
-        tblHdu.writeto('/Users/npingel/Desktop/test.fits')
-        binHeader['COMMENT'] = 'End of SDFITS CORE keywords/columns.'
-        binHeader['COMMENT'] = 'Start of SDFITS DATA column and descriptive axes.'
-        ##TODO: SDFITS DATA KEYWORDS (including Beamformer specific)
-        binHeader['COMMENT'] = 'End of SDFITS DATA column and descriptive axes.'
-        binHeader['COMMENT'] = 'Start of SDFITS SHARED keywords/columns.'
-        ##TODO: SDFITS SHARED KEYWORDS
-        binHeader['COMMENT'] = 'End of SDFITS SHARED keywords/columns.'
-        binHeader['COMMENT'] = 'Start of GBT-specific keywords/columns.'
-        ##TODO: GBT-SPECIFIC KEYWORDS
-        binHeader['COMMENT'] = 'Feed offsets ARE included in the CRVAL2 and CRVAL3 columns.'
-        ##TODO: MORE GBT-SPECIFIC KEYWORDS
-        ## TODO: comment; find this 'PROJID'
-        ##TODO: 'CTYPE4':'STOKES', ##TODO: comment
-        ##TODO: 'BACKEND'
-        binHeader['COMMENT'] = 'End of GBT-specific keywords/columns.'
-        binHeader.set('EXTNAME','SINGLE DISH', 'name of this binary table extension')
+        ##Now, update comments beginnning of table
+        tblHdu.header.set('NAXIS',2, '2-dimensional binary table')
+        rowBytes = tblHdu.size/(2*self.numInts)
+        tblHdu.header.set('NAXIS1',int(rowBytes),'width of table in bytes')
+        tblHdu.header.set('NAXIS2',self.numInts*2,'number of rows in table')
+        tblHdu.header.set('PCOUNT',0,'size of special data area')
+        tblHdu.header.set('GCOUNT',1,'one data group (required keyword)')
+        tblHdu.header.set('TFIELDS',70,'number of fields in each row')
+        tblHdu.header.set('EXTNAME','SINGLE DISH', 'name of this binary table extension')       
+        idx = 0        
+        for i in range(0,len(keyWordArr),3):
+            keyword = keyWordArr[i]
+            tblHdu.header.set(keyword,paramList[idx],commentList[idx])
+            idx+=1
+        ##insert final additional comments
+        tblHdu.header.insert('TTYPE1',('COMMENT', 'Start of SDFITS CORE keywords/columns.'))
+        tblHdu.header.insert('TTYPE2',('TELESCOP','NRAO_GBT','the telescope used'))
+        tblHdu.header.insert('TTYPE7',('COMMENT', 'End of SDFITS CORE keywords/columns.'))
+        tblHdu.header.insert('TTYPE7',('COMMENT', 'Start of SDFITS DATA column and descriptive axes.'))
+        tblHdu.header.insert('TTYPE18',('CTYPE4','STOKES', 'fourth axis is Stokes'))
+        tblHdu.header.insert('TTYPE19',('COMMENT', 'End of SDFITS DATA column and descriptive axes.'))
+        tblHdu.header.insert('TTYPE19',('COMMENT', 'Start of SDFITS SHARED keywords/columns.'))
+        projId = self.getProjId()    
+        tblHdu.header.insert('TTYPE21',('PROJID',projId,'project identifier'))        
+        tblHdu.header.insert('TTYPE24',('BACKEND','FLAG','backend device'))
+        tblHdu.header.insert('TTYPE35',('SITELONG', -7.983983E+01,'E. longitude of intersection of the az/el axes'))
+        tblHdu.header.insert('TTYPE35',('SITELAT', 3.843312E+01,'N. latitude of intersection of the az/el axes'))
+        tblHdu.header.insert('TTYPE35',('SITEELEV', 8.245950E+02,'height of the intersection of az/el axes'))
+        tblHdu.header.insert('TTYPE37',('COMMENT', 'End of SDFITS SHARED keywords/columns.'))
+        tblHdu.header.insert('TTYPE37',('COMMENT', 'Start of GBT-specific keywords/columns.'))
+        tblHdu.header.insert('TTYPE44',('COMMENT', 'Feed offsets ARE included in the CRVAL2 and CRVAL3 columns'))
+        tblHdu.header.insert('TFORM70',('COMMENT', 'End of GBT-specific keywords/columns.'))    
         
-        ##TODO:
-        #'SITELONG':getAntFits, ## find and define this
-        #'SITELAT':getAntFits,## find and define this
-        #'SITEELEV':getAntFits,## find and define this        
-        return binHeader
-    def constructBinTableData(self):
-        return
+        thduList = fits.HDUList([prihdu, tblHdu])
+      
+        return thduList
+    
