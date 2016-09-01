@@ -21,7 +21,6 @@ class MetaDataModule:
         self.fitsList = [metaFitsList]     
         for i in range(0,len(self.fitsList)):
             self.fitsList[i] = self.fitsList[i][:-7] + "4" + self.fitsList[i][-5:]           
-        print(self.fitsList)
         ##TODO: remove above for production
         self.dataFitsList = dataFitsList
         os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData') ##TODO: run on flag3
@@ -804,7 +803,12 @@ class MetaDataModule:
         dateStr+=':'+str(time.strftime('%S'))
         return dateStr
         
-    def contstructPriHDUHeader(self):
+    def readScanLog_Header(self):
+        os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03')
+        hdu = fits.open('ScanLog.fits')
+        return hdu[0].header      
+        
+    def constructPriHDUHeader(self):
         ## Collect header metadata from ScanLog
         priHeader=fits.Header()
         currentUTC = self.getCurrentUTC()
@@ -821,7 +825,8 @@ class MetaDataModule:
         priHeader.set('INSTRUME','FLAGBF','backend')
         priHeader.set('SDFITVER','sdfits-bf','SDFITS format for BF')
         priHeader.set('FITSVER','fits-bf','FITS format for BF')
-        return priHeader   
+        prihdu = fits.PrimaryHDU(header=priHeader)
+        return prihdu 
 
     def progressBar(self,value, endvalue, beam,bar_length=20):
 
@@ -839,7 +844,7 @@ class MetaDataModule:
     
     def constuctBinTableHeader(self):    
         
-        prihdu = self.construcPriHDUHeader()        
+        prihdu = self.constructPriHDUHeader()   
         binHeader = fits.Header()
         keywordList = np.loadtxt('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/sdKeywords.txt',dtype='bytes')
         keyWordArr = keywordList.astype(str)
@@ -903,6 +908,7 @@ class MetaDataModule:
         tblHdu.header.insert('TFORM70',('COMMENT', 'End of GBT-specific keywords/columns.'))    
         
         thduList = fits.HDUList([prihdu, tblHdu])
+        os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData')   ##TODO: run on flag3; 
       
         return thduList
     

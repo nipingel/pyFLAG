@@ -100,6 +100,7 @@ def main():
             cnt = 0
             fileIdx = -1
             for file in fileList:        
+                print('\n')                
                 print('Beamforming correlations in: '+file[-25:]+', Beam: '+np.str(beam)) 
                 if cnt % numTotalThreads == 0:
                     dataBuff_X = np.zeros([numInts,25*20])   ##TODO: make mode independent  
@@ -128,7 +129,7 @@ def main():
             thduList = md.constuctBinTableHeader()
             fileName = fileList[0]
             fileName = fileName[:-6]
-            thduList.writeto(pwd+'/'+fileName+'_Beam'+str(beam))
+            thduList.writeto(pwd+'/'+fileName+'_Beam'+str(beam)+'.fits')
     
     
     ##TODO:construct actual binTbl

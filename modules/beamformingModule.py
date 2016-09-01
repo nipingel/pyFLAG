@@ -17,13 +17,13 @@ class BeamformingModule:
     def __init__ (self):
         self.mapVector = np.loadtxt('/Users/npingel/Desktop/Research/FLAG/pros/SpectralFiller/misc/gpuToNativeMap.dat', dtype='int')
 
-    def progressBar(self,value, endvalue, beam,bar_length=20):
+    def progressBar(self,value, endvalue, beam,xid,bar_length=20):
 
         percent = float(value) / endvalue
         arrow = '-' * int(round(percent * bar_length)-1) + '>'
         spaces = ' ' * (bar_length - len(arrow))
 
-        sys.stdout.write("\rPercent of integrations filled in beam "+np.str(beam)+": [{0}] {1}%".format(arrow + spaces, int(round(percent * 100))))
+        sys.stdout.write("\rPercent of integrations filled in beam "+np.str(beam)+",xid "+str(xid)+": [{0}] {1}%".format(arrow + spaces, int(round(percent * 100))))
         sys.stdout.flush()    
     
     def getRawCorrelations(self,fitsName):
@@ -129,7 +129,7 @@ class BeamformingModule:
         spectrumArr_Y = np.zeros([len(dataArr[:,0]),num_freq], dtype='float32') 
         xWeight,yWeight = self.getWeights(num_freq,xid)
         for ints in range(0,len(dataArr[:,0])):   
-            self.progressBar(ints,len(dataArr[:,0]),beam)            
+            self.progressBar(ints,len(dataArr[:,0]),beam,xid)            
             dataVector=dataArr[ints,:]
             corrCube = self.getCorrelationCube(dataVector)
             corrShape = corrCube.shape
