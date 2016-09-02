@@ -25,7 +25,7 @@ class BeamformingModule:
 
         sys.stdout.write("\rPercent of integrations filled in beam "+np.str(beam)+",xid "+str(xid)+": [{0}] {1}%".format(arrow + spaces, int(round(percent * 100))))
         sys.stdout.flush()    
-    
+        
     def getRawCorrelations(self,fitsName):
         hdu = fits.open(fitsName)
         corrData = hdu[1].data.field('DATA')

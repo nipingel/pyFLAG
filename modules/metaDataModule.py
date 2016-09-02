@@ -51,6 +51,7 @@ class MetaDataModule:
             elif param == 'EXPOSURE':
                 valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
                 paramLook = 'ACTSTI'
+                paramLook = 'REQSTI' ##TODO: remove for production
                 corHDU = fits.open(dataFitsList[0])
                 value = corHDU[0].header[paramLook]
                 repeat = True
@@ -71,7 +72,7 @@ class MetaDataModule:
                 for file in range(0,len(self.fitsList)):            
                     corHDU = fits.open(dataFitsList[file])
                     dateTime = corHDU[0].header[param1]
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(dateTime))
+                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(dateTime)+2)
                     intLen = corHDU[0].header[param2]
                     dateTimeObj = Time(dateTime,format='isot',scale='utc')   
                     intLen = np.float(intLen)/(24*3600.)
@@ -80,7 +81,7 @@ class MetaDataModule:
                         newTime = ((idx*self.numInts)+i)*intLen+dateTimeObj.jd
                         newTime = Time(newTime,format='jd', scale='utc')
                         value = newTime.fits
-                        value = value[:-9] ##drop erroneus digits
+                        value = value[:-6] ##drop erroneus digits
                         valueArr[(idx*self.numInts)+i] = value
                         valueArr[(idx*self.numInts)+i+1] = value
                     idx+=1
@@ -150,7 +151,7 @@ class MetaDataModule:
                 elif param =='VELOCITY':
                     valStr = goHDU[0].header['VELOCITY']
                     valStr = value
-                    valueArr = valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
+                    valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
                 elif param =='OBJECT':
                     valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(value)) 
                     valStr = value
@@ -289,9 +290,13 @@ class MetaDataModule:
             elif param == 'BEAM':    
                 valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')                
                 valueArr.fill(self.beamNum)
-            elif param == 'FEED' or param == 'SUBREF_STATE' or param == 'QD_BAD' or param == 'CRVAL4':    
+            elif param == 'FEED' or param == 'SUBREF_STATE' or param == 'QD_BAD':    
                 valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='int16')                
                 valueArr.fill(1)
+            elif param == 'CRVAL4':
+                valueArr = np.zeros([2*self.numInts*len(self.fitsList)], dtype='int16')
+                valueArr[0::2] = -5
+                valueArr[1::2] = -6
             elif param == 'ZEROCHAN' or param =='TWARM' or param =='TCOLD' or param == 'QD_XEL' or param == 'QD_EL' or param == 'CALPOSITION':
                 valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')                
                 valueArr.fill(np.nan)
@@ -320,9 +325,11 @@ class MetaDataModule:
                 valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=1)
                 valueArr.fill('L')
             elif param =='SAMPLER':
-                valStr = 'A1_0'                
-                valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))  
-                valueArr[:] = valStr
+                valStr1 = 'A1_0'    
+                valStr2 = 'A2_0'
+                valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr1))  
+                valueArr[0::2] = valStr1
+                valueArr[1::2] = valStr2
             elif param == 'DOPFREQ':
                 valStr = 1432.729*1e6 ##TODO: fix for production. 
                 valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
@@ -833,7 +840,6 @@ class MetaDataModule:
         percent = float(value) / endvalue
         arrow = '-' * int(round(percent * bar_length)-1) + '>'
         spaces = ' ' * (bar_length - len(arrow))
-
         sys.stdout.write("\rPercent of FITS table for  beam "+np.str(beam)+": [{0}] {1}%".format(arrow + spaces, int(round(percent * 100))))
         sys.stdout.flush()     
     
@@ -898,7 +904,7 @@ class MetaDataModule:
         tblHdu.header.insert('TTYPE19',('COMMENT', 'Start of SDFITS SHARED keywords/columns.'))
         projId = self.getProjId()    
         tblHdu.header.insert('TTYPE21',('PROJID',projId,'project identifier'))        
-        tblHdu.header.insert('TTYPE24',('BACKEND','FLAG','backend device'))
+##        tblHdu.header.insert('TTYPE24',('BACKEND','FLAG','backend device'))
         tblHdu.header.insert('TTYPE35',('SITELONG', -7.983983E+01,'E. longitude of intersection of the az/el axes'))
         tblHdu.header.insert('TTYPE35',('SITELAT', 3.843312E+01,'N. latitude of intersection of the az/el axes'))
         tblHdu.header.insert('TTYPE35',('SITEELEV', 8.245950E+02,'height of the intersection of az/el axes'))
