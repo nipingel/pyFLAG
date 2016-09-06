@@ -20,6 +20,9 @@ import matplotlib.pyplot as pyplot
 ##global variables
 numGPU = 2
 numTotalThreads = numGPU*2
+##paths to FITS files
+goFitsPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/GO' ##TODO: change to work on flag03/lustre
+
 
 ##TODO:Extend sorting from 4 FITS files to 20 FITS files.
 def xid0(dataBuff,data,ints):
@@ -55,7 +58,7 @@ def xid3(dataBuff,data,ints):
 
 ##function to determine number of objects observed in session
 def numObjs():        
-    goFits = glob.glob('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/GO/*.fits') ##TODO: change to work on flag03/lustre
+    goFits = glob.glob(goFitsPath+'/*.fits')
     objList = []
     fitsList = []
     itr = 0.
@@ -73,6 +76,12 @@ def numObjs():
                fitsList.append([])
            fitsList[-1].extend([goName[-24:]])
     return objList, fitsList
+
+##function to get number of integrations
+def getNumInts(file):
+    hdu = fits.open(file)
+    return hdu[1].header['NAXIS2']
+
 def main():
     bf = BeamformingModule()
     banks = {"A" : xid0,
@@ -89,11 +98,12 @@ def main():
     #os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData/') 
     objList,fitsList = numObjs()    
     ##TODO: put back in: for objs in range(0,len(objList)):
-    for objs in range(1,2):
-        numInts =4806 ##TODO: grab number of integrations from header?    
+    for objs in range(1,2):  
         intLen = .25 ##seconds
         fileList = fitsList[objs]  
-        fileList = ['2016_07_29_10:46:06A.fits','2016_07_29_10:46:06B.fits','2016_07_29_10:46:06C.fits','2016_07_29_10:46:06D.fits'] ##TODO: make general
+        #fileList = ['2016_07_29_10:46:06A.fits','2016_07_29_10:46:06B.fits','2016_07_29_10:46:06C.fits','2016_07_29_10:46:06D.fits'] ##TODO: make general
+        fileList = ['2016_07_29_11:29:17A.fits','2016_07_29_11:29:17B.fits','2016_07_29_11:29:17C.fits','2016_07_29_11:29:17D.fits']
+        numInts = getNumInts(fileList[0])
         for beam in range(0,7): ##TODO: change back to 7 
             globalDataBuff_X = np.zeros([int(len(fileList)/len(banks)),numInts,25*20]) ##TODO: make general based on CovMode
             globalDataBuff_Y = np.zeros([int(len(fileList)/len(banks)),numInts,25*20]) ##TODO: make general based on CovMode
@@ -124,21 +134,13 @@ def main():
                 globalDataBuff_Y[fileIdx,:,:] = dataBuff_Y
                 cnt+=1
 
-            fileList = ['2016_07_29_10:46:06A.fits','2016_07_29_10:46:06B.fits','2016_07_29_10:46:06C.fits','2016_07_29_10:46:06D.fits']
-            md = MetaDataModule(fileList[0],fileList,numInts,globalDataBuff_X,globalDataBuff_Y,beam,intLen,numTotalThreads) ##TODO: slice list every numThread to select relevant FITS files
+            print('\n')            
+            md = MetaDataModule(fileList[0],fileList,numInts,globalDataBuff_X,globalDataBuff_Y,beam,intLen,numTotalThreads)
             thduList = md.constuctBinTableHeader()
             fileName = fileList[0]
             fileName = fileName[:-6]
             thduList.writeto(pwd+'/'+fileName+'_Beam'+str(beam)+'.fits')
     
-    
-    ##TODO:construct actual binTbl
-    ##Get objects observed and their corresponding GO FITS file names.
-#    objList,fitsList = numObjs()
-#    numInts=50 ##TODO: update and how to figure this out during data processing? Basically number of integrations*numPol
-#    for objs in range(0,len(objList)):
-#        md = MetaDataModule(fitsList[objs],numInts)
-       #md.constuctBinTableHeader()
        
     
 #run main function

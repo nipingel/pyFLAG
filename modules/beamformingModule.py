@@ -12,6 +12,9 @@ from astropy.io import fits
 import numpy as np
 import sys
 
+##global paths
+weightPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Weights'
+
 class BeamformingModule:
     
     def __init__ (self):
@@ -31,7 +34,7 @@ class BeamformingModule:
         corrData = hdu[1].data.field('DATA')
         return corrData      
     def getWeights(self,numChans,xid):
-        hdu = fits.open('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Weights/2016_07_25_04:32:35_xid'+np.str(xid)+'_weights.fits')
+        hdu = fits.open(weightPath+'/Weights/2016_07_25_04:32:35_xid'+np.str(xid)+'_weights.fits')
         ##TODO: make above line more general        
         xWeights = np.zeros([numChans,40,7], dtype='complex64') 
         yWeights = np.zeros([numChans,40,7], dtype='complex64')  

@@ -12,6 +12,14 @@ import datetime
 import collections
 import sys
 
+##globalPaths
+rawDataPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData'
+goDataPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/GO'
+antDataPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Antenna'
+lo1APath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/LO1A/'
+weightDataPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Weights/'
+fitsPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/'
+keywordPath = '/Users/npingel/Desktop/Research/FLAG/pros/exampleData/sdKeywords.txt'
 
 class MetaDataModule:
     
@@ -23,7 +31,7 @@ class MetaDataModule:
             self.fitsList[i] = self.fitsList[i][:-7] + "4" + self.fitsList[i][-5:]           
         ##TODO: remove above for production
         self.dataFitsList = dataFitsList
-        os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData') ##TODO: run on flag3
+        os.chdir(rawDataPath) ##TODO: run on flag3
         hdu = fits.open(dataFitsList[0])
         dmjd = hdu[1].data['DMJD']
         self.dmjd = dmjd
@@ -39,7 +47,7 @@ class MetaDataModule:
 
 ##TODO: check to make sure len(fitsList) / numThreads = 1in all methods
         def getSMKey(self,param,singleVal = False): ##TODO: get actual shared memory values
-            os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData') ##TODO: run on flag03
+            os.chdir(rawDatapath) ##TODO: run on flag03
             ##TODO: remove for production
             repeat = False
             if param == 'DURATION':
@@ -98,7 +106,7 @@ class MetaDataModule:
             
         ##TODO: error handling (e.g. keyword not found)
         def getGOFITSParam(self,param):
-            os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/GO') ##TODO: run on flag03          
+            os.chdir(goDataPath) ##TODO: run on flag03          
             idx = 0          
             if param == 'TRGTLONG':
                 paramLook = 'RA'
@@ -196,7 +204,7 @@ class MetaDataModule:
             self.Column.comment = comment
         
         def getAntFITSParam(self,param):
-            os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Antenna') ##TODO: run on flag03         
+            os.chdir(antDataPath) ##TODO: run on flag03         
             idx = 0             
             repeat = True
             for file in range(0,len(self.fitsList)):            
@@ -233,7 +241,7 @@ class MetaDataModule:
                 elif param == 'LST':
                     param1 = 'LSTSTART'
                     lstStart = antHDU[0].header[param1]
-                    os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData')
+                    os.chdir(rawDataPath)
                     param2 = 'REQSTI'
                     corHDU = fits.open(dataFitsList[file])
                     intLen = np.float(corHDU[0].header[param2])
@@ -266,9 +274,9 @@ class MetaDataModule:
             self.Column.comment = comment
             
         def getRcvrFITSParam(self,param):
-            os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/Rcvr1_2/') ##TODO: run on flag03         
+            #os.chdir('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/Rcvr1_2/') ##TODO: run on flag03         
             idx = 0 
-            RcvrHDU = fits.open('2005_05_27_00:00:00.fits')
+           # RcvrHDU = fits.open('2005_05_27_00:00:00.fits')
             #value = RcvrHDU[0].header[param]
             if param == 'FRONTEND':            
                 value = 'PAF' ##TODO: search for value in PAF manager for production
@@ -358,7 +366,7 @@ class MetaDataModule:
             self.Column.comment = comment
         
         def getLOFITSParam(self,param, repeat = True ): 
-            os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/LO1A/') ##TODO: run on flag3/GB
+            os.chdir(lo1APath) ##TODO: run on flag3/GB
             if param == 'VELDEF':
                 loHDU = fits.open(self.fitsList[0])   
                 tblNum = 2
@@ -390,7 +398,7 @@ class MetaDataModule:
             self.Column.comment = comment
         
         def getBeamOffsets(self,param):
-            os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Weights/')            
+            os.chdir(weightDataPath)            
             hdu = fits.open('2016_07_25_04:32:35_xid0_weights.fits') ##TODO: work on flag3
             if param == 'FEEDXOFF':
                 beamOff_Az = hdu[1].data['BeamOff_AZ']
@@ -811,7 +819,7 @@ class MetaDataModule:
         return dateStr
         
     def readScanLog_Header(self):
-        os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03')
+        os.chdir(fitsPath)
         hdu = fits.open('ScanLog.fits')
         return hdu[0].header      
         
@@ -844,7 +852,7 @@ class MetaDataModule:
         sys.stdout.flush()     
     
     def getProjId(self):
-        os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03')
+        os.chdir(fitsPath)
         hdu = fits.open('ScanLog.fits')
         return hdu[0].header['PROJID']
     
@@ -852,7 +860,7 @@ class MetaDataModule:
         
         prihdu = self.constructPriHDUHeader()   
         binHeader = fits.Header()
-        keywordList = np.loadtxt('/Users/npingel/Desktop/Research/FLAG/pros/exampleData/sdKeywords.txt',dtype='bytes')
+        keywordList = np.loadtxt(keywordPath,dtype='bytes')
         keyWordArr = keywordList.astype(str)
         commentList = []
         paramList = []
@@ -914,7 +922,7 @@ class MetaDataModule:
         tblHdu.header.insert('TFORM70',('COMMENT', 'End of GBT-specific keywords/columns.'))    
         
         thduList = fits.HDUList([prihdu, tblHdu])
-        os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData')   ##TODO: run on flag3; 
+        os.chdir(rawDataPath)   ##TODO: run on flag3; 
       
         return thduList
     
