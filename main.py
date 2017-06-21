@@ -173,7 +173,7 @@ def main():
 
                 print('\n')
                 ## build metadata; inputs are FITS file for ancillary files, numInts, global data buffers, int length            
-                md = MetaDataModule(fileList, allBanksList, numBanksList, globalDataBuff_X, globalDataBuff_Y, beam, projectPath, dataPath)
+                md = MetaDataModule(projectPath, fileList, allBanksList, numBanksList, globalDataBuff_X, globalDataBuff_Y, beam, projectPath, dataPath)
                 thduList = md.constuctBinTableHeader()
                 dataFITSFile[:-6] = dataFITSFile
                 thduList.writeto(pwd+'/' + dataFITSFile + '_Beam'+str(beam)+'.fits')

@@ -26,8 +26,8 @@ class MetaDataModule:
         
     ## initialize function. Opens raw data file, numInts, data buffers (banpasses), beam, freqChans, intLength
     ## total BANK files, and creates column object. 
-    def __init__(self, metaFitsList, bankFitsList, numBanksList, dataBuff_X,dataBuff_Y,beamNum, ancPath, rawDataPath):        
-        self.fitsList = metaFitsList     
+    def __init__(self, projectPath, fitsList, bankFitsList, numBanksList, dataBuff_X,dataBuff_Y,beamNum, ancPath, rawDataPath):        
+        self.fitsList = projectPath +      
         self.bankFitsList = bankFitsList
         self.numBanksList = numBanksList
         os.chdir(rawDataPath) ##TODO: run on flag3
@@ -47,8 +47,8 @@ class MetaDataModule:
             ## iterate flag defaults to false. Is set True based on parameter
             iterate = False
             ## open first BANK file to get initial number of integrations used to initialize value array
-            corHDU = fits.open(self.dataFitsList[0])
-            initIntVal = corHDU[1].header['NAXIS2']
+            corrHDU = fits.open(self.bankFitsList[0])
+            initIntVal = corrHDU[1].header['NAXIS2']
             ## determine time spent in state (e.g. calOn, calOff); 
             ## since we do no freq sw or cal sw, this is equal to scan time
             if param == 'DURATION':
@@ -71,38 +71,41 @@ class MetaDataModule:
                 covModeList = []
                 ## loop through first BANK files to compile list of COVMODES
                 for bankIdx in range(0, len(self.dataFitsList), self.numBanks):
-                    corHDU = fits.open(dataFitsList[bankIdx])
-                    covModeList.append(corHDU[0].header[paramLook])
+                    corrHDU = fits.open(dataFitsList[bankIdx])
+                    covModeList.append(corrHDU[0].header[paramLook])
                 return covModeList 
             ## determine start time of each integration
             elif param == 'DATE-OBS':
                 bankIdx = 0
                 for fileNum in range(0,len(self.fitsList)):            
-                    corHDU = fits.open(dataFitsList[bankIdx])
-                    scanDMJD = corHDU[1].data['DMJD']
-                    scanNumInts = corHdu[0].header['NAXIS2']
+                    corrHDU = fits.open(self.bankFitsList[bankIdx])
+                    scanDMJD = corrHDU[1].data['DMJD']
+                    scanNumInts = corHdu[1].header['NAXIS2']
                     ## cast DMJD to correct string format
                     timeObj = Time(scanDMJD, format = 'mjd', scale='utc') 
                     ## initialize array to store parameter values
                     if fileNum == 0: 
                         valueArr = np.chararray([2*scanNumInts],itemsize=len(timeObj[0].isot))
                         ## fill with correctly formated integration start times
-                        valueArr[:] = times.isot
+                        ## skip every other element because we have two polarizations per integration
+                        valueArr[0::2] = timeObj.isot
+                        valueArr[1::2] = timeObj.isot
                     ## if not first iteration, create new array and concatenate
                     else:
                         newArr = np.chararray([2*scanNumInts],itemsize=len(timeObj[0].isot))
+                        newArr[0::2] = timeObj.isot
+                        newArr[1::2] = timeObj.isot
                         valueArr = np.concatenate([valueArr, newArr])
                     bankIdx += self.numBanksList[fileNum]
             
-            ## fill in value array for similar values across integrations
+            ## fill in value array for similar values across integrations/polarizations
             if iterate == True: 
                 ## initialize FITS file index           
-                fileIdx = 0
                 bankIdx = 0
                 for fileNum in range(0,len(self.fitsList)):
-                    corHDU = fits.open(self.dataFitsList[bandIdx])
-                    scanNumInts = corHdu[0].header['NAXIS2']
-                    value = corHDU[0].header[paramLook]
+                    corrHDU = fits.open(self.bankFitsList[bandIdx])
+                    scanNumInts = corrHdu[1].header['NAXIS2']
+                    value = corrHDU[0].header[paramLook]
                     ## if first iteration, fill already initialized array
                     if fileNum == 0: 
                         valueArr[:] = value
@@ -118,10 +121,10 @@ class MetaDataModule:
             self.Column.param = param            
             self.Column.comment = comment
             self.Column.valueArr = valueArr
-            
+        
+        ## function to get values for GO FITS file parameters    
         ##TODO: error handling (e.g. keyword not found)
         def getGOFITSParam(self,param):
-            os.chdir(goDataPath) ##TODO: run on flag03          
             idx = 0          
             if param == 'TRGTLONG':
                 paramLook = 'RA'
@@ -131,88 +134,162 @@ class MetaDataModule:
                 paramLook = 'COORDSYS'
             else:
                 paramLook = param
-            for file in range(0,len(self.fitsList)):            
-                goHDU = fits.open(self.fitsList[file])                
+            bankIdx = 0
+            for fileNum in range(0,len(self.fitsList)):            
+                goHDU = fits.open(self.projectPath + '/' + self.fitsList[fileNum])                
+                corrHDU = fits.open(self.bankFitsList[bandIdx])
+                scanNumInts = corrHDU[1].header['NAXIS2']
                 if paramLook != 'TIMESTAMP':           
                     value = goHDU[0].header[paramLook]
                 else:
                     value = None
                 if value == 'GALACTIC' and param == 'CTYPE2':
                     valStr = 'GLON'
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
+                    ## initialize array to hold values if first iteration
+                    if fileNum == 0:
+                        valueArr = np.chararray([ 2 * scanNumInts],itemsize=len(valStr))
+                    ## else create new array to concatenate
+                    else:
+                        newArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))                
                 elif value == 'GALACTIC' and param == 'CTYPE3':
                     valStr = 'GLAT'
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
+                    if fileNum == 0:
+                        valueArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
+                    else:
+                        newArr = np.chararray([2 * scanNumInts],itemsize=len(valStr)) 
                 elif value == 'RADEC' and param == 'CTYPE2':
                     valStr = 'RA'
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
+                    if fileNum == 0:
+                        valueArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
+                    else:
+                        newArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
                 elif value == 'RADEC' and param == 'CTYPE3':
                     valStr = 'DEC'
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
+                    if fileNum == 0:
+                        valueArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
+                    else:
+                        newArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
                 elif value == 'HADEC' and param == 'CTYPE2':
                     valStr = 'HA'
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
+                    if fileNum == 0:
+                        valueArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
+                    else:
+                        newArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
                 elif value == 'HADEC' and param == 'CTYPE3':
                     valStr = 'DEC'
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
+                    if fileNum == 0:
+                        valueArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
+                    else:
+                        newArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
                 elif value == 'AZEL' and param == 'CTYPE2':
                     valStr = 'AZ'
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
+                    if fileNum == 0:
+                        valueArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
+                    else:
+                        newArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
                 elif value == 'AZEL' and param == 'CTYPE3':
                     valStr = 'EL'
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                 
+                    if fileNum == 0:
+                        valueArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
+                    else:
+                        newArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
                 elif param =='TRGTLONG':
-                    valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
+                    if fileNum == 0:
+                        valueArr = np.empty([2 * scanNumInts],dtype='float32')
+                    else: 
+                        valueArr = np.empty([2 * scanNumInts],dtype='float32')
                     valStr = value
                 elif param =='TRGTLAT':
-                    valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
+                    if fileNum == 0:
+                        valueArr = np.empty([2 * scanNumInts],dtype='float32')
+                    else:
+                        newArr = np.empty([2 * scanNumInts],dtype='float32')
                     valStr = value
                 elif param  == 'TIMESTAMP':
-                    valStr = self.fitsList[file]
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr)) 
-                    value = valStr[:-6] 
+                    valStr = self.fitsList[fileNum]
+                    valStr = valStr[:-6]
+                    if fileNum == 0:
+                        valueArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
+                    else:
+                        newArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
                 elif param =='VELOCITY':
-                    valStr = goHDU[0].header['VELOCITY']
                     valStr = value
-                    valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
+                    if fileNum == 0:
+                        valueArr = np.empty([2 * scanNumInts], dtype='float32')
+                    else:
+                        newArr = np.empty([2 * scanNumInts], dtype='float32')
                 elif param =='OBJECT':
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(value)) 
                     valStr = value
+                    if fileNum == 0:
+                        valueArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
+                    else:
+                        newArr = np.chararray([2 * scanNumInts],itemsize=len(valStr)) 
                 elif param == 'OBSERVER':
                     valStr = value
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
+                    if fileNum == 0:
+                        valueArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
+                    else:
+                        newArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))  
                 elif param == 'OBSID':
                     valStr = 'unknown'
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))
+                    if fileNum == 0:
+                        valueArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
+                    else:
+                        newArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
                 elif param == 'RESTFRQ':
-                    valueArr = valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
-                    valStr = 1432.729*1e6##TODO:remove for production
+                    if fileNum == 0:
+                        valueArr = np.empty([2 * scanNumInts], dtype='float32')
+                    else:
+                        newArr = np.empty([2 * scanNumInts], dtype='float32')
+                    valStr = 1450.00*1e6##TODO:remove for production
                 elif param == 'SCAN' or param == 'PROCSEQN' or param == 'PROCSIZE':
                     valStr = value
-                    valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='int32')    
+                    if fileNum == 0:
+                        valueArr = np.empty([2 * scanNumInts], dtype='int32')
+                    else:
+                        newArr = np.empty([2 * scanNumInts], dtype='int32')
                 elif param == 'PROCSCAN' or param == 'PROCTYPE':
                     valStr = value
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))
+                    if fileNum == 0:
+                        valueArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
+                    else:
+                        newArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
                 elif param =='EQUINOX':
                     valStr = value
-                    valueArr = np.zeros([2*self.numInts*len(self.fitsList)],dtype='float32')  
+                    if fileNum == 0:
+                        valueArr = np.empty([2 * scanNumInts], dtype='float32')
+                    else:
+                        newArr = np.empty([2 * scanNumInts], dtype='float32')
                 elif param == 'LASTON':
-                    valStr = 0
-                    valueArr = np.zeros([2*self.numInts*len(self.fitsList)],dtype='int16') 
+                    valStr = value
+                    if fileNum == 0:
+                        valueArr = np.empty([2 * scanNumInts], dtype='int16')
+                    else:
+                        newArr = np.empty([2 * scanNumInts], dtype='int16')
                 elif param == 'LASTOFF':
-                    valStr = 0
-                    valueArr = np.zeros([2*self.numInts*len(self.fitsList)],dtype='int16') 
+                    valStr = value
+                    if fileNum == 0:
+                        valueArr = np.empty([2 * scanNumInts], dtype='int16')
+                    else:
+                        newArr = np.empty([2 * scanNumInts], dtype='int16')
                 elif param == 'RADESYS':
                     coordSys = goHDU[0].header['COORDSYS']
                     if coordSys == 'RADEC':
                         valStr = value
                     else:
                         valStr=''
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))
-                valueArr[(idx*2*self.numInts):(idx*2*self.numInts)+2*self.numInts:2] = valStr
-                valueArr[(idx*2*self.numInts)+1:(idx*2*self.numInts)+2*self.numInts:2] = valStr
-                idx+=1
-                    
+                    if fileNum == 0:
+                        valueArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
+                    else:
+                        newArr = np.chararray([2 * scanNumInts],itemsize=len(valStr))
+                ## fill initial array
+                if fileNum == 0:
+                    valueArr[:] = valStr
+                ## concatenate subsequent arrays
+                else:
+                    newArr[:] = valStr
+                    valueArr = np.concatenate([valueArr, newArr])    
+            ## retrieve comment and construct column 
             comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
