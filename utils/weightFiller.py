@@ -24,15 +24,13 @@ from astropy.io import fits
 ## get directory as command line argument. 
 binDir = sys.argv[1]
 
-## which correlation mode are we in? 
-corrMode = sys.argv[2]
-
 ## global values 
 floatBytes = 4
 totalElements = 64
 numBeams = 7
 pols = 2
 complexPairs = 2 
+numFreqChans = 25
 
 ## progress bar
 def progressBar(value, endvalue,bar_length=20):
@@ -45,17 +43,8 @@ def progressBar(value, endvalue,bar_length=20):
     sys.stdout.flush()
 
 # TODO: input exceptions
-if corrMode == 'Spectral':
-	numFreqChans = 160
-elif corrMode == 'Calibration':
-	numFreqChans = 25
-elif corrMode == 'FRB':
-	numFreqChans = 5
 
-
-
-
-binList = glob.glob(binDir + '*.bin')
+binList = glob.glob(binDir + '*.bfw')
 
 for i in range(0,len(binList)):
 	progressBar(i,len(binList))
@@ -95,16 +84,15 @@ for i in range(0,len(binList)):
 	## calibration Set filename [64 char]
 	## beamforming algorithm [64 char]
 	## X-Engine ID (unit64)
-
+        print(absIdx)
 
 	##Metadata
 	startByte = totBytes
-
 	## array to store beam offsets. Rows: Az and El offset, columns (beams)
 	offSetArr = np.zeros([2,7],dtype='float32')
 	for off in range(0,7):
-	    offsetIdx = startByte+(i*8)
-	    offSetArr[0, off] = struct.unpack('f',data[offsetIdx:offsetIdx+4])[0]
+	    offsetIdx = startByte+(off*8)
+            offSetArr[0, off] = struct.unpack('f',data[offsetIdx:offsetIdx+4])[0]
 	    offSetArr[1, off] = struct.unpack('f',data[offsetIdx+4:offsetIdx+8])[0]
 
 	## update starting byte to get filenames and BF algorithm

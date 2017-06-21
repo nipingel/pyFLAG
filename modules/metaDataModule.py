@@ -19,16 +19,15 @@ antDataPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508
 lo1APath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/LO1A/'
 weightDataPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Weights/'
 fitsPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/'
-keywordPath = '/Users/npingel/Desktop/Research/FLAG/pros/exampleData/sdKeywords.txt'
+keywordPath = '/users/npingel/FLAG/SpectralFiller/misc/sdKeywords.txt'
 
 class MetaDataModule:
     
         
-
+    ## initialize function. Opens raw data file, numInts, data buffers (banpasses), beam, freqChans, intLength
+    ## total BANK files, and creates column object. 
     def __init__(self,metaFitsList,dataFitsList,numInts,dataBuff_X,dataBuff_Y,beamNum,intLen,numThreads):        
         self.fitsList = [metaFitsList]     
-        for i in range(0,len(self.fitsList)):
-            self.fitsList[i] = self.fitsList[i][:-7] + "4" + self.fitsList[i][-5:]           
         ##TODO: remove above for production
         self.dataFitsList = dataFitsList
         os.chdir(rawDataPath) ##TODO: run on flag3
@@ -857,20 +856,26 @@ class MetaDataModule:
         return hdu[0].header['PROJID']
     
     def constuctBinTableHeader(self):    
-        
+        ## construct primary HDU
         prihdu = self.constructPriHDUHeader()   
         binHeader = fits.Header()
+        ## load list of required SDFITS keywords
         keywordList = np.loadtxt(keywordPath,dtype='bytes')
         keyWordArr = keywordList.astype(str)
+        ##TODO ??
         commentList = []
         paramList = []
         
         ##TODO:SDFITS CORE KEYWORDS
+        ## loop through each keyword
         for keyIdx in range(0,len(keyWordArr),3):
             keyword = keyWordArr[keyIdx]         
-            #if keyword[0:5] != 'TFORM' and keyword[0:5] != 'TUNIT':
+            ## utilize the keyword dictionary to get the associated parameter
             param = self.keyToParamDict[keyword]
+            ## should this be here????
             self.progressBar(keyIdx, len(keyWordArr),self.beamNum)
+            ## knowing the required parameter, use a dictionary of associated functions
+            ## which provide required metadata information and place data
             self.funcDict[param.strip()](self,param.strip())  
             formKey = keyWordArr[keyIdx+1]
             unitKey = keyWordArr[keyIdx+2]

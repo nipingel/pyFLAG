@@ -17,129 +17,159 @@ from modules.metaDataModule import MetaDataModule
 from modules.beamformingModule import BeamformingModule
 import matplotlib.pyplot as pyplot
 
-##global variables
-numGPU = 2
-numTotalThreads = numGPU*2
-##paths to FITS files
-goFitsPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/GO' ##TODO: change to work on flag03/lustre
+## command line inputs
+##TODO: exception handling
+projectPath = sys.argv[1] ## of the form /home/gbtdata/AGBT16B_400_01
+## split project path to get project string
+projectPathSplit = projectPath.split('/')
+projectStr = projectPathSplit[-1] + '/'
+dataPath = '/lustre/projects/flag/' +  projectStr + '/BF/'
 
+##global variables
+numGPU = 10
+numBanks = numGPU*2
+##paths to ancillary FITS files
+goFitsPath = projectPath + '/GO'
 
 ##TODO:Extend sorting from 4 FITS files to 20 FITS files.
-def xid0(dataBuff,data,ints):
-    endChan = 0
-    for i in range(0,25,5):
-        startChan = endChan
-        endChan = startChan+5       
-        dataBuff[ints,startChan:endChan] = data[i:i+5]
-        endChan+=95
-def xid1(dataBuff,data,ints):
-    endChan = 5
-    for i in range(0,25,5):
-        startChan = endChan
-        endChan = startChan+5       
-        dataBuff[ints,startChan:endChan] = data[i:i+5]
-        endChan+=95
- 
-def xid2(dataBuff,data,ints):
-    endChan = 10
-    for i in range(0,25,5):
-        startChan = endChan
-        endChan = startChan+5       
-        dataBuff[ints,startChan:endChan] = data[i:i+5]
-        endChan+=95 
- 
-def xid3(dataBuff,data,ints):
-    endChan = 15
-    for i in range(0,25,5):
-        startChan = endChan
-        endChan = startChan+5       
-        dataBuff[ints,startChan:endChan] = data[i:i+5]
-        endChan+=95   
+
+## function to sort individual BANK data
+## to the full bandpass based on XID. 
+##TODO: add FRB mode functionality
+def bandpassSort(xID, dataBuff, bankData, ints):
+    ## which correlation mode are we in?
+    ## determine this based on number of channels 
+    ## in bandpasss 
+    if len(dataBuf) == 500:
+        ## coarse channel mode
+        ## position in bandpass dictated by xID
+        bandpassStartChan = xID*5
+        bandpassEndChan = bandpassStartChan+5
+        ## get each chunk of five contigious channels from BANK data,
+        ## and place it in the proper spot in full bandpass
+        for i in range(0, 5):
+            bankStartChan = i * 5
+            bankEndChan = bankStartChan + 5
+            dataBuff[ints, bandpassStartChan:bandpassEndChan] = bankData[ints, startBankChan:endBankChan]
+            
+            ## increment bandpassStartChan/bandpassEndChan by 100 for proper position in full bandpass
+            bandpassStartChan += 100
+            bandpassEndChan = bandpassStartChan+5
 
 ##function to determine number of objects observed in session
 def numObjs():        
     goFits = glob.glob(goFitsPath+'/*.fits')
+    ## sort to get correct time stamp order
+    goFitsSorted = np.sort(goFits)
     objList = []
     fitsList = []
     itr = 0.
-    for goName in goFits:
+    for goName in goFitsSorted:
        goHDU = fits.open(goName)
        if itr == 0:
            objList.append(goHDU[0].header['OBJECT'])
            fitsList.append([])
-           fitsList[-1].append(goName[-24:])
+           fitsList[0].append(goName[-24:])
            itr+=1
        else:
            obj = goHDU[0].header['OBJECT']
-           if objList[-1] != obj:
+           if obj not in objList:
                objList.append(goHDU[0].header['OBJECT']) 
-               fitsList.append([])
-           fitsList[-1].extend([goName[-24:]])
+               fitsList.append([])    
+           fitsList[-1].append(goName[-24:])
     return objList, fitsList
 
-##function to get number of integrations
-def getNumInts(file):
-    hdu = fits.open(file)
-    return hdu[1].header['NAXIS2']
+##function to get number of integrations, integration length, and number of channels
+def getScanInfo(fileName):
+    fitsLst = glob.glob(dataPath + fileName[:-6] + '*.fits')
+    hdu = fits.open(fitsLst[0])
+    intLen = np.float(hdu[0].header['REQSTI'])
+    numInts = np.int(hdu[1].header['NAXIS2'])
+    form = np.float(hdu[1].header['TFORM3'][:-1])
+    numChans = form/2112
+    return numInts, intLen, numChans, np.sort(fitsLst)
 
 def main():
-    bf = BeamformingModule()
-    banks = {"A" : xid0,
-             "B" : xid3,
-             "C" : xid1,
-             "D" : xid2,
+    bf = BeamformingModule(dataPath)
+    bankDict = {"A" : 0,
+             "B" : 1,
+             "C" : 2,
+             "D" : 3,
+	     "E" : 4, 
+	     "F" : 5, 
+             "G" : 6, 
+             "H" : 7,
+             "I" : 8, 
+             "J" : 9,
+             "K" : 10,
+             "L" : 11,
+             "M" : 12,
+             "N" : 13,
+             "O" : 14,
+             "P" : 15,
+             "Q" : 16,
+             "R" : 17,
+             "S" : 18,
+             "T" : 19,
              }
-##TODO: include intLen parameter
-## change working directory to project dir assumed to be first and only command-line argument. 
+##TODO: check current directory permissions -- must have writing access
+## the only commandline argument should be path to project/session ancillary FITS files    
     pwd = os.getcwd()
-    os.chdir(str(sys.argv[1]))    
-    print('Changing working directory to: '+str(sys.argv[1]))
+    print('Project directory: ' + np.str(sys.argv[1]))
     print('Building Primary HDU...')  
     #os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData/') 
     objList,fitsList = numObjs()    
-    ##TODO: put back in: for objs in range(0,len(objList)):
+    ##TODO: put in logic to sort list of fits files if observer went back to the same source... 
     for objs in range(1,2):  
-        intLen = .25 ##seconds
-        fileList = fitsList[objs]  
-        #fileList = ['2016_07_29_10:46:06A.fits','2016_07_29_10:46:06B.fits','2016_07_29_10:46:06C.fits','2016_07_29_10:46:06D.fits'] ##TODO: make general
-        fileList = ['2016_07_29_11:29:17A.fits','2016_07_29_11:29:17B.fits','2016_07_29_11:29:17C.fits','2016_07_29_11:29:17D.fits']
-        numInts = getNumInts(fileList[0])
-        for beam in range(0,7): ##TODO: change back to 7 
-            globalDataBuff_X = np.zeros([int(len(fileList)/len(banks)),numInts,25*20]) ##TODO: make general based on CovMode
-            globalDataBuff_Y = np.zeros([int(len(fileList)/len(banks)),numInts,25*20]) ##TODO: make general based on CovMode
-            cnt = 0
-            fileIdx = -1
-            for file in fileList:        
-                print('\n')                
-                print('Beamforming correlations in: '+file[-25:]+', Beam: '+np.str(beam)) 
-                if cnt % numTotalThreads == 0:
-                    dataBuff_X = np.zeros([numInts,25*20])   ##TODO: make mode independent  
-                    dataBuff_Y = np.zeros([numInts,25*20])
-                    fileIdx+=1
-                bank = file[-6]
-                bank = bank[0]##TODO: grab from header? 
-                if bank == 'A':
-                    xid = 0
-                elif bank == 'B':
-                    xid = 3
-                elif bank == 'C':
-                    xid = 1
-                elif bank == 'D':
-                    xid = 2
-                xData,yData,nints = bf.getSpectralArray(file,beam,xid)       
-                for ints in range(0,nints):
-                    banks.get(bank)(dataBuff_X,xData[ints,:],ints)
-                    banks.get(bank)(dataBuff_Y,yData[ints,:],ints)
-                globalDataBuff_X[fileIdx,:,:] = dataBuff_X
-                globalDataBuff_Y[fileIdx,:,:] = dataBuff_Y
-                cnt+=1
+        fileList = fitsList[objs]
+        ## above file list does not contain fits files with BANK info
+        ## get number of ints, int length, # chans, and proper bankList 
+        numInts, intLen, numChans, bankList = getScanInfo(fileList[0])
+        
+        ## loop over FITS files for one object to construct a single SINGLE DISH binary FITS table
+        for dataFITSFile in fileList:
+            ## process data per beam
+            for beam in range(0,7): 
+                ## structure of global buffer is:
+                ## dim1: scan
+                ## dim2: integrations
+                ## dim3: bandpass
+                globalDataBuff_X = np.zeros([int(len(fileList)), numInts, numChans * numBanks]) ##TODO: make general based on CovMode
+                globalDataBuff_Y = np.zeros([int(len(fileList)), numInts, numChans * numBanks]) ##TODO: make general based on CovMode
+                fileIdx = -1
+                cnt = 0
+                for fileName in bankList:        
+                    print('\n')                
+                    print('Beamforming correlations in: '+fileName[-25:]+', Beam: '+np.str(beam)) 
+                    if cnt % len(bankList) == 0:
+                         dataBuff_X = np.zeros([numInts, numChans * numBanks])   ##TODO: make mode independent  
+                         dataBuff_Y = np.zeros([numInts, numChans * numBanks])
+                         fileIdx+=1 
+                    ## bank name is ALWAYS sixth-to-last character in string
+                    bank = fileName[-6] 
+                    ## grab xid from dictionary
+                    xID = bankDict[bank]
+                
+                    ## Do the beamforming; returns processed BANK data 
+                    ## (cov matrices to a beam-formed bandpass) in both
+                    ## XX/YY Pols; returned data are in form: 
+                    ## rows: ints, columns: freqChans
+                    xData,yData = bf.getSpectralArray(fileName,beam,xid)       
+                    ## sort based on xid number for each integration
+                    for ints in range(0,numInts):
+                        bandpassSort(xID, dataBuff_X, xData, ints)
+		        bandpassSort(xID, dataBuff_Y, yData, ints)
+                    ## fill global data bufs
+                    globalDataBuff_X[fileIdx,:,:] = dataBuff_X
+                    globalDataBuff_Y[fileIdx,:,:] = dataBuff_Y
+                    cnt+=1
 
-            print('\n')            
-            md = MetaDataModule(fileList[0],fileList,numInts,globalDataBuff_X,globalDataBuff_Y,beam,intLen,numTotalThreads)
-            thduList = md.constuctBinTableHeader()
-            fileName = fileList[0]
-            fileName = fileName[:-6]
-            thduList.writeto(pwd+'/'+fileName+'_Beam'+str(beam)+'.fits')
+                print('\n')
+                ## build metadata; inputs are FITS file for ancillary files, numInts, global data buffers, int length            
+                md = MetaDataModule(fileList[0],fileList,numInts,globalDataBuff_X,globalDataBuff_Y,beam,intLen,numTotalThreads)
+                thduList = md.constuctBinTableHeader()
+                dataFITSFile[:-6] = dataFITSFile
+                thduList.writeto(pwd+'/' + dataFITSFile + '_Beam'+str(beam)+'.fits')
     
        
     
