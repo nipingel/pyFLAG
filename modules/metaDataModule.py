@@ -13,7 +13,7 @@ import collections
 import sys
 
 ##globalPaths
-rawDataPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData'
+rawDataPath = 
 goDataPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/GO'
 antDataPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Antenna'
 lo1APath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/LO1A/'
@@ -26,78 +26,94 @@ class MetaDataModule:
         
     ## initialize function. Opens raw data file, numInts, data buffers (banpasses), beam, freqChans, intLength
     ## total BANK files, and creates column object. 
-    def __init__(self,metaFitsList,dataFitsList,numInts,dataBuff_X,dataBuff_Y,beamNum,intLen,numThreads):        
-        self.fitsList = [metaFitsList]     
-        ##TODO: remove above for production
-        self.dataFitsList = dataFitsList
+    def __init__(self, metaFitsList, bankFitsList, numBanksList, dataBuff_X,dataBuff_Y,beamNum, ancPath, rawDataPath):        
+        self.fitsList = metaFitsList     
+        self.bankFitsList = bankFitsList
+        self.numBanksList = numBanksList
         os.chdir(rawDataPath) ##TODO: run on flag3
-        hdu = fits.open(dataFitsList[0])
+        hdu = fits.open(bankFitsList[0])
         dmjd = hdu[1].data['DMJD']
         self.dmjd = dmjd
-        self.numInts = numInts
         self.dataBuff_X = dataBuff_X
         self.dataBuff_Y = dataBuff_Y
         self.beamNum = beamNum 
+        self.ancPath = ancPath
+        self.dataPath = rawDataPath
         self.numFreqChans = len(dataBuff_X[0,0,:])
-        self.intLen = intLen
-        self.numThreads = numThreads
         self.Column = collections.namedtuple('Column',['param','valueArr','comment'])
         self.cols = None
 
-##TODO: check to make sure len(fitsList) / numThreads = 1in all methods
-        def getSMKey(self,param,singleVal = False): ##TODO: get actual shared memory values
-            os.chdir(rawDatapath) ##TODO: run on flag03
-            ##TODO: remove for production
-            repeat = False
+        def getSMKey(self,param,singleVal = False):
+            ## iterate flag defaults to false. Is set True based on parameter
+            iterate = False
+            ## open first BANK file to get initial number of integrations used to initialize value array
+            corHDU = fits.open(self.dataFitsList[0])
+            initIntVal = corHDU[1].header['NAXIS2']
+            ## determine time spent in state (e.g. calOn, calOff); 
+            ## since we do no freq sw or cal sw, this is equal to scan time
             if param == 'DURATION':
-                paramLook = 'REQSTI'
-                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
-                corHDU = fits.open(dataFitsList[0])
-                value = corHDU[0].header[paramLook]
-                repeat = True
+                valueArr = np.empty([2 * initIntVal], dtype='float32')
+                paramLook = 'SCANLEN'
+                iterate = True ## will be equal for all integrations within one FITS file
+            ## retrieve actual integration time
             elif param == 'EXPOSURE':
-                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
+                valueArr = np.empty([2 * initIntVal], dtype='float32')
                 paramLook = 'ACTSTI'
-                paramLook = 'REQSTI' ##TODO: remove for production
-                corHDU = fits.open(dataFitsList[0])
-                value = corHDU[0].header[paramLook]
-                repeat = True
-            elif any([param == 'OBSMODE', param == 'BANDWID', param == 'CRPIX1', param == 'CDELT1', param == 'FREQRES']) and singleVal == True:
-                paramLook = 'COVMODE'
-                corHDU = fits.open(dataFitsList[0])
-                value = corHDU[0].header[paramLook]
-                return value
+                iterate = True 
+            ## retrieve correlation mode
             elif param == 'OBSMODE':
-                paramLook = 'COVMODE'  
-                corHDU = fits.open(dataFitsList[0])
-                value = corHDU[0].header[paramLook]
-                valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(value))                
-                repeat = True
+                valueArr = np.empty([2 * initIntVal], dtype='float32')
+                paramLook = 'COVMODE'
+                iterate = True
+            ## function that is called in getModeDepParams; returns a list of correlation modes for FITS files associated with object
+            elif any(param == 'BANDWID', param == 'CRPIX1', param == 'CDELT1', param == 'FREQRES']) and singleVal == True:
+                paramLook = 'COVMODE'
+                covModeList = []
+                ## loop through first BANK files to compile list of COVMODES
+                for bankIdx in range(0, len(self.dataFitsList), self.numBanks):
+                    corHDU = fits.open(dataFitsList[bankIdx])
+                    covModeList.append(corHDU[0].header[paramLook])
+                return covModeList 
+            ## determine start time of each integration
             elif param == 'DATE-OBS':
-                param1 = 'DATE-OBS'
-                param2 = 'REQSTI'
-                for file in range(0,len(self.fitsList)):            
-                    corHDU = fits.open(dataFitsList[file])
-                    dateTime = corHDU[0].header[param1]
-                    valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(dateTime)+2)
-                    intLen = corHDU[0].header[param2]
-                    dateTimeObj = Time(dateTime,format='isot',scale='utc')   
-                    intLen = np.float(intLen)/(24*3600.)
-                    idx = 0
-                    for i in range(0,2*self.numInts,2):
-                        newTime = ((idx*self.numInts)+i)*intLen+dateTimeObj.jd
-                        newTime = Time(newTime,format='jd', scale='utc')
-                        value = newTime.fits
-                        value = value[:-6] ##drop erroneus digits
-                        valueArr[(idx*self.numInts)+i] = value
-                        valueArr[(idx*self.numInts)+i+1] = value
-                    idx+=1
-            if repeat == True:            
-                idx = 0
-                for file in range(0,len(self.fitsList)):                      
-                    valueArr[(idx*2*self.numInts):(idx*2*self.numInts)+2*self.numInts:2] = value
-                    valueArr[(idx*2*self.numInts)+1:(idx*2*self.numInts)+2*self.numInts:2] = value
-                idx+=1
+                bankIdx = 0
+                for fileNum in range(0,len(self.fitsList)):            
+                    corHDU = fits.open(dataFitsList[bankIdx])
+                    scanDMJD = corHDU[1].data['DMJD']
+                    scanNumInts = corHdu[0].header['NAXIS2']
+                    ## cast DMJD to correct string format
+                    timeObj = Time(scanDMJD, format = 'mjd', scale='utc') 
+                    ## initialize array to store parameter values
+                    if fileNum == 0: 
+                        valueArr = np.chararray([2*scanNumInts],itemsize=len(timeObj[0].isot))
+                        ## fill with correctly formated integration start times
+                        valueArr[:] = times.isot
+                    ## if not first iteration, create new array and concatenate
+                    else:
+                        newArr = np.chararray([2*scanNumInts],itemsize=len(timeObj[0].isot))
+                        valueArr = np.concatenate([valueArr, newArr])
+                    bankIdx += self.numBanksList[fileNum]
+            
+            ## fill in value array for similar values across integrations
+            if iterate == True: 
+                ## initialize FITS file index           
+                fileIdx = 0
+                bankIdx = 0
+                for fileNum in range(0,len(self.fitsList)):
+                    corHDU = fits.open(self.dataFitsList[bandIdx])
+                    scanNumInts = corHdu[0].header['NAXIS2']
+                    value = corHDU[0].header[paramLook]
+                    ## if first iteration, fill already initialized array
+                    if fileNum == 0: 
+                        valueArr[:] = value
+                    else: 
+                        ## construct new array
+                        newArray = np.full([2*scanNumInts], dtype = valueArr.dtype, fill_value = value)
+                        ## concatenate array to global value arr 
+                        valueArr = np.concatenate([valueArr, newArr])
+                    ## update indices
+                    bankIdx += self.numBanksList[fileNum]
+            ## retrieve comment and construct column    
             comment = self.commentDict[param]            
             self.Column.param = param            
             self.Column.comment = comment
@@ -507,7 +523,6 @@ class MetaDataModule:
                             'LST': 'local sidereal time (LST)', 
                             'CTYPE2':'second axis is longitude-like',
                             'CTYPE3': 'third axis is latitude-like',
-                            'BANDWID':'bandwidth',
                             'CRVAL1':'',
                             'CRPIX1':'',
                             'CDELT1':'',

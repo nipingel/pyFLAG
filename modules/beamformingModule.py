@@ -21,22 +21,22 @@ class BeamformingModule:
         self.dataPath = dataPath
         ## get project ID
         dataPathSplit = dataPath.split('/')
-        self.projectId = dataPathSplit[-2] ## always second last
-    def progressBar(self,value, endvalue, beam,xid,bar_length=20):
+        self.projectID = dataPathSplit[-3] ## always third last
+    def progressBar(self,value, endvalue, beam, xID,bar_length=20):
 
         percent = float(value) / endvalue
         arrow = '-' * int(round(percent * bar_length)-1) + '>'
         spaces = ' ' * (bar_length - len(arrow))
 
-        sys.stdout.write("\rPercent of integrations filled in beam "+np.str(beam)+",xid "+str(xid)+": [{0}] {1}%".format(arrow + spaces, int(round(percent * 100))))
+        sys.stdout.write("\rPercent of integrations filled in beam "+np.str(beam)+",xID "+str(xID)+": [{0}] {1}%".format(arrow + spaces, int(round(percent * 100))))
         sys.stdout.flush()    
         
     def getRawCorrelations(self,fitsName):
         hdu = fits.open(fitsName)
         corrData = hdu[1].data.field('DATA')
         return corrData      
-    def getWeights(self,numChans): ## TODO: finish weights
-        hdu = fits.open(dataPath+'/weight_files/' + 'w_' + self.projectID + '*.fits')
+    def getWeights(self,numChans,bank): ## TODO: finish weights
+        hdu = fits.open(self.dataPath+'weight_files/' + 'w_' + self.projectID + '_' + bank + '.FITS')
         ## weight array in the form of freqchans, element data, beams
         xWeights = np.zeros([numChans,40,7], dtype='complex64') 
         yWeights = np.zeros([numChans,40,7], dtype='complex64')  
@@ -75,7 +75,7 @@ class BeamformingModule:
            ## set starting index for new data buffer
            FITS_strt_idx = 0
            ## put correlations into real/imag pairs
-           for i in range(0,freqChans*2112, 2112):
+           for i in range(0, numFreqs*2112, 2112):
                singleChanData = dataVector[i:i+2112]
                for z in range(0,len(self.mapVector)):
                    newDataVector[z+FITS_strt_idx] = singleChanData[self.mapVector[z]]
@@ -99,9 +99,9 @@ class BeamformingModule:
            ## The lower index of rows is increased to avoid placing a redundant correlation
            for col in range(numElem) :
                for row in range(col, numElem) :
-                   retCube[row,col, :] = newDataVector[offset::num_cor]
+                   retCube[row,col, :] = newDataVector[offset::numCorr]
                    if row != col :
-                       retCube[col,row,:] = newDataVector[offset::num_cor].conj()
+                       retCube[col,row,:] = newDataVector[offset::numCorr].conj()
                    offset += 1   
            return retCube
     
@@ -140,32 +140,30 @@ class BeamformingModule:
         ydat = dat[20:39]
         return xdat, ydat 
         
-    def getSpectralArray(self,fitsName,beam):
+    def getSpectralArray(self, fitsName, beam, xID, bank):
         ## open BANK FITS file
         dataArr = self.getRawCorrelations(fitsName)
-        
         ## get number of freq channels
-        num_freqs = dataArr.shape[1] / 2112 ## always 2112 complex pairs per frequency channel
-        
+        numFreqs = dataArr.shape[1] / 2112 ## always 2112 complex pairs per frequency channel
         ## create bandpass containers. Rows are ints; colums represent integration bandpasses
-        spectrumArr_X = np.zeros([len(dataArr[:,0]),num_freq], dtype='float32')    
-        spectrumArr_Y = np.zeros([len(dataArr[:,0]),num_freq], dtype='float32') 
+        spectrumArr_X = np.zeros([len(dataArr[:,0]),numFreqs], dtype='float32')    
+        spectrumArr_Y = np.zeros([len(dataArr[:,0]),numFreqs], dtype='float32') 
         
         ## unpack the weights from the associated binary file
-        xWeight,yWeight = self.getWeights(num_freq,xid)
+        xWeight,yWeight = self.getWeights(numFreqs, bank)
         ## loop through integrations and process covariance bandpass to beam-formed spectra
         for ints in range(0,len(dataArr[:,0])):   
             ## TODO: best place for this??
-            self.progressBar(ints,len(dataArr[:,0]),beam)            
+            self.progressBar(ints,len(dataArr[:,0]), beam, xID)            
             ## grab a covariance bandpass for a single integration
             dataVector=dataArr[ints,:]
             ## send to get in FISHFITS order before sorting into 'cube' of shape (40,40,freqChans)
-            corrCube = self.getCorrelationCube(dataVector)
+            corrCube = self.getCorrelationCube(dataVector, numFreqs)
             ## loop through frequency channels to apply weights. Inputs into processPol
             ## are a 40x40 covariance matrix, pol flag, and a length 40 weight vector
-            for z in range(0,num_freq):
-                dat = corrCube[z,:,:]
+            for z in range(0,numFreqs):
+                dat = corrCube[:,:,z]
                 spectrumArr_X[ints,z] = np.real(self.processPol(dat,0,xWeight[z,:,beam])) ##0 is XX
                 spectrumArr_Y[ints,z] = np.real(self.processPol(dat,1,yWeight[z,:,beam])) ##1 is YY
-        return spectrumArr_X,spectrumArr_Y,ints+1 ##TODO: why return ints?
+        return spectrumArr_X,spectrumArr_Y
         

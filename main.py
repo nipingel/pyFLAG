@@ -23,7 +23,7 @@ projectPath = sys.argv[1] ## of the form /home/gbtdata/AGBT16B_400_01
 ## split project path to get project string
 projectPathSplit = projectPath.split('/')
 projectStr = projectPathSplit[-1] + '/'
-dataPath = '/lustre/projects/flag/' +  projectStr + '/BF/'
+dataPath = '/lustre/projects/flag/' +  projectStr + 'BF/'
 
 ##global variables
 numGPU = 10
@@ -40,7 +40,7 @@ def bandpassSort(xID, dataBuff, bankData, ints):
     ## which correlation mode are we in?
     ## determine this based on number of channels 
     ## in bandpasss 
-    if len(dataBuf) == 500:
+    if len(dataBuff) == 500:
         ## coarse channel mode
         ## position in bandpass dictated by xID
         bandpassStartChan = xID*5
@@ -122,12 +122,17 @@ def main():
     ##TODO: put in logic to sort list of fits files if observer went back to the same source... 
     for objs in range(1,2):  
         fileList = fitsList[objs]
-        ## above file list does not contain fits files with BANK info
-        ## get number of ints, int length, # chans, and proper bankList 
-        numInts, intLen, numChans, bankList = getScanInfo(fileList[0])
-        
+        allBanksList = [] ## master list of all BANKS for all FITS files associated with object
+        numBanksList = [] ## number of BANKS associated with FITS file
         ## loop over FITS files for one object to construct a single SINGLE DISH binary FITS table
         for dataFITSFile in fileList:
+            ## above file list does not contain fits files with BANK info
+            ## get number of ints, int length, # chans, and proper bankList
+            numInts, intLen, numChans, bankList = getScanInfo(fileList[0])
+            ## append master BANK list
+            allBanksList.extend(bankList)
+            ## append number of BANKS
+            numBanksList.append(len(bankList))
             ## process data per beam
             for beam in range(0,7): 
                 ## structure of global buffer is:
@@ -138,7 +143,9 @@ def main():
                 globalDataBuff_Y = np.zeros([int(len(fileList)), numInts, numChans * numBanks]) ##TODO: make general based on CovMode
                 fileIdx = -1
                 cnt = 0
-                for fileName in bankList:        
+                for fileName in bankList:
+                    print(bankList)
+                    print(fileList)        
                     print('\n')                
                     print('Beamforming correlations in: '+fileName[-25:]+', Beam: '+np.str(beam)) 
                     if cnt % len(bankList) == 0:
@@ -154,7 +161,7 @@ def main():
                     ## (cov matrices to a beam-formed bandpass) in both
                     ## XX/YY Pols; returned data are in form: 
                     ## rows: ints, columns: freqChans
-                    xData,yData = bf.getSpectralArray(fileName,beam,xid)       
+                    xData,yData = bf.getSpectralArray(fileName,beam, xID, bank)       
                     ## sort based on xid number for each integration
                     for ints in range(0,numInts):
                         bandpassSort(xID, dataBuff_X, xData, ints)
@@ -166,7 +173,7 @@ def main():
 
                 print('\n')
                 ## build metadata; inputs are FITS file for ancillary files, numInts, global data buffers, int length            
-                md = MetaDataModule(fileList[0],fileList,numInts,globalDataBuff_X,globalDataBuff_Y,beam,intLen,numTotalThreads)
+                md = MetaDataModule(fileList, allBanksList, numBanksList, globalDataBuff_X, globalDataBuff_Y, beam, projectPath, dataPath)
                 thduList = md.constuctBinTableHeader()
                 dataFITSFile[:-6] = dataFITSFile
                 thduList.writeto(pwd+'/' + dataFITSFile + '_Beam'+str(beam)+'.fits')

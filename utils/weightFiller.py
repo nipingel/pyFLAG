@@ -50,7 +50,8 @@ for i in range(0,len(binList)):
 	progressBar(i,len(binList))
 	file = binList[i]
 	fileSplit = file.split('/')
-	with open(file, 'rb') as f:
+	bank = file[-5]
+        with open(file, 'rb') as f:
 		data=f.read()
 
 	## array to hold weights
@@ -84,7 +85,6 @@ for i in range(0,len(binList)):
 	## calibration Set filename [64 char]
 	## beamforming algorithm [64 char]
 	## X-Engine ID (unit64)
-        print(absIdx)
 
 	##Metadata
 	startByte = totBytes
@@ -147,12 +147,7 @@ for i in range(0,len(binList)):
 	thdulist = fits.HDUList([priHdu, tbHdu])
 	
 	## generate filename from split path
-	weightFITSName = '' 
-	for idx in range(1, len(fileSplit)): ## start at index 1 since first element is blank
-		strVal = fileSplit[idx]
-		if strVal == fileSplit[-1]:
-			strVal = strVal[:-4]+'.FITS'
-		weightFITSName += '/'+strVal
+        weightFITSName = binDir + '/weight_files/w_' + fileSplit[-3] + '_' + bank +'.FITS'
 	thdulist.writeto(weightFITSName)
 ## when finished, print newline character
 print('\n')
