@@ -137,19 +137,20 @@ def main():
     ##TODO: put in logic to sort list of fits files if observer went back to the same source... 
     for objs in range(1,2):  
         fileList = fitsList[objs]
+        fileList = fileList[0:2]
         allBanksList = [] ## master list of all BANKS for all FITS files associated with object
         numBanksList = [] ## number of BANKS associated with FITS file
         ## loop over FITS files for one object to construct a single SINGLE DISH binary FITS table
-        for dataFITSFile in fileList:
+        for beam in range(0,7):
             ## above file list does not contain fits files with BANK info
-            ## get number of ints, int length, # chans, and proper bankList
-            numInts, intLen, numChans, bankList = getScanInfo(fileList[0])
-            ## append master BANK list
-            allBanksList.extend(bankList)
-            ## append number of BANKS
-            numBanksList.append(len(bankList))
             ## process data per beam
-            for beam in range(0,7): 
+            for dataFITSFile in fileList: 
+                numInts, intLen, numChans, bankList = getScanInfo(dataFITSFile)
+                ## append master BANK list
+                allBanksList.extend(bankList)
+                ## append number of BANKS
+                numBanksList.append(len(bankList))
+
                 ## structure of global buffer is:
                 ## dim1: scan
                 ## dim2: integrations
@@ -159,11 +160,9 @@ def main():
                 fileIdx = -1
                 cnt = 0
                 for fileName in bankList:
-                    print(bankList)
-                    print(fileList)        
                     print('\n')                
                     print('Beamforming correlations in: '+fileName[-25:]+', Beam: '+np.str(beam)) 
-                    if cnt % len(bankList) == 0:
+                    if cnt == 0:
                          dataBuff_X = np.zeros([numInts, numChans * numBanks])   ##TODO: make mode independent  
                          dataBuff_Y = np.zeros([numInts, numChans * numBanks])
                          fileIdx+=1 
@@ -181,23 +180,24 @@ def main():
                     for ints in range(0,numInts):
                         bandpassSort(xID, dataBuff_X, xData, ints)
 		        bandpassSort(xID, dataBuff_Y, yData, ints)
+                    print(np.max(dataBuff_Y))
                     ## fill global data bufs
                     globalDataBuff_X[fileIdx,:,:] = dataBuff_X
                     globalDataBuff_Y[fileIdx,:,:] = dataBuff_Y
                     cnt+=1
 
-                print('\n')
-                if numChans == 160:
-                    pfb == True
+            print('\n')
+            if numChans == 160:
+                pfb == True
 
-                ## save out important variables TEST
-                with open('/users/npingel/FLAG/M51Vars.pickle', 'rb') as f:
-                   globalDataBuff_X, globalDataBuff_Y, fileList, allBanksList, numBanksList, beam, projectPath, dataPath, pfb = pickle.load(f)
-                ## build metadata; inputs are FITS file for ancillary files, numInts, global data buffers, int length            
-                md = MetaDataModule(projectPath, fileList, allBanksList, numBanksList, globalDataBuff_X, globalDataBuff_Y, beam, projectPath, dataPath, pfb)
-                thduList = md.constuctBinTableHeader()
-                dataFITSFile[:-6] = dataFITSFile
-                thduList.writeto(pwd+'/' + dataFITSFile + '_Beam'+str(beam)+'.fits')
+            ## save out important variables TEST
+            ##with open('/users/npingel/FLAG/M51Vars_' + np.str(beam) + '.pickle', 'wb') as f:
+            ##    pickle.dump([globalDataBuff_X, globalDataBuff_Y, fileList, allBanksList, numBanksList, beam, projectPath, dataPath, pfb],  f)
+            ## build metadata; inputs are FITS file for ancillary files, numInts, global data buffers, int length            
+            md = MetaDataModule(projectPath, dataPath, fileList, allBanksList, numBanksList, globalDataBuff_X, globalDataBuff_Y, beam, pfb)
+            thduList = md.constuctBinTableHeader()
+            dataFITSFile[:-6] = dataFITSFile
+            thduList.writeto(pwd+'/' + dataFITSFile + '_Beam'+str(beam)+'.fits')
     
        
     

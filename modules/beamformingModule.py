@@ -50,8 +50,8 @@ class BeamformingModule:
             ## can drop last 24 correlation pairs as they are unused and zero. First 80 elements are good. 
             for chan in range(0,numChans):
                 weightPairs = data[(totalElemInChan*chan):(totalElemInChan*chan)+80]                 
-                xWeights[chan,:,i].real = weightPairs[0:len(weightPairs):2]
-                xWeights[chan,:,i].imag = weightPairs[1:len(weightPairs):2]
+                xWeights[chan,:,i].real = weightPairs[0::2]
+                xWeights[chan,:,i].imag = weightPairs[1::2]
             ## open and process YY Pol
             polStr = 'Y'
             data = hdu[1].data['Beam'+np.str(i)+polStr]
@@ -61,7 +61,7 @@ class BeamformingModule:
                 yWeights[chan,:,i].imag = weightPairs[1:len(weightPairs):2] 
         return xWeights,yWeights
     
-    def processPol(self,R,pol,w):
+    def processPol(self,R,w):
         spectrum = np.dot(w.conj().T,np.dot(R,w))
         return spectrum
         
@@ -169,14 +169,15 @@ class BeamformingModule:
             for z in range(0,numFreqs):
                 dat = corrCube[:,:,z]
                 if numFreqs == 25:
-                    spectrumArr_X[ints,z] = np.real(self.processPol(dat,0,xWeight[z,:,beam])) ##0 is XX
-                    spectrumArr_Y[ints,z] = np.real(self.processPol(dat,1,yWeight[z,:,beam])) ##1 is YY
+                    retSpec = np.real(self.processPol(dat, yWeight[z,:,beam]))
+                    spectrumArr_X[ints,z] = np.real(self.processPol(dat, xWeight[z,:,beam])) ##0 is XX
+                    spectrumArr_Y[ints,z] = np.real(self.processPol(dat, yWeight[z,:,beam])) ##1 is YY
                 elif numFreqs == 160:
                     wtIdx = absWtIdx + (chanSel*5)
                     xWeightIn = xWeight[wtIdx,:,beam]
                     yWeightIn = yWeight[wtIdx,:,beam]
-                    SpectrumArr_X[ints,z] = np.real(self.processPol(dat,0,xWeightIn)) ##0 is XX
-                    SpectrumArr_Y[ints,z] = np.real(self.processPol(dat,1,yWeightIn)) ##1 is YY
+                    SpectrumArr_X[ints,z] = np.real(self.processPol(dat, xWeightIn)) ##0 is XX
+                    SpectrumArr_Y[ints,z] = np.real(self.processPol(dat, yWeightIn)) ##1 is YY
                     cnt += 1
                     if cnt > 32:
                         absWtIdx += 1

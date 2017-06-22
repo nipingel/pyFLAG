@@ -20,19 +20,14 @@ class MetaDataModule:
         
     ## initialize function. Opens raw data file, numInts, data buffers (banpasses), beam, freqChans, intLength
     ## total BANK files, and creates column object. 
-    def __init__(self, projectPath, fitsList, bankFitsList, numBanksList, weightFile, dataBuff_X,dataBuff_Y,beamNum, ancPath, rawDataPath):        
+    def __init__(self, projectPath, rawDataPath, fitsList, bankFitsList, numBanksList, dataBuff_X,dataBuff_Y,beamNum, pfb):        
+        self.projectPath = projectPath
         self.fitsList = fitsList     
         self.bankFitsList = bankFitsList
         self.numBanksList = numBanksList
-        self.weightFile = weightFile
-        os.chdir(rawDataPath) ##TODO: run on flag3
-        hdu = fits.open(bankFitsList[0])
-        dmjd = hdu[1].data['DMJD']
-        self.dmjd = dmjd
         self.dataBuff_X = dataBuff_X
         self.dataBuff_Y = dataBuff_Y
         self.beamNum = beamNum 
-        self.ancPath = ancPath
         self.dataPath = rawDataPath
         self.valueArr = None
         self.newArr = None
@@ -453,7 +448,9 @@ class MetaDataModule:
         def getBeamOffsets(self,param):
             bankIdx = 0
             for fileNum in range(0,len(self.fitsList)):
-                wHDU = fits.open(self.weightFile)
+                weightFiles = glob.glob(self.dataPath + 'weight_files/*.FITS') 
+                ## just open first file since offsets are ubiquitous
+                wHDU = fits.open(weightFiles[0]))
                 if param == 'FEEDXOFF':
                     beamOff_Az = hdu[1].data['BeamOff_AZ']
                     value = beamOff_Az[self.beamNum]
@@ -888,8 +885,7 @@ class MetaDataModule:
         return dateStr
         
     def readScanLog_Header(self):
-        os.chdir(fitsPath)
-        hdu = fits.open('ScanLog.fits')
+        hdu = fits.open(self.projectPath + '/ScanLog.fits')
         return hdu[0].header      
         
     def constructPriHDUHeader(self):
