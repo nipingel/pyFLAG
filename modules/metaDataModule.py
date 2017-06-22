@@ -127,6 +127,8 @@ class MetaDataModule:
             for fileNum in range(0,len(self.fitsList)):            
                 goHDU = fits.open(self.projectPath + '/GO/' + self.fitsList[fileNum])                
                 corrHDU = fits.open(self.bankFitsList[bandIdx])
+                ## get chansel
+                chanSel = corrHdu[0].header['CHANSEL']
                 scanNumInts = corrHDU[1].header['NAXIS2']
                 if paramLook != 'TIMESTAMP':           
                     value = goHDU[0].header[paramLook]
@@ -181,6 +183,10 @@ class MetaDataModule:
                     self.initArr(fileNum, numScanInts, 'str', valStr)
                 elif param == 'RESTFRQ':
                     valStr = 1450.00*1e6##TODO:remove for production
+                    if self.pfb == True
+                        lowEnd = valStr-(250-(chanSel*100))*.30318
+                        highEnd = valStr-(250-(chanSel*100+100))*.30318
+                        valStr = highEnd - (highEnd-lowEnd)/2
                     self.initArr(fileNum, numScanInts, 'float32', None)
                 elif param == 'SCAN' or param == 'PROCSEQN' or param == 'PROCSIZE':
                     valStr = value
