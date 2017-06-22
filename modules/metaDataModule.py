@@ -13,12 +13,6 @@ import collections
 import sys
 
 ##globalPaths
-rawDataPath = 
-goDataPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/GO'
-antDataPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Antenna'
-lo1APath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/LO1A/'
-weightDataPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/Weights/'
-fitsPath = '/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/'
 keywordPath = '/users/npingel/FLAG/SpectralFiller/misc/sdKeywords.txt'
 
 class MetaDataModule:
@@ -26,10 +20,11 @@ class MetaDataModule:
         
     ## initialize function. Opens raw data file, numInts, data buffers (banpasses), beam, freqChans, intLength
     ## total BANK files, and creates column object. 
-    def __init__(self, projectPath, fitsList, bankFitsList, numBanksList, dataBuff_X,dataBuff_Y,beamNum, ancPath, rawDataPath):        
+    def __init__(self, projectPath, fitsList, bankFitsList, numBanksList, weightFile, dataBuff_X,dataBuff_Y,beamNum, ancPath, rawDataPath):        
         self.fitsList = projectPath +      
         self.bankFitsList = bankFitsList
         self.numBanksList = numBanksList
+        self.weightFile = weightFile
         os.chdir(rawDataPath) ##TODO: run on flag3
         hdu = fits.open(bankFitsList[0])
         dmjd = hdu[1].data['DMJD']
@@ -64,8 +59,6 @@ class MetaDataModule:
                     self.newArr = np.chararray([self.numPhases * NumInts], itemsize=len(valStr))
                 else
                     self.newArr = np.empty([self.numPhases * numInts], dtype=dtype)
-                    
-                      
 
         def getSMKey(self,param,singleVal = False):
             ## iterate flag defaults to false. Is set True based on parameter
@@ -86,17 +79,7 @@ class MetaDataModule:
                  ## retrieve correlation mode
                  elif param == 'OBSMODE':
                      self.initArr(fileNum, numScanInts, 'float32', None)
-                     value = corrHDU[0].header['COVMODE']
-                 ## function that is called in getModeDepParams; returns a list of correlation modes for FITS files associated with object
-                 elif any(param == 'BANDWID', param == 'CRPIX1', param == 'CDELT1', param == 'FREQRES']) and singleVal == True:
-                     paramLook = 'COVMODE'
-                     covModeList = []
-                     ## loop through first BANK files to compile list of COVMODES
-                     for bankIdx in range(0, len(self.dataFitsList), self.numBanks):
-                         corrHDU = fits.open(dataFitsList[bankIdx])
-                         covModeList.append(corrHDU[0].header[paramLook])
-                     return covModeList 
-                 ## determine start time of each integration
+                     value = corrHDU[0].header['MODENAME']
                  elif param == 'DATE-OBS':
                      scanDMJD = corrHDU[1].data['DMJD']
                      ## cast DMJD to correct string format
@@ -142,7 +125,7 @@ class MetaDataModule:
                 paramLook = param
             bankIdx = 0
             for fileNum in range(0,len(self.fitsList)):            
-                goHDU = fits.open(self.projectPath + '/' + self.fitsList[fileNum])                
+                goHDU = fits.open(self.projectPath + '/GO/' + self.fitsList[fileNum])                
                 corrHDU = fits.open(self.bankFitsList[bandIdx])
                 scanNumInts = corrHDU[1].header['NAXIS2']
                 if paramLook != 'TIMESTAMP':           
@@ -241,7 +224,7 @@ class MetaDataModule:
             iterate = True
             bankIdx = 0
             for fileNum in range(0,len(self.fitsList)):            
-                antHDU = fits.open(self.fitsList[fileNum])
+                antHDU = fits.open(self.projectPath + '/Antenna/' + self.fitsList[fileNum]))
                 antDMJD = antHDU[2].data['DMJD']
                 ## get integrations this scan
                 corrHDU = fits.open(self.bankFitsList[bankIdx])
@@ -277,23 +260,14 @@ class MetaDataModule:
                 elif param == 'TAMBIENT':
                     value = antHDU[0].header['AMBTEMP']
                     value+=273.0
-                    if fileNum == 0:
-                        valueArr = np.full([2 * scanNuInts], dtype='float32', fill_value = value)
-                    else:
-                        newArr = np.full([2 * scanNuInts], dtype='float32', fill_value = value)
+                    self.initArr(fileNum, numScanInts, 'float32', None)
                 elif param == 'HUMIDITY':
                     value = antHDU[0].header['AMBHUMID']
-                    if fileNum == 0:
-                        valueArr = np.full([2 * scanNuInts], dtype='float32', fill_value = value)
-                    else:
-                        newArr = np.full([2 * scanNuInts], dtype='float32', fill_value = value)
+                    self.initArr(fileNum, numScanInts, 'float32', None)
                 elif param == 'PRESSURE':
                     value = antHDU[0].header['AMBPRESS']
                     value=value*0.75006375541921    
-                    if fileNum == 0:
-                        valueArr = np.full([2 * scanNuInts], dtype='float32', fill_value = value)
-                    else:
-                        newArr = np.full([2 * scanNuInts], dtype='float32', fill_value = value)
+                    self.initArr(fileNum, numScanInts, 'float32', None)
                 if fileNum == 0:
                     self.valueArr[0::2] = value
                     self.valueArr[0::1] = value
@@ -310,11 +284,10 @@ class MetaDataModule:
         
             ## delete variables: bankIdx, valueArr, newArr
             del, bankIdx, valueArr, newArr
-    
+        ## function to write backend to data; will need to get from Manager FITS file at production    
         def getRcvrFITSParam(self,param):
             if param == 'FRONTEND':            
                 valStr = 'PAF' ##TODO: search for value in PAF manager for production
-            valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(value))    
             bankIdx = 0
             for fileNum in range(0,len(self.fitsList)):            
                 corrHDU = fits.open(self.bankFitsList[bankIdx])
@@ -332,125 +305,166 @@ class MetaDataModule:
             self.Column.param = param
             self.Column.valueArr = valueArr
             self.Column.comment = comment    
+        ## function that fills column with a single value
+        def getArbParam(self,param):
+            bankIdx = 0
+            ## flag for multiple values
+            multiVal = False
+            for fileNum in range(0,len(self.fitsList)):
+                corrHDU = fits.open(self.bankFitsList[bankIdx])
+                scanNumInts = corrHDU[1].header['NAXIS2']           
+                if param == 'TSYS' or param == 'TCAL' or param == 'DOPFREQ':    
+                    self.initArr(fileNum, numScanInts, 'float32', None)
+                    value = 1.0
+                elif param == 'BEAM':    
+                    self.initArr(fileNum, numScanInts, 'float32', None)
+                    value = self.beamNum
+                elif param == 'FEED' or param == 'SUBREF_STATE' or param == 'QD_BAD':
+                    self.initArr(fileNum, numScanInts, 'int16', None)
+                    value = 1
+                elif param == 'CRVAL4':
+                    self.initArr(fileNum, numScanInts, 'int16', None)
+                    value1 = -5
+                    value2 = -6
+                    multiVal = True
+                elif param == 'ZEROCHAN' or param =='TWARM' or param =='TCOLD' or param == 'QD_XEL' or param == 'QD_EL' or param == 'CALPOSITION':
+                    self.initArr(fileNum, numScanInts, 'float32', None)
+                    value = np.nan
+                elif param == 'FDNUM' or param == 'IFNUM':
+                    self.initArr(fileNum, numScanInts, 'int16', None)
+                    value = 0
+                elif param == 'SIG' or param == 'CAL' or param == 'CALTYPE':
+                    value = 'T'
+                    self.initArr(fileNum, numScanInts, 'str', value)
+                elif param == 'QD_METHOD':
+                    self.initArr(fileNum, numScanInts, 'str', value)
+                    value = 'C' 
+                elif param == 'TUNIT7':
+                    value = 'counts'
+                    self.initArr(fileNum, numScanInts, 'str', value)
+                elif param == 'CTYPE1':
+                    value = 'FREQ-OBS'
+                    self.initArr(fileNum, numScanInts, 'str', value)
+                elif param == 'SRFEED':
+                    value = 0
+                    self.initArr(fileNum, numScanInts, 'int16', None)
+                elif param == 'SIDEBAND':
+                    value = 'L'
+                    self.initArr(fileNum, numScanInts, 'str', value)
+                elif param =='SAMPLER':
+                    value1 = 'A1_0'    
+                    value2 = 'A2_0'
+                    self.initArr(fileNum, numScanInts, 'str', value1)
+                    multiVal = True
+                elif param == 'DOPFREQ':
+                    value = 1450*1e6 ##TODO: fix for production. 
+                    self.initArr(fileNum, numScanInts, 'float32', None)
+
+                 if multiVal == True and fileNum == 0:
+                     self.valueArr[0::2] = value1
+                     self.valueArr[1::2] = value2
+                 elif multiVal == True and FileNum > 0:
+                     self.newArr[0::2] = value1
+                     self.newArr[1::2] = value2
+                     self.valueArr = np.concatenate([self.valueArr, self.newArr])
+                 elif mutliVal == False and FileNum == 0:
+                     self.valueArr[:] = value
+                 else:
+                     self.newArr[:] = value
+                     ## concatenate new array to global value array
+                     self.valueArr = np.concatenate([self.valueArr, self.newArr])
+
+                 bankIdx += self.numBanksList[fileNum]
        
-        def getArbParam(self,param):           
-            if param == 'TSYS' or param == 'TCAL' or param == 'DOPFREQ':    
-                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')                
-                valueArr.fill(1.0)
-            elif param == 'BEAM':    
-                valueArr = np.empty([self.numInts*len(self.fitsList)],dtype='float32')                
-                valueArr.fill(self.beamNum)
-            elif param == 'FEED' or param == 'SUBREF_STATE' or param == 'QD_BAD':    
-                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='int16')                
-                valueArr.fill(1)
-            elif param == 'CRVAL4':
-                valueArr = np.zeros([2*self.numInts*len(self.fitsList)], dtype='int16')
-                valueArr[0::2] = -5
-                valueArr[1::2] = -6
-            elif param == 'ZEROCHAN' or param =='TWARM' or param =='TCOLD' or param == 'QD_XEL' or param == 'QD_EL' or param == 'CALPOSITION':
-                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')                
-                valueArr.fill(np.nan)
-            elif param == 'FDNUM' or param == 'IFNUM':
-                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='int16')                 
-                valueArr.fill(0.0)
-            elif param == 'SIG' or param == 'CAL' or param == 'CALTYPE':
-                valStr = param
-                valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=1)  
-                valueArr.fill('T')
-            elif param == 'QD_METHOD':
-                valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=1)              
-                valueArr.fill('C')
-            elif param == 'TUNIT7':
-                valStr = 'counts'
-                valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
-                valueArr[:] = valStr 
-            elif param == 'CTYPE1':
-                valStr = 'FREQ-OBS'
-                valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
-                valueArr[:] = valStr                 
-            elif param == 'SRFEED':
-                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='int16')
-                valueArr.fill(0)
-            elif param == 'SIDEBAND':
-                valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=1)
-                valueArr.fill('L')
-            elif param =='SAMPLER':
-                valStr1 = 'A1_0'    
-                valStr2 = 'A2_0'
-                valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr1))  
-                valueArr[0::2] = valStr1
-                valueArr[1::2] = valStr2
-            elif param == 'DOPFREQ':
-                valStr = 1432.729*1e6 ##TODO: fix for production. 
-                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
-                valueArr[:] = valStr
             comment = self.commentDict[param]
             self.Column.param = param
-            self.Column.valueArr = valueArr
+            self.Column.valueArr = self.valueArr
             self.Column.comment = comment
-        
+        ## function to process keywords related to the actual data
         def getDataParam(self,param):
-            if param == 'DATA':
-                valueArr = np.empty([2*self.numInts*len(self.fitsList),self.numFreqChans],dtype='float32')
-                valueArr[::2,:] = self.dataBuff_Y[0,:,:]
-                valueArr[1::2,:] = self.dataBuff_X[0,:,:]            
-            elif param == 'TDIM7':
-                valStr = '['+np.str(self.numFreqChans)+',1,1,1]'
-                valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(valStr))                
-                valueArr[:] = valStr             
-            elif param == 'PLNUM':
-                valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='int16')
-                valueArr[::2] = 0
-                valueArr[1::2] = 1
+            bankIdx = 0
+            multiVal == False
+            for fileNum in range(0,len(self.fitsList)):
+                corrHDU = fits.open(self.bankFitsList[bankIdx])
+                scanNumInts = corrHDU[1].header['NAXIS2']
+                if param == 'DATA':
+                    self.initArr(fileNum, numScanInts, 'float32', None)
+                    value1 = self.dataBuff_Y[fileNum,:,:]
+                    value2 = self.dataBuff_X[fileNum,:,:] 
+                elif param == 'TDIM7':
+                    value = '['+np.str(self.numFreqChans)+',1,1,1]'
+                    self.initArr(fileNum, numScanInts, 'str', value)
+                elif param == 'PLNUM':
+                    value1 = 0 
+                    value2 = 1
+                    self.initArr(fileNum, numScanInts, 'int16', None) 
+                
+                if multiVal == True and fileNum == 0:
+                     self.valueArr[::2] = value1
+                     self.valueArr[1::2] = value2
+                elif multiVal == True and FileNum > 0:
+                     self.newArr[::2] = value1
+                     self.newArr[1::2] = value2
+                     self.valueArr = np.concatenate([self.valueArr, self.newArr])
+                elif mutliVal == False and FileNum == 0:
+                     self.valueArr[:] = value
+                else:
+                    self.newArr[:] = value
+                    self.valueArr = np.concatenate([self.valueArr, self.newArr])
+
+                bankIdx += self.numBanksList[fileNum] 
+             
             comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
             self.Column.comment = comment
         
         def getLOFITSParam(self,param, repeat = True ): 
-            os.chdir(lo1APath) ##TODO: run on flag3/GB
-            if param == 'VELDEF':
-                loHDU = fits.open(self.fitsList[0])   
-                tblNum = 2
-                value = loHDU[tblNum].header[param]
-                valueArr = np.chararray([2*self.numInts*len(self.fitsList)],itemsize=len(value)) 
-                valueArr[:] = value
-                repeat = False
-            elif param == 'VFRAME' or param == 'RVSYS':
-                valueArr = np.zeros([2*self.numInts*len(self.fitsList)],dtype='float32')            
-                tblNum = 3             
-                repeat = True
-                paramLook = param
-            elif param == 'CRVAL1' or 'OBSFREQ':
-                valueArr = np.zeros([2*self.numInts*len(self.fitsList)],dtype='float32')
-                paramLook = 'LO1FREQ'
-                tblNum = 3
-            idx=0            
-            for file in range(0,len(self.fitsList)):            
-                loHDU = fits.open(self.fitsList[file])       
-                if repeat == True:        
-                    value = loHDU[tblNum].data[paramLook]
-                    valueArr[(idx*2*self.numInts):(idx*2*self.numInts)+2*self.numInts:2] = value
-                    valueArr[(idx*2*self.numInts)+1:(idx*2*self.numInts)+2*self.numInts:2] = value
-                idx+=1
-               
+            bankIdx = 0
+            for fileNum in range(0,len(self.fitsList)):
+                corrHDU = fits.open(self.bankFitsList[bankIdx])
+                scanNumInts = corrHDU[1].header['NAXIS2']
+                if param == 'VELDEF':
+                    value = 'VRAD-TOP'
+                    self.initArr(fileNum, numScanInts, 'str', value)
+                elif param == 'VFRAME' or param == 'RVSYS':
+                    value = 0
+                    self.initArr(fileNum, numScanInts, 'int16', None)
+                elif param == 'CRVAL1' or 'OBSFREQ':
+                    value = 1.42172900e+09
+                    self.initArr(fileNum, numScanInts, 'float32', None)
+                
+                if FileNum == 0:
+                     self.valueArr[:] = value
+                else:
+                    self.newArr[:] = value
+                    self.valueArr = np.concatenate([self.valueArr, self.newArr])
+                bankIdx += self.numBanksList[fileNum]              
+            
             comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
             self.Column.comment = comment
         
         def getBeamOffsets(self,param):
-            os.chdir(weightDataPath)            
-            hdu = fits.open('2016_07_25_04:32:35_xid0_weights.fits') ##TODO: work on flag3
-            if param == 'FEEDXOFF':
-                beamOff_Az = hdu[1].data['BeamOff_AZ']
-                value = beamOff_Az[self.beamNum]
-            else:
-                beamOff_El = hdu[1].data['BeamOff_EL']
-                value = beamOff_El[self.beamNum]
-            valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
-            valueArr.fill(value) 
-            
+            bankIdx = 0
+            for fileNum in range(0,len(self.fitsList)):
+                wHDU = fits.open(self.weightFile)
+                if param == 'FEEDXOFF':
+                    beamOff_Az = hdu[1].data['BeamOff_AZ']
+                    value = beamOff_Az[self.beamNum]
+                    self.initArr(fileNum, numScanInts, 'float32', None)
+                else:
+                    beamOff_El = hdu[1].data['BeamOff_EL']
+                    value = beamOff_El[self.beamNum]
+                    self.initArr(fileNum, numScanInts, 'float32', None)
+                if FileNum == 0:
+                    self.valueArr[:] = value
+                else:
+                    self.newArr[:] = value
+                    self.valueArr = np.concatenate([self.valueArr, self.newArr])
+                bankIdx += self.numBanksList[fileNum]
+
             comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
@@ -458,27 +472,37 @@ class MetaDataModule:
                 
         
         def getModeDepParams(self,param):
-            if param == 'CDELT1' or param == 'FREQRES':
-                modeName = getSMKey(self,param,singleVal = True)
-                if modeName == 'PAF_CAL':
-                    value = 303.18*1000.
-                    valueArr = np.zeros([2*self.numInts*len(self.fitsList)],dtype='float32')    
-            elif param == 'CRPIX1':
-                modeName = getSMKey(self,param,singleVal = True)
-                if modeName == 'PAF_CAL':
-                    value = 500/2.
-                    valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
-            elif param == 'BANDWID':
-                modeName = getSMKey(self,param,singleVal = True)
-                if modeName == 'PAF_CAL':
+            bankIdx = 0
+            for fileNum in range(0,len(self.fitsList)):
+                corrHDU = fits.open(self.bankFitsList[bankIdx])
+                scanNumInts = corrHDU[1].header['NAXIS2']
+                modeName = corrHDU[0].header('MODENAME')
+                
+                if param == 'CDELT1' or param == 'FREQRES':
+                    if modeName == 'FLAG_CALCORR_MODE'
+                        value = 303.18*1000.
+                    elif modeName == 'FLAG_PFBCORR_MODE':
+                        value = 303.18*5/160.*1000.
+                    self.initArr(fileNum, numScanInts, 'float32', None)
+                elif param == 'CRPIX1':
+                    if modeName == 'FLAG_CALCORR_MODE'
+                        value = value = 500/2   
+                    elif modeName == 'FLAG_PFBCORR_MODE':
+                        value = 3200/2
+                    self.initArr(fileNum, numScanInts, 'float32', None)
+                elif param == 'BANDWID':
+                    if modeName == 'FLAG_CALCORR_MODE':
                     value = 303.18*500*1000.
-                    valueArr = np.empty([2*self.numInts*len(self.fitsList)],dtype='float32')
-            idx = 0
-            for file in range(0,len(self.fitsList)):
-                valueArr[(idx*2*self.numInts):(idx*2*self.numInts)+2*self.numInts:2] = value
-                valueArr[(idx*2*self.numInts)+1:(idx*2*self.numInts)+2*self.numInts:2] = value
-                idx+=1
-                    
+                    elif modeName = 'FLAG_PFB_MODE':
+                    value = 100*303.18*1000
+                    self.initArr(fileNum, numScanInts, 'float32', None)
+                if FileNum == 0:
+                    self.valueArr[:] = value
+                else:
+                    self.newArr[:] = value
+                    self.valueArr = np.concatenate([self.valueArr, self.newArr])
+                bankIdx += self.numBanksList[fileNum]
+            
             comment = self.commentDict[param]
             self.Column.param = param
             self.Column.valueArr = valueArr
@@ -949,7 +973,7 @@ class MetaDataModule:
             keyword = keyWordArr[i]
             tblHdu.header.set(keyword,paramList[idx],commentList[idx])
             idx+=1
-        ##insert final additional comments
+        ## insert final additional comments
         tblHdu.header.insert('TTYPE1',('COMMENT', 'Start of SDFITS CORE keywords/columns.'))
         tblHdu.header.insert('TTYPE2',('TELESCOP','NRAO_GBT','the telescope used'))
         tblHdu.header.insert('TTYPE7',('COMMENT', 'End of SDFITS CORE keywords/columns.'))
@@ -959,7 +983,7 @@ class MetaDataModule:
         tblHdu.header.insert('TTYPE19',('COMMENT', 'Start of SDFITS SHARED keywords/columns.'))
         projId = self.getProjId()    
         tblHdu.header.insert('TTYPE21',('PROJID',projId,'project identifier'))        
-##        tblHdu.header.insert('TTYPE24',('BACKEND','FLAG','backend device'))
+        ## tblHdu.header.insert('TTYPE24',('BACKEND','FLAG','backend device'))
         tblHdu.header.insert('TTYPE35',('SITELONG', -7.983983E+01,'E. longitude of intersection of the az/el axes'))
         tblHdu.header.insert('TTYPE35',('SITELAT', 3.843312E+01,'N. latitude of intersection of the az/el axes'))
         tblHdu.header.insert('TTYPE35',('SITEELEV', 8.245950E+02,'height of the intersection of az/el axes'))
@@ -969,7 +993,6 @@ class MetaDataModule:
         tblHdu.header.insert('TFORM70',('COMMENT', 'End of GBT-specific keywords/columns.'))    
         
         thduList = fits.HDUList([prihdu, tblHdu])
-        os.chdir(rawDataPath)   ##TODO: run on flag3; 
       
         return thduList
     
