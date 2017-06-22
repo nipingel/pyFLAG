@@ -38,30 +38,35 @@ goFitsPath = projectPath + '/GO'
 ## function to sort individual BANK data
 ## to the full bandpass based on XID. 
 ##TODO: add FRB mode functionality
-def bandpassSort(xID, dataBuff, bankData, ints):
+def bandpassSort(xID, dataBuff, bankData):
     ## which correlation mode are we in?
     ## determine this based on number of channels 
-    ## in bandpasss 
-    if len(dataBuff) == 500:
-        ## coarse channel mode
-        ## position in bandpass dictated by xID
-        bandpassStartChan = xID*5
-        bandpassEndChan = bandpassStartChan+5
-        ## get each chunk of five contigious channels from BANK data,
-        ## and place it in the proper spot in full bandpass
-        for i in range(0, 5):
-            bankStartChan = i * 5
-            bankEndChan = bankStartChan + 5
-            dataBuff[ints, bandpassStartChan:bandpassEndChan] = bankData[ints, startBankChan:endBankChan]
-            
-            ## increment bandpassStartChan/bandpassEndChan by 100 for proper position in full bandpass
-            bandpassStartChan += 100
+    ## in bandpasss (second element in shape)
+    ## Number of integrations are the first element
+    numInts = bankData.shape[0]
+    numChans = bankData.shape[1]
+    for ints in range(0, numInts):
+        if numChans == 25:
+            print('HEREEEEEE')
+            ## coarse channel mode
+            ## position in bandpass dictated by xID
+            bandpassStartChan = xID*5
             bandpassEndChan = bandpassStartChan+5
-    elif len(dataBuff) == 3200:
-       bandpassStartChan = xid*160
-       bandpassEndChan = bandpassStartChan + 160
-       dataBuff[ints, bandpassStartChan] = bandData[ints, :]
-                 
+            ## get each chunk of five contigious channels from BANK data,
+            ## and place it in the proper spot in full bandpass
+            for i in range(0, 5):
+                bankStartChan = i * 5
+                bankEndChan = bankStartChan + 5
+                dataBuff[ints, bandpassStartChan:bandpassEndChan] = bankData[ints, bankStartChan:bankEndChan]
+            
+                ## increment bandpassStartChan/bandpassEndChan by 100 for proper position in full bandpass
+                bandpassStartChan += 100
+                bandpassEndChan = bandpassStartChan+5
+        elif numChans == 160:
+            bandpassStartChan = xid*160
+            bandpassEndChan = bandpassStartChan + 160
+            dataBuff[ints, bandpassStartChan] = bandData[ints, :]
+    return dataBuff
 ##function to determine number of objects observed in session
 def numObjs():        
     goFits = glob.glob(goFitsPath+'/*.fits')
@@ -177,9 +182,8 @@ def main():
                     ## rows: ints, columns: freqChans
                     xData,yData = bf.getSpectralArray(fileName,beam, xID, bank)       
                     ## sort based on xid number for each integration
-                    for ints in range(0,numInts):
-                        bandpassSort(xID, dataBuff_X, xData, ints)
-		        bandpassSort(xID, dataBuff_Y, yData, ints)
+                    dataBuff_X = bandpassSort(xID, dataBuff_X, xData)
+		    dataBuff_Y = bandpassSort(xID, dataBuff_Y, yData)
                     print(np.max(dataBuff_Y))
                     ## fill global data bufs
                     globalDataBuff_X[fileIdx,:,:] = dataBuff_X

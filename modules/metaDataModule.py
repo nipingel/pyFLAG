@@ -450,7 +450,7 @@ class MetaDataModule:
             for fileNum in range(0,len(self.fitsList)):
                 weightFiles = glob.glob(self.dataPath + 'weight_files/*.FITS') 
                 ## just open first file since offsets are ubiquitous
-                wHDU = fits.open(weightFiles[0]))
+                wHDU = fits.open(weightFiles[0])
                 if param == 'FEEDXOFF':
                     beamOff_Az = hdu[1].data['BeamOff_AZ']
                     value = beamOff_Az[self.beamNum]
@@ -926,7 +926,7 @@ class MetaDataModule:
         prihdu = self.constructPriHDUHeader()   
         binHeader = fits.Header()
         ## load list of required SDFITS keywords
-        keywordList = np.loadtxt(keywordPath,dtype='bytes')
+        keywordList = np.loadtxt(keywordPath,dtype='str')
         keyWordArr = keywordList.astype(str)
         ##TODO ??
         commentList = []
