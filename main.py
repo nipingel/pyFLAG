@@ -13,6 +13,7 @@ import numpy as np
 import sys
 import os
 import glob
+import pickle
 from modules.metaDataModule import MetaDataModule
 from modules.beamformingModule import BeamformingModule
 import matplotlib.pyplot as pyplot
@@ -32,6 +33,7 @@ numBanks = numGPU*2
 goFitsPath = projectPath + '/GO'
 
 ##TODO:Extend sorting from 4 FITS files to 20 FITS files.
+
 
 ## function to sort individual BANK data
 ## to the full bandpass based on XID. 
@@ -56,7 +58,10 @@ def bandpassSort(xID, dataBuff, bankData, ints):
             bandpassStartChan += 100
             bandpassEndChan = bandpassStartChan+5
      elif len(dataBuff) == 3200:
-        
+         bandpassStartChan = xid*160
+         bandpassEndChan = bandpassStartChan + 160
+         dataBuff[ints, bandpassStartChan] = bandData[ints, :]
+                 
 ##function to determine number of objects observed in session
 def numObjs():        
     goFits = glob.glob(goFitsPath+'/*.fits')
@@ -116,6 +121,7 @@ def main():
 ##TODO: check current directory permissions -- must have writing access
 ## the only commandline argument should be path to project/session ancillary FITS files    
     pwd = os.getcwd()
+    pfb = False
     print('Project directory: ' + np.str(sys.argv[1]))
     print('Building Primary HDU...')  
     #os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData/') 
@@ -173,8 +179,14 @@ def main():
                     cnt+=1
 
                 print('\n')
+                if numChans == 160:
+                    pfb == True
+
+                ## save out important variables TEST
+                with open('/users/npingel/FLAG/M51Vars.pickle', 'rb') as f:
+                   globalDataBuff_X, globalDataBuff_Y, fileList, allBanksList, numBanksList, beam, projectPath, dataPath, pfb = pickle.load(f)
                 ## build metadata; inputs are FITS file for ancillary files, numInts, global data buffers, int length            
-                md = MetaDataModule(projectPath, fileList, allBanksList, numBanksList, globalDataBuff_X, globalDataBuff_Y, beam, projectPath, dataPath)
+                md = MetaDataModule(projectPath, fileList, allBanksList, numBanksList, globalDataBuff_X, globalDataBuff_Y, beam, projectPath, dataPath, pfb)
                 thduList = md.constuctBinTableHeader()
                 dataFITSFile[:-6] = dataFITSFile
                 thduList.writeto(pwd+'/' + dataFITSFile + '_Beam'+str(beam)+'.fits')
