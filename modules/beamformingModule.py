@@ -61,11 +61,8 @@ class BeamformingModule:
                 yWeights[chan,:,i].imag = weightPairs[1:len(weightPairs):2] 
         return xWeights,yWeights
     
-    def processPol(self,R,pol,w, numFreqs):
-        if numFreqs == 25:
-            spectrum = np.dot(w.conj().T,np.dot(R,w))
-        elif numFreqs == 160:
-            newWeightArr = np.zeros([len(w) * 
+    def processPol(self,R,pol,w):
+        spectrum = np.dot(w.conj().T,np.dot(R,w))
         return spectrum
         
     ## function which reorders correlation bandpass to FISHFITS order;
@@ -149,7 +146,7 @@ class BeamformingModule:
         ## get number of freq channels
         numFreqs = dataArr.shape[1] / 2112 ## always 2112 complex pairs per frequency channel
         ## get CHANSEL for if we are in PFB mode
-        corrHDU = fits.open('fitsName')
+        corrHDU = fits.open(fitsName)
         chanSel = corrHDU[0].header['CHANSEL']
         ## create bandpass containers. Rows are ints; colums represent integration bandpasses
         spectrumArr_X = np.zeros([len(dataArr[:,0]),numFreqs], dtype='float32')    
@@ -167,17 +164,18 @@ class BeamformingModule:
             corrCube = self.getCorrelationCube(dataVector, numFreqs)
             ## loop through frequency channels to apply weights. Inputs into processPol
             ## are a 40x40 covariance matrix, pol flag, and a length 40 weight vector
+            cnt = 0
+            absWtIdx = 0
             for z in range(0,numFreqs):
                 dat = corrCube[:,:,z]
-                spectrumArr_X[ints,z] = np.real(self.processPol(dat,0,xWeight[z,:,beam])) ##0 is XX
-                spectrumArr_Y[ints,z] = np.real(self.processPol(dat,1,yWeight[z,:,beam])) ##1 is YY
-                cnt = 0
-                absWtIdx = 0
+                if numFreqs == 25:
+                    spectrumArr_X[ints,z] = np.real(self.processPol(dat,0,xWeight[z,:,beam])) ##0 is XX
+                    spectrumArr_Y[ints,z] = np.real(self.processPol(dat,1,yWeight[z,:,beam])) ##1 is YY
                 elif numFreqs == 160:
                     wtIdx = absWtIdx + (chanSel*5)
-                    xWeightIn = xWeight[wtIdx,:,beam]))
-                    yWeightIn = yWeight[wtIdx,:,beam]))
-                    SpectrumArr_X[ints,z] = np.real(self.processPol(dat,0,xWeightIn])) ##0 is XX
+                    xWeightIn = xWeight[wtIdx,:,beam]
+                    yWeightIn = yWeight[wtIdx,:,beam]
+                    SpectrumArr_X[ints,z] = np.real(self.processPol(dat,0,xWeightIn)) ##0 is XX
                     SpectrumArr_Y[ints,z] = np.real(self.processPol(dat,1,yWeightIn)) ##1 is YY
                     cnt += 1
                     if cnt > 32:

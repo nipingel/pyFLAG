@@ -57,10 +57,10 @@ def bandpassSort(xID, dataBuff, bankData, ints):
             ## increment bandpassStartChan/bandpassEndChan by 100 for proper position in full bandpass
             bandpassStartChan += 100
             bandpassEndChan = bandpassStartChan+5
-     elif len(dataBuff) == 3200:
-         bandpassStartChan = xid*160
-         bandpassEndChan = bandpassStartChan + 160
-         dataBuff[ints, bandpassStartChan] = bandData[ints, :]
+    elif len(dataBuff) == 3200:
+       bandpassStartChan = xid*160
+       bandpassEndChan = bandpassStartChan + 160
+       dataBuff[ints, bandpassStartChan] = bandData[ints, :]
                  
 ##function to determine number of objects observed in session
 def numObjs():        
@@ -96,6 +96,14 @@ def getScanInfo(fileName):
     return numInts, intLen, numChans, np.sort(fitsLst)
 
 def main():
+    ## command line inputs
+    ##TODO: exception handling
+    projectPath = sys.argv[1] ## of the form /home/gbtdata/AGBT16B_400_01
+    ## split project path to get project string
+    projectPathSplit = projectPath.split('/')
+    projectStr = projectPathSplit[-1] + '/'
+    dataPath = '/lustre/projects/flag/' +  projectStr + 'BF/'
+
     bf = BeamformingModule(dataPath)
     bankDict = {"A" : 0,
              "B" : 1,

@@ -21,7 +21,7 @@ class MetaDataModule:
     ## initialize function. Opens raw data file, numInts, data buffers (banpasses), beam, freqChans, intLength
     ## total BANK files, and creates column object. 
     def __init__(self, projectPath, fitsList, bankFitsList, numBanksList, weightFile, dataBuff_X,dataBuff_Y,beamNum, ancPath, rawDataPath):        
-        self.fitsList = projectPath +      
+        self.fitsList = fitsList     
         self.bankFitsList = bankFitsList
         self.numBanksList = numBanksList
         self.weightFile = weightFile
@@ -47,17 +47,17 @@ class MetaDataModule:
             ## only scan phases are the two pols so self.numPhases = 2. Makes a character array if
             ## data types are not numeric
             if fileNum == 0: 
-                if not any(dtype == 'float32', dtype == 'int32', dtype == 'int16']):
+                if not any(dtype == 'float32', dtype == 'int32', dtype == 'int16'):
                     self.valueArr = np.chararray([self.numPhases * NumInts], itemsize=len(valStr))
-                else   
+                else:  
                     self.valueArr = np.empty([self.numPhases * numInts], dtype=dtype)
                 if fill == True:
                     self.valueArr
             ## update self.newArr if we are past the first iteration of the loop over scan FITS files
             else:
-                if not any(dtype == 'float32', dtype == 'int32', dtype == 'int16']):
+                if not any(dtype == 'float32', dtype == 'int32', dtype == 'int16'):
                     self.newArr = np.chararray([self.numPhases * NumInts], itemsize=len(valStr))
-                else
+                else:
                     self.newArr = np.empty([self.numPhases * numInts], dtype=dtype)
 
         def getSMKey(self,param,singleVal = False):
@@ -66,45 +66,45 @@ class MetaDataModule:
             for fileNum in range(0,len(self.fitsList)):
                 corrHDU = fits.open(self.bankFitsList[bandIdx])
                 scanNumInts = corrHdu[1].header['NAXIS2']
-                 ## determine time spent in state (e.g. calOn, calOff); 
-                 ## since we do no freq sw or cal sw, this is equal to scan time
-                 if param == 'DURATION':
-                     self.initArr(fileNum, numScanInts, 'float32', None)
-                     value = corrHDU[0].header['SCANLEN']
-                 ## retrieve actual integration time
-                 elif param == 'EXPOSURE':
-                     paramLook = 'ACTSTI'
-                     self.initArr(fileNum, numScanInts, 'float32', None)
-                     value = corrHDU[0].header['ACTSTI']
-                 ## retrieve correlation mode
-                 elif param == 'OBSMODE':
-                     self.initArr(fileNum, numScanInts, 'float32', None)
-                     value = corrHDU[0].header['MODENAME']
-                 elif param == 'DATE-OBS':
-                     scanDMJD = corrHDU[1].data['DMJD']
-                     ## cast DMJD to correct string format
-                     timeObj = Time(scanDMJD, format = 'mjd', scale='utc') 
-                     ## initialize array to store parameter values
-                     self.initArr(fileNum, numScanInts, 'str', timeObj)
-                     TimeVal == True
-                 bankIdx += self.numBanksList[fileNum]
+                ## determine time spent in state (e.g. calOn, calOff); 
+                ## since we do no freq sw or cal sw, this is equal to scan time
+                if param == 'DURATION':
+                    self.initArr(fileNum, numScanInts, 'float32', None)
+                    value = corrHDU[0].header['SCANLEN']
+                ## retrieve actual integration time
+                elif param == 'EXPOSURE':
+                    paramLook = 'ACTSTI'
+                    self.initArr(fileNum, numScanInts, 'float32', None)
+                    value = corrHDU[0].header['ACTSTI']
+                ## retrieve correlation mode
+                elif param == 'OBSMODE':
+                    self.initArr(fileNum, numScanInts, 'float32', None)
+                    value = corrHDU[0].header['MODENAME']
+                elif param == 'DATE-OBS':
+                    scanDMJD = corrHDU[1].data['DMJD']
+                    ## cast DMJD to correct string format
+                    timeObj = Time(scanDMJD, format = 'mjd', scale='utc') 
+                    ## initialize array to store parameter values
+                    self.initArr(fileNum, numScanInts, 'str', timeObj)
+                    TimeVal == True
+                bankIdx += self.numBanksList[fileNum]
             
-                 ## fill in value array for similar values across integrations/polarizations
-                 if timeVal == True and fileNum == 0:
-                     self.valueArr[0::2] = timeObj.isot
-                     self.valueArr[1::2] = timeObj.isot
-                 elif timeVal == True and FileNum > 0:
-                     self.newArr[0::2] = timeObj.isot
-                     self.newArr[1::2] = timeObj.isot
-                     self.valueArr = np.concatenate([self.valueArr, self.newArr])
-                 elif timeVal == False and FileNum == 0:
-                     self.valueArr[:] = value
-                 else:
-                     self.newArr[:] = value
-                     ## concatenate new array to global value array
-                     self.valueArr = np.concatenate([self.valueArr, self.newArr])
-                 ## update BANK index
-                 bankIdx += self.numBanksList[fileNum]
+                ## fill in value array for similar values across integrations/polarizations
+                if timeVal == True and fileNum == 0:
+                    self.valueArr[0::2] = timeObj.isot
+                    self.valueArr[1::2] = timeObj.isot
+                elif timeVal == True and FileNum > 0:
+                    self.newArr[0::2] = timeObj.isot
+                    self.newArr[1::2] = timeObj.isot
+                    self.valueArr = np.concatenate([self.valueArr, self.newArr])
+                elif timeVal == False and FileNum == 0:
+                    self.valueArr[:] = value
+                else:
+                    self.newArr[:] = value
+                    ## concatenate new array to global value array
+                    self.valueArr = np.concatenate([self.valueArr, self.newArr])
+                ## update BANK index
+                bankIdx += self.numBanksList[fileNum]
             ## retrieve comment and construct column    
             comment = self.commentDict[param]            
             self.Column.param = param            
@@ -183,7 +183,7 @@ class MetaDataModule:
                     self.initArr(fileNum, numScanInts, 'str', valStr)
                 elif param == 'RESTFRQ':
                     valStr = 1450.00*1e6##TODO:remove for production
-                    if self.pfb == True
+                    if self.pfb == True:
                         lowEnd = valStr-(250-(chanSel*100))*.30318
                         highEnd = valStr-(250-(chanSel*100+100))*.30318
                         valStr = highEnd - (highEnd-lowEnd)/2
@@ -230,7 +230,7 @@ class MetaDataModule:
             iterate = True
             bankIdx = 0
             for fileNum in range(0,len(self.fitsList)):            
-                antHDU = fits.open(self.projectPath + '/Antenna/' + self.fitsList[fileNum]))
+                antHDU = fits.open(self.projectPath + '/Antenna/' + self.fitsList[fileNum])
                 antDMJD = antHDU[2].data['DMJD']
                 ## get integrations this scan
                 corrHDU = fits.open(self.bankFitsList[bankIdx])
@@ -280,16 +280,14 @@ class MetaDataModule:
                 else:    
                     self.newArr[0::2] = value
                     self.newArr[1::2] = value
-                    self.valueArr = np.concatenate(self.valueArr, self.newArr
+                    self.valueArr = np.concatenate(self.valueArr, self.newArr)
                 bankIdx += self.numBanksList[fileNum]
             ## retrieve comment and create column 
             comment = self.commentDict[param]
             self.Column.param = param
-            self.Column.valueArr = valueArr
+            self.Column.valueArr = self.valueArr
             self.Column.comment = comment
         
-            ## delete variables: bankIdx, valueArr, newArr
-            del, bankIdx, valueArr, newArr
         ## function to write backend to data; will need to get from Manager FITS file at production    
         def getRcvrFITSParam(self,param):
             if param == 'FRONTEND':            
@@ -303,7 +301,7 @@ class MetaDataModule:
                     self.valueArr[:] = valStr
                 else: 
                     self.newArr[:] = valStr
-                    self.valueArr = np.concatenate(self.valueArr, self.newArr
+                    self.valueArr = np.concatenate(self.valueArr, self.newArr)
                  
                 bankIdx += self.numBanksList[fileNum]
                     
@@ -366,21 +364,21 @@ class MetaDataModule:
                     value = 1450*1e6 ##TODO: fix for production. 
                     self.initArr(fileNum, numScanInts, 'float32', None)
 
-                 if multiVal == True and fileNum == 0:
-                     self.valueArr[0::2] = value1
-                     self.valueArr[1::2] = value2
-                 elif multiVal == True and FileNum > 0:
-                     self.newArr[0::2] = value1
-                     self.newArr[1::2] = value2
-                     self.valueArr = np.concatenate([self.valueArr, self.newArr])
-                 elif mutliVal == False and FileNum == 0:
-                     self.valueArr[:] = value
-                 else:
-                     self.newArr[:] = value
-                     ## concatenate new array to global value array
-                     self.valueArr = np.concatenate([self.valueArr, self.newArr])
+                if multiVal == True and fileNum == 0:
+                    self.valueArr[0::2] = value1
+                    self.valueArr[1::2] = value2
+                elif multiVal == True and FileNum > 0:
+                    self.newArr[0::2] = value1
+                    self.newArr[1::2] = value2
+                    self.valueArr = np.concatenate([self.valueArr, self.newArr])
+                elif mutliVal == False and FileNum == 0:
+                    self.valueArr[:] = value
+                else:
+                    self.newArr[:] = value
+                    ## concatenate new array to global value array
+                    self.valueArr = np.concatenate([self.valueArr, self.newArr])
 
-                 bankIdx += self.numBanksList[fileNum]
+                bankIdx += self.numBanksList[fileNum]
        
             comment = self.commentDict[param]
             self.Column.param = param
@@ -485,22 +483,22 @@ class MetaDataModule:
                 modeName = corrHDU[0].header('MODENAME')
                 
                 if param == 'CDELT1' or param == 'FREQRES':
-                    if modeName == 'FLAG_CALCORR_MODE'
+                    if modeName == 'FLAG_CALCORR_MODE':
                         value = 303.18*1000.
                     elif modeName == 'FLAG_PFBCORR_MODE':
                         value = 303.18*5/160.*1000.
                     self.initArr(fileNum, numScanInts, 'float32', None)
                 elif param == 'CRPIX1':
-                    if modeName == 'FLAG_CALCORR_MODE'
+                    if modeName == 'FLAG_CALCORR_MODE':
                         value = value = 500/2   
                     elif modeName == 'FLAG_PFBCORR_MODE':
                         value = 3200/2
                     self.initArr(fileNum, numScanInts, 'float32', None)
                 elif param == 'BANDWID':
                     if modeName == 'FLAG_CALCORR_MODE':
-                    value = 303.18*500*1000.
-                    elif modeName = 'FLAG_PFB_MODE':
-                    value = 100*303.18*1000
+                        value = 303.18*500*1000.
+                    elif modeName == 'FLAG_PFB_MODE':
+                        value = 100*303.18*1000
                     self.initArr(fileNum, numScanInts, 'float32', None)
                 if FileNum == 0:
                     self.valueArr[:] = value
