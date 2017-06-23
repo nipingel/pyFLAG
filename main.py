@@ -21,10 +21,6 @@ import matplotlib.pyplot as pyplot
 ## command line inputs
 ##TODO: exception handling
 projectPath = sys.argv[1] ## of the form /home/gbtdata/AGBT16B_400_01
-## split project path to get project string
-projectPathSplit = projectPath.split('/')
-projectStr = projectPathSplit[-1] + '/'
-dataPath = '/lustre/projects/flag/' +  projectStr + 'BF/'
 
 ##global variables
 numGPU = 10
@@ -47,7 +43,6 @@ def bandpassSort(xID, dataBuff, bankData):
     numChans = bankData.shape[1]
     for ints in range(0, numInts):
         if numChans == 25:
-            print('HEREEEEEE')
             ## coarse channel mode
             ## position in bandpass dictated by xID
             bandpassStartChan = xID*5
@@ -91,7 +86,7 @@ def numObjs():
     return objList, fitsList
 
 ##function to get number of integrations, integration length, and number of channels
-def getScanInfo(fileName):
+def getScanInfo(fileName, dataPath):
     fitsLst = glob.glob(dataPath + fileName[:-6] + '*.fits')
     hdu = fits.open(fitsLst[0])
     intLen = np.float(hdu[0].header['REQSTI'])
@@ -106,8 +101,8 @@ def main():
     projectPath = sys.argv[1] ## of the form /home/gbtdata/AGBT16B_400_01
     ## split project path to get project string
     projectPathSplit = projectPath.split('/')
-    projectStr = projectPathSplit[-1] + '/'
-    dataPath = '/lustre/projects/flag/' +  projectStr + 'BF/'
+    projectStr = projectPathSplit[-1]
+    dataPath = '/lustre/projects/flag/' +  projectStr + '/BF/'
 
     bf = BeamformingModule(dataPath)
     bankDict = {"A" : 0,
@@ -149,33 +144,37 @@ def main():
         for beam in range(0,7):
             ## above file list does not contain fits files with BANK info
             ## process data per beam
+            ## open first FITS file to get relevant parameters
+            numInts, intLen, numChans, bankList = getScanInfo(fileList[0], dataPath)
+            ## structure of global buffer is:
+            ## dim1: scan
+            ## dim2: integrations
+            ## dim3: bandpass
+            globalDataBuff_X = np.zeros([int(len(fileList)), numInts, numChans * numBanks])
+            globalDataBuff_Y = np.zeros([int(len(fileList)), numInts, numChans * numBanks])
+            fileIdx = 0
             for dataFITSFile in fileList: 
-                numInts, intLen, numChans, bankList = getScanInfo(dataFITSFile)
+                numInts, intLen, numChans, bankList = getScanInfo(dataFITSFile, dataPath)
                 ## append master BANK list
                 allBanksList.extend(bankList)
                 ## append number of BANKS
                 numBanksList.append(len(bankList))
-
-                ## structure of global buffer is:
-                ## dim1: scan
-                ## dim2: integrations
-                ## dim3: bandpass
-                globalDataBuff_X = np.zeros([int(len(fileList)), numInts, numChans * numBanks]) ##TODO: make general based on CovMode
-                globalDataBuff_Y = np.zeros([int(len(fileList)), numInts, numChans * numBanks]) ##TODO: make general based on CovMode
-                fileIdx = -1
-                cnt = 0
+                if fileIdx == 0:
+                    numBanksList[0] = numBanksList[0] - 1          
+                ## initialize bank data buffers
+                dataBuff_X = np.zeros([numInts, numChans * numBanks])
+                dataBuff_Y = np.zeros([numInts, numChans * numBanks])
                 for fileName in bankList:
+                #for m in range(0,1):
+                    #fileName = bankList[m]
                     print('\n')                
                     print('Beamforming correlations in: '+fileName[-25:]+', Beam: '+np.str(beam)) 
-                    if cnt == 0:
-                         dataBuff_X = np.zeros([numInts, numChans * numBanks])   ##TODO: make mode independent  
-                         dataBuff_Y = np.zeros([numInts, numChans * numBanks])
-                         fileIdx+=1 
                     ## bank name is ALWAYS sixth-to-last character in string
                     bank = fileName[-6] 
                     ## grab xid from dictionary
                     xID = bankDict[bank]
-                
+               
+                     
                     ## Do the beamforming; returns processed BANK data 
                     ## (cov matrices to a beam-formed bandpass) in both
                     ## XX/YY Pols; returned data are in form: 
@@ -184,24 +183,22 @@ def main():
                     ## sort based on xid number for each integration
                     dataBuff_X = bandpassSort(xID, dataBuff_X, xData)
 		    dataBuff_Y = bandpassSort(xID, dataBuff_Y, yData)
-                    print(np.max(dataBuff_Y))
                     ## fill global data bufs
                     globalDataBuff_X[fileIdx,:,:] = dataBuff_X
                     globalDataBuff_Y[fileIdx,:,:] = dataBuff_Y
-                    cnt+=1
-
+                ## increment fileIdx for global data buffers
+                fileIdx += 1 
             print('\n')
             if numChans == 160:
                 pfb == True
-
             ## save out important variables TEST
-            ##with open('/users/npingel/FLAG/M51Vars_' + np.str(beam) + '.pickle', 'wb') as f:
-            ##    pickle.dump([globalDataBuff_X, globalDataBuff_Y, fileList, allBanksList, numBanksList, beam, projectPath, dataPath, pfb],  f)
+            #with open('/users/npingel/FLAG/M51Vars_' + np.str(beam) + '.pickle', 'wb') as f:
+            #    pickle.dump([globalDataBuff_X, globalDataBuff_Y, fileList, allBanksList, numBanksList, beam, projectPath, dataPath, pfb],  f)
             ## build metadata; inputs are FITS file for ancillary files, numInts, global data buffers, int length            
             md = MetaDataModule(projectPath, dataPath, fileList, allBanksList, numBanksList, globalDataBuff_X, globalDataBuff_Y, beam, pfb)
             thduList = md.constuctBinTableHeader()
-            dataFITSFile[:-6] = dataFITSFile
-            thduList.writeto(pwd+'/' + dataFITSFile + '_Beam'+str(beam)+'.fits')
+            dataFITSFile = dataFITSFile[:-6]
+            thduList.writeto(pwd+'/' + projectStr + '_Beam'+str(beam)+'.fits')
     
        
     
