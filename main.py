@@ -58,9 +58,9 @@ def bandpassSort(xID, dataBuff, bankData):
                 bandpassStartChan += 100
                 bandpassEndChan = bandpassStartChan+5
         elif numChans == 160:
-            bandpassStartChan = xid*160
+            bandpassStartChan = xID*160
             bandpassEndChan = bandpassStartChan + 160
-            dataBuff[ints, bandpassStartChan] = bandData[ints, :]
+            dataBuff[ints, bandpassStartChan:bandpassEndChan] = bankData[ints, :]
     return dataBuff
 ##function to determine number of objects observed in session
 def numObjs():        
@@ -88,11 +88,14 @@ def numObjs():
 ##function to get number of integrations, integration length, and number of channels
 def getScanInfo(fileName, dataPath):
     fitsLst = glob.glob(dataPath + fileName[:-6] + '*.fits')
+    print(fitsLst)
     hdu = fits.open(fitsLst[0])
     intLen = np.float(hdu[0].header['REQSTI'])
     numInts = np.int(hdu[1].header['NAXIS2'])
     form = np.float(hdu[1].header['TFORM3'][:-1])
-    numChans = form/2112
+    data = hdu[1].data['DATA']
+    numChans = data.shape[1]/2112
+    #numChans = np.int(form/2112)
     return numInts, intLen, numChans, np.sort(fitsLst)
 
 def main():
@@ -133,11 +136,13 @@ def main():
     print('Project directory: ' + np.str(sys.argv[1]))
     print('Building Primary HDU...')  
     #os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData/') 
-    objList,fitsList = numObjs()    
+    objList,fitsList = numObjs()
+    print(objList)
     ##TODO: put in logic to sort list of fits files if observer went back to the same source... 
-    for objs in range(1,2):  
+    for objs in range(3,4):
         fileList = fitsList[objs]
-        fileList = fileList[0:2]
+        fileList = fileList[-2:]
+        print(fileList)
         allBanksList = [] ## master list of all BANKS for all FITS files associated with object
         numBanksList = [] ## number of BANKS associated with FITS file
         ## loop over FITS files for one object to construct a single SINGLE DISH binary FITS table
@@ -150,11 +155,12 @@ def main():
             ## dim1: scan
             ## dim2: integrations
             ## dim3: bandpass
+            ## TODO: WHAT HAPPENS WHEN WE HAVE DIFFERENT NUMBER OF INTEGRATIONS!!
             globalDataBuff_X = np.zeros([int(len(fileList)), numInts, numChans * numBanks])
             globalDataBuff_Y = np.zeros([int(len(fileList)), numInts, numChans * numBanks])
             fileIdx = 0
             for dataFITSFile in fileList: 
-                numInts, intLen, numChans, bankList = getScanInfo(dataFITSFile, dataPath)
+                numInts, intLen, numSpecChans, bankList = getScanInfo(dataFITSFile, dataPath)
                 ## append master BANK list
                 allBanksList.extend(bankList)
                 ## append number of BANKS
@@ -162,35 +168,51 @@ def main():
                 if fileIdx == 0:
                     numBanksList[0] = numBanksList[0] - 1          
                 ## initialize bank data buffers
-                dataBuff_X = np.zeros([numInts, numChans * numBanks])
-                dataBuff_Y = np.zeros([numInts, numChans * numBanks])
+                dataBuff_X = np.zeros([numInts, numSpecChans * numBanks])
+                dataBuff_Y = np.zeros([numInts, numSpecChans * numBanks])
                 for fileName in bankList:
-                #for m in range(0,1):
-                    #fileName = bankList[m]
                     print('\n')                
                     print('Beamforming correlations in: '+fileName[-25:]+', Beam: '+np.str(beam)) 
                     ## bank name is ALWAYS sixth-to-last character in string
                     bank = fileName[-6] 
                     ## grab xid from dictionary
-                    xID = bankDict[bank]
-               
-                     
-                    ## Do the beamforming; returns processed BANK data 
-                    ## (cov matrices to a beam-formed bandpass) in both
-                    ## XX/YY Pols; returned data are in form: 
-                    ## rows: ints, columns: freqChans
-                    xData,yData = bf.getSpectralArray(fileName,beam, xID, bank)       
-                    ## sort based on xid number for each integration
-                    dataBuff_X = bandpassSort(xID, dataBuff_X, xData)
-		    dataBuff_Y = bandpassSort(xID, dataBuff_Y, yData)
-                    ## fill global data bufs
-                    globalDataBuff_X[fileIdx,:,:] = dataBuff_X
-                    globalDataBuff_Y[fileIdx,:,:] = dataBuff_Y
+                    corrHDU = fits.open(fileName)
+                    nRows = corrHDU[1].header['NAXIS2']
+                    data = corrHDU[1].data['DATA']
+                    xID = np.int(corrHDU[0].header['XID'])
+                    if nRows != 0:
+                        ## Do the beamforming; returns processed BANK data 
+                        ## (cov matrices to a beam-formed bandpass) in both
+                        ## XX/YY Pols; returned data are in form: 
+                        ## rows: ints, columns: freqChans
+                        xData,yData = bf.getSpectralArray(fileName, data, beam, xID, bank)       
+                        
+                        ## DEBUG
+                        ## plot bank bandpasses
+                        #pyplot.figure()
+                        #pyplot.title('Beamformed Bank Bandpass; XID: ' + np.str(xID))
+                        #pyplot.plot(np.mean(xData, axis=0), label = 'XX-Pol')
+                        #pyplot.plot(np.mean(yData, axis=0), label = 'YY-Pol')
+                        #pyplot.xlabel('Bank Channels')
+                        #pyplot.ylabel('Power')
+                        #pyplot.legend(loc=0)
+                        #pyplot.show()
+                        #pyplot.savefig('/users/npingel/FLAG/2017Reduction/Plots/BankBandPass_' + 'XID_' + np.str(xID) + '_' + np.str(objList[objs]) + '.pdf')
+                        ## sort based on xid number for each integration
+                        dataBuff_X = bandpassSort(xID, dataBuff_X, xData)
+    		        dataBuff_Y = bandpassSort(xID, dataBuff_Y, yData)
+                        #print('\n')
+                        #print('Max X Value: ' + np.str(np.max(xData)))
+                        #print('Max Y Value: ' + np.str(np.max(yData)))
+                        #print('\n')
+                        ## fill global data bufs
+                        globalDataBuff_X[fileIdx,:,:] = dataBuff_X
+                        globalDataBuff_Y[fileIdx,:,:] = dataBuff_Y
                 ## increment fileIdx for global data buffers
                 fileIdx += 1 
             print('\n')
-            if numChans == 160:
-                pfb == True
+            if globalDataBuff_X.shape[2] == 3200:
+                pfb = True
             ## save out important variables TEST
             #with open('/users/npingel/FLAG/M51Vars_' + np.str(beam) + '.pickle', 'wb') as f:
             #    pickle.dump([globalDataBuff_X, globalDataBuff_Y, fileList, allBanksList, numBanksList, beam, projectPath, dataPath, pfb],  f)

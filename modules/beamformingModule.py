@@ -11,7 +11,8 @@ each individual beam
 from astropy.io import fits
 import numpy as np
 import sys
-
+import glob
+import matplotlib.pyplot as pyplot
 ## class to read in BANK data from FITS; processes each integration to go from raw covariances to beam-formed spectra
 class BeamformingModule:
     ## initialize function
@@ -19,9 +20,11 @@ class BeamformingModule:
     def __init__ (self, dataPath):
         self.mapVector = np.loadtxt('/users/npingel/FLAG/SpectralFiller/misc/gpuToNativeMap.dat', dtype='int')
         self.dataPath = dataPath
+        self.ints = 0
         ## get project ID
         dataPathSplit = dataPath.split('/')
         self.projectID = dataPathSplit[-3] ## always third last
+                          
     def progressBar(self,value, endvalue, beam, xID,bar_length=20):
 
         percent = float(value) / endvalue
@@ -35,30 +38,56 @@ class BeamformingModule:
         hdu = fits.open(fitsName)
         corrData = hdu[1].data.field('DATA')
         return corrData      
-    def getWeights(self,numChans,bank): ## TODO: finish weights
-        hdu = fits.open(self.dataPath+'weight_files/' + 'w_' + self.projectID + '_' + bank + '.FITS')
+    def getWeights(self,numChans, xID): ## TODO: finish weights
+        weightFileList = glob.glob(self.dataPath+'weight_files/' + 'w_*.FITS')
+        for wtFile in weightFileList:
+            wtHDU = fits.open(wtFile)
+            instID = wtHDU[0].header['XENGINE']
+            if instID == xID:
+                break
+        print(wtFile)
         ## weight array in the form of freqchans, element data, beams
-        xWeights = np.zeros([numChans,40,7], dtype='complex64') 
-        yWeights = np.zeros([numChans,40,7], dtype='complex64')  
+        xWeights = np.zeros([25,40,7], dtype='complex64') 
+        yWeights = np.zeros([25,40,7], dtype='complex64')  
         for i in range(0,7):
             ## process XX Pol
             polStr = 'X'
             ## open file
-            data = hdu[1].data['Beam'+np.str(i)+polStr]
+            data = wtHDU[1].data['Beam'+np.str(i)+polStr]
             ## 64 complex pairs per freq channel
             totalElemInChan = 64*2
             ## can drop last 24 correlation pairs as they are unused and zero. First 80 elements are good. 
-            for chan in range(0,numChans):
+            for chan in range(0,25):
                 weightPairs = data[(totalElemInChan*chan):(totalElemInChan*chan)+80]                 
                 xWeights[chan,:,i].real = weightPairs[0::2]
                 xWeights[chan,:,i].imag = weightPairs[1::2]
             ## open and process YY Pol
             polStr = 'Y'
-            data = hdu[1].data['Beam'+np.str(i)+polStr]
-            for chan in range(0,numChans):
+            data = wtHDU[1].data['Beam'+np.str(i)+polStr]
+            for chan in range(0,25):
                 weightPairs = data[(totalElemInChan*chan):(totalElemInChan*chan)+80]                 
                 yWeights[chan,:,i].real = weightPairs[0:len(weightPairs):2]
                 yWeights[chan,:,i].imag = weightPairs[1:len(weightPairs):2] 
+            #for chan in range(0,25): 
+            #    for elem in range(1,41):
+            #        print(elem-1)
+            #        print(self.elemDict[elem])
+            #        xWeights[chan, elem-1, i] = xWeights[chan, self.elemDict[elem], i]
+            #        yWeights[chan, elem-1, i] = yWeights[chan, self.elemDict[elem], i]
+        ## DEBUG
+        if self.ints == 1:
+            ## diagnositc plotting (weights)
+            pyplot.figure()
+            pyplot.plot(np.abs(xWeights[9,:,i]), label = 'XX-Pol', linewidth=2)
+            pyplot.plot(np.abs(yWeights[9,:,i]), label = 'YY-Pol', linewidth=2)
+            pyplot.xlabel('Data Channel')
+            pyplot.ylabel('Magnitude')
+            pyplot.title('Weight Vector; Coarse Channel: 110')
+            pyplot.legend(loc=0)
+            pyplot.savefig('/users/npingel/FLAG/2017Reduction/Plots/WeightVector_coarseChan110.pdf')
+            pyplot.clf()
+            pyplot.close()
+            self.ints == 0
         return xWeights,yWeights
     
     def processPol(self,R,w):
@@ -103,6 +132,20 @@ class BeamformingModule:
                    if row != col :
                        retCube[col,row,:] = newDataVector[offset::numCorr].conj()
                    offset += 1   
+           ##DEBUG
+           if self.ints == 1:
+               ## diagnostic plotting
+               pyplot.figure()
+               pyplot.title('Covariance Matrix; Fine Frequency Channel: 650')
+               pyplot.xlabel('Data Channel')
+               pyplot.ylabel('Data Channel')  
+               pyplot.imshow(np.log10(abs(retCube[0:39,0:39,9])), extent = [0,39,0,39])
+               pyplot.colorbar()
+               pyplot.savefig('/users/npingel/FLAG/2017Reduction/Plots/CoVarMatrix_fineChan650_Int100.pdf')
+               pyplot.clf()
+               pyplot.close()
+               self.ints = 0
+           ##DEBUG
            return retCube
     
     ##TODO:Remove?    
@@ -140,28 +183,32 @@ class BeamformingModule:
         ydat = dat[20:39]
         return xdat, ydat 
         
-    def getSpectralArray(self, fitsName, beam, xID, bank):
-        ## open BANK FITS file
-        dataArr = self.getRawCorrelations(fitsName)
+    def getSpectralArray(self, fitsName, dataArr, beam, xID, bank):
         ## get number of freq channels
         numFreqs = dataArr.shape[1] / 2112 ## always 2112 complex pairs per frequency channel
         ## get CHANSEL for if we are in PFB mode
         corrHDU = fits.open(fitsName)
-        chanSel = corrHDU[0].header['CHANSEL']
+        chanSel = np.int(corrHDU[0].header['CHANSEL'])
         ## create bandpass containers. Rows are ints; colums represent integration bandpasses
         spectrumArr_X = np.zeros([len(dataArr[:,0]),numFreqs], dtype='float32')    
         spectrumArr_Y = np.zeros([len(dataArr[:,0]),numFreqs], dtype='float32') 
-        
         ## unpack the weights from the associated binary file
-        xWeight,yWeight = self.getWeights(numFreqs, bank)
+        #if xID == 5:
+            #self.ints=1
+        xWeight,yWeight = self.getWeights(numFreqs, xID)
         ## loop through integrations and process covariance bandpass to beam-formed spectra
         for ints in range(0,len(dataArr[:,0])):   
             ## TODO: best place for this??
             self.progressBar(ints,len(dataArr[:,0]), beam, xID)            
+            ## DEBUG
+            #if ints == 99:
+                #self.ints= 1
+            ## DEBUG
             ## grab a covariance bandpass for a single integration
             dataVector=dataArr[ints,:]
             ## send to get in FISHFITS order before sorting into 'cube' of shape (40,40,freqChans)
             corrCube = self.getCorrelationCube(dataVector, numFreqs)
+            
             ## loop through frequency channels to apply weights. Inputs into processPol
             ## are a 40x40 covariance matrix, pol flag, and a length 40 weight vector
             cnt = 0
@@ -169,18 +216,17 @@ class BeamformingModule:
             for z in range(0,numFreqs):
                 dat = corrCube[:,:,z]
                 if numFreqs == 25:
-                    retSpec = np.real(self.processPol(dat, yWeight[z,:,beam]))
-                    spectrumArr_X[ints,z] = np.real(self.processPol(dat, xWeight[z,:,beam])) ##0 is XX
-                    spectrumArr_Y[ints,z] = np.real(self.processPol(dat, yWeight[z,:,beam])) ##1 is YY
+                    spectrumArr_X[ints,z] = np.abs(self.processPol(dat, xWeight[z,:,beam])) ##0 is XX
+                    spectrumArr_Y[ints,z] = np.abs(self.processPol(dat, yWeight[z,:,beam])) ##1 is YY
                 elif numFreqs == 160:
                     wtIdx = absWtIdx + (chanSel*5)
                     xWeightIn = xWeight[wtIdx,:,beam]
                     yWeightIn = yWeight[wtIdx,:,beam]
-                    SpectrumArr_X[ints,z] = np.real(self.processPol(dat, xWeightIn)) ##0 is XX
-                    SpectrumArr_Y[ints,z] = np.real(self.processPol(dat, yWeightIn)) ##1 is YY
+                    spectrumArr_X[ints,z] = np.abs(self.processPol(dat, xWeightIn)) ##0 is XX
+                    spectrumArr_Y[ints,z] = np.abs(self.processPol(dat, yWeightIn)) ##1 is YY
                     cnt += 1
                     if cnt > 32:
                         absWtIdx += 1
-                    
+                        cnt = 0
         return spectrumArr_X,spectrumArr_Y
         

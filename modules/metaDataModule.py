@@ -493,7 +493,7 @@ class MetaDataModule:
             goHDU = fits.open(self.projectPath + '/GO/' + self.fitsList[fileNum])                
             corrHDU = fits.open(self.bankFitsList[bankIdx])
             ## get chansel
-            chanSel = corrHDU[0].header['CHANSEL']
+            chanSel = np.int(corrHDU[0].header['CHANSEL'])
             numScanInts = corrHDU[1].header['NAXIS2']
             if paramLook != 'TIMESTAMP' and paramLook != 'OBSMODE':           
                 value = goHDU[0].header[paramLook]
@@ -554,8 +554,8 @@ class MetaDataModule:
             elif param == 'RESTFRQ':
                 valStr = 1450.00*1e6##TODO:remove for production
                 if self.pfb == True:
-                    lowEnd = valStr-(250-(chanSel*100))*.30318
-                    highEnd = valStr-(250-(chanSel*100+100))*.30318
+                    lowEnd = valStr-(250-(chanSel*100))*.30318*1e6
+                    highEnd = valStr-(250-(chanSel*100+100))*.30318*1e6
                     valStr = highEnd - (highEnd-lowEnd)/2
                 self.initArr(fileNum, numScanInts, 'float32', None)
             elif param == 'SCAN' or param == 'PROCSEQN' or param == 'PROCSIZE':
@@ -699,8 +699,8 @@ class MetaDataModule:
                 value = 1
             elif param == 'CRVAL4':
                 self.initArr(fileNum, numScanInts, 'int16', None)
-                value1 = -5
-                value2 = -6
+                value1 = -6
+                value2 = -5
                 multiVal = True
             elif param == 'ZEROCHAN' or param =='TWARM' or param =='TCOLD' or param == 'QD_XEL' or param == 'QD_EL' or param == 'CALPOSITION':
                 self.initArr(fileNum, numScanInts, 'float32', None)
@@ -807,6 +807,8 @@ class MetaDataModule:
         for fileNum in range(0,len(self.fitsList)):
             corrHDU = fits.open(self.bankFitsList[bankIdx])
             numScanInts = corrHDU[1].header['NAXIS2']
+            ## get chansel
+            chanSel = np.int(corrHDU[0].header['CHANSEL'])
             if param == 'VELDEF':
                 value = 'VRAD-TOP'
                 self.initArr(fileNum, numScanInts, 'str', value)
@@ -814,7 +816,11 @@ class MetaDataModule:
                 value = 0
                 self.initArr(fileNum, numScanInts, 'int16', None)
             elif param == 'CRVAL1' or 'OBSFREQ':
-                value = 1.42172900e+09
+                value = 1450.00*1e6##TODO:remove for production
+                if self.pfb == True:
+                    lowEnd = value - (250-(chanSel*100))*.30318*1e6
+                    highEnd = value-(250-(chanSel*100+100))*.30318*1e6
+                    value = highEnd - (highEnd-lowEnd)/2
                 self.initArr(fileNum, numScanInts, 'float32', None)
             
             if fileNum == 0:
@@ -880,7 +886,7 @@ class MetaDataModule:
             elif param == 'BANDWID':
                 if modeName == 'FLAG_CALCORR_MODE':
                     value = 303.18*500*1000.
-                elif modeName == 'FLAG_PFB_MODE':
+                elif modeName == 'FLAG_PFBCORR_MODE':
                     value = 100*303.18*1000
                 self.initArr(fileNum, numScanInts, 'float32', None)
             if fileNum == 0:
