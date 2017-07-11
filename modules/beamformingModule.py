@@ -82,12 +82,13 @@ class BeamformingModule:
             pyplot.plot(np.abs(yWeights[9,:,i]), label = 'YY-Pol', linewidth=2)
             pyplot.xlabel('Data Channel')
             pyplot.ylabel('Magnitude')
-            pyplot.title('Weight Vector; Coarse Channel: 110')
+            pyplot.title('Weight Vector; Coarse Channel: 130')
             pyplot.legend(loc=0)
-            pyplot.savefig('/users/npingel/FLAG/2017Reduction/Plots/WeightVector_coarseChan110.pdf')
+            pyplot.savefig('/users/npingel/FLAG/2017Reduction/Plots/WeightVector_coarseChan130.pdf')
             pyplot.clf()
             pyplot.close()
             self.ints == 0
+        ## DEBUG 
         return xWeights,yWeights
     
     def processPol(self,R,w):
@@ -140,6 +141,8 @@ class BeamformingModule:
                pyplot.xlabel('Data Channel')
                pyplot.ylabel('Data Channel')  
                pyplot.imshow(np.log10(abs(retCube[0:39,0:39,9])), extent = [0,39,0,39])
+               pyplot.xlim(0,39)
+               pyplot.ylim(0,39)
                pyplot.colorbar()
                pyplot.savefig('/users/npingel/FLAG/2017Reduction/Plots/CoVarMatrix_fineChan650_Int100.pdf')
                pyplot.clf()
@@ -194,16 +197,23 @@ class BeamformingModule:
         spectrumArr_Y = np.zeros([len(dataArr[:,0]),numFreqs], dtype='float32') 
         ## unpack the weights from the associated binary file
         #if xID == 5:
-            #self.ints=1
+        #    self.ints=1
         xWeight,yWeight = self.getWeights(numFreqs, xID)
+        
+        ## DEBUG (build weight bandpass)
+        weightXBP = np.zeros([25], dtype='complex64')
+        weightYBP = np.zeros([25], dtype='complex64')
+        ## DEBUG
+
         ## loop through integrations and process covariance bandpass to beam-formed spectra
         for ints in range(0,len(dataArr[:,0])):   
             ## TODO: best place for this??
             self.progressBar(ints,len(dataArr[:,0]), beam, xID)            
             ## DEBUG
             #if ints == 99:
-                #self.ints= 1
+            #    self.ints= 1
             ## DEBUG
+            
             ## grab a covariance bandpass for a single integration
             dataVector=dataArr[ints,:]
             ## send to get in FISHFITS order before sorting into 'cube' of shape (40,40,freqChans)
@@ -218,6 +228,13 @@ class BeamformingModule:
                 if numFreqs == 25:
                     spectrumArr_X[ints,z] = np.abs(self.processPol(dat, xWeight[z,:,beam])) ##0 is XX
                     spectrumArr_Y[ints,z] = np.abs(self.processPol(dat, yWeight[z,:,beam])) ##1 is YY
+                    ## DEBUG
+                    ## we wish to produce a diagnostic plot which shows a max weight (as determined by the real component)
+                    if ints == 0: 
+                        weightXBP[z] = np.max(xWeight[z,0,beam])
+                        weightYBP[z] = np.max(yWeight[z,20,beam])
+                    ## DEBUG
+                                           
                 elif numFreqs == 160:
                     wtIdx = absWtIdx + (chanSel*5)
                     xWeightIn = xWeight[wtIdx,:,beam]
@@ -225,8 +242,13 @@ class BeamformingModule:
                     spectrumArr_X[ints,z] = np.abs(self.processPol(dat, xWeightIn)) ##0 is XX
                     spectrumArr_Y[ints,z] = np.abs(self.processPol(dat, yWeightIn)) ##1 is YY
                     cnt += 1
-                    if cnt > 32:
+                    
+                    if cnt == 32:
                         absWtIdx += 1
                         cnt = 0
-        return spectrumArr_X,spectrumArr_Y
+                    if ints == 0:
+                        weightXBP[z] = np.max(np.abs(xWeightIn))
+                        weightYBP[z] = np.max(np.abs(yWeightIn))
+                    ## DEBUG         
+        return spectrumArr_X,spectrumArr_Y, weightXBP, weightYBP
         

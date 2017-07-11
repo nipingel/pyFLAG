@@ -12,11 +12,13 @@ __status__ = "Beta"
 """
 ## imports
 from astropy.io import fits
+from astropy.convolution import convolve, Box1DKernel
 import numpy as np
 import matplotlib.pyplot as pyplot
 import matplotlib 
 import glob
 import sys
+import pickle
 from scipy.optimize import curve_fit
 matplotlib.rc('font', family='serif') 
 matplotlib.rc('font', serif='Avant Garde') 
@@ -33,7 +35,7 @@ class WrongDirectionInput(Error):
 	"""Raised when input is not 'Az' or 'El'"""
 	pass
 
-##grab file timestamp (first command line argument) and scan direciton (Az or El; second command line argument) and element number (third command line argument)
+##grab file timestamp (first and second command line argument) and element number (third command line argument)
 OnFileTimeStamp = sys.argv[1]
 OffFileTimeStamp = sys.argv[2]
 elem = sys.argv[3] ## needs to be integer in ranging from 1-19
@@ -59,6 +61,21 @@ elemMapDict = {'1_X':0, '1_Y': 260, '2_X':3, '2_Y': 263, '3_X': 8, '3_Y': 308, '
 '10_X': 59, '10_Y': 479, '11_X': 80, '11_Y': 540, '12_X': 83, '12_Y': 543, '13_X': 108, '13_Y': 608, '14_X': 111, '14_Y': 611,
 '15_X': 140, '15_Y': 680, '16_X': 143, '16_Y': 683, '17_X': 176, '17_Y': 756, '18_X': 179, '18_Y': 759, '19_X': 216, '19_Y': 836} 
 
+## function to fit and subtract bandpass structre
+def fitBase(xAxis, bandpass, order, x0,x1,x3,x4):
+	subSpecArr = bandpass[x0:x1]
+	subSpecArr = np.concatenate([subSpecArr, bandpass[x3:x4]])
+	subFreqArr = xAxis[x0:x1]
+	subFreqArr = np.concatenate([subFreqArr, xAxis[x3:x4]])
+	fit = np.polyfit(subFreqArr, subSpecArr, order)
+	p = np.poly1d(fit)
+	newSpec = bandpass - p(xAxis)
+	return newSpec
+
+## smooth function with boxcar
+def boxcar(bandpass, width):
+	smoothedBandpass = convolve(bandpass, Box1DKernel(width))
+	return smoothedBandpass
 ## progress bar
 def progressBar(value, endvalue,bar_length=20):
 
@@ -76,7 +93,7 @@ elemIdx_X = elemMapDict[elemX]
 elemIdx_Y = elemMapDict[elemY]
 
 ## define data directories
-dataDir = '/lustre/projects/flag/AGBT16B_400_05/BF/'
+dataDir = '/lustre/projects/flag/AGBT16B_400_03/BF/'
 
 onFitsList = glob.glob(dataDir+OnFileTimeStamp+'*.fits')
 offFitsList = glob.glob(dataDir+OffFileTimeStamp+'*.fits')
@@ -202,7 +219,7 @@ fullBandpassArr_Off_YY = np.mean(fullBandpassArr_Off_YY, axis=0)
 
 
 ## perform calibration
-Tsys = 18.6 ## estimate 
+Tsys = 140.4 ## estimate 
 Ta_XX = (fullBandpassArr_On_XX/fullBandpassArr_Off_XX-1)*Tsys
 Ta_YY = (fullBandpassArr_On_YY/fullBandpassArr_Off_YY-1)*Tsys
 ## frequency axis assuming restfreq of 1450 [MHz]; bandWidth is set in processing above
@@ -213,24 +230,44 @@ freqAxis = np.linspace(cenFreq-bandWidth/2, cenFreq+bandWidth/2,num = numChans*2
 if numChans == 160:
 	minXid = np.min(xidArr)
 	maxXid = np.max(xidArr)
-	lowEnd = cenFreq-(250-(chanSel*100))*.30318 
-	highEnd = cenFreq-(250-(chanSel*100+100))*.30318
-	cenFreq = highEnd - (highEnd-lowEnd)/2
+	nu0_Coarse = cenFreq - 75.795
+	nu0_Fine = nu0_Coarse + (chanSel*100)*.30318
+	nu1_Fine = nu0_Fine + 100*0.30318
+	cenFreq = nu0_Fine + (nu1_Fine - nu0_Fine)/2
 	freqAxis = np.linspace(cenFreq-bandWidth/2, cenFreq+bandWidth/2,num = numChans*20)
+
+
+## fit polynomial to baseline 
+if numChans == 25:
+	baseTa_XX = fitBase(freqAxis,Ta_XX, 3, 100, 120, 160, 180)
+        baseTa_YY = fitBase(freqAxis, Ta_YY, 3, 50, 140, 160, 450)
+elif numChans == 160:
+	baseTa_XX = fitBase(freqAxis, Ta_XX, 3, 850,1475,1900,2056) 
+	baseTa_YY = fitBase(freqAxis, Ta_YY, 3, 850,1475,1900,2056)
+
+## smooth bandpass
+#smoothTa_XX = boxcar(Ta_XX, 2)
+#smoothTa_YY = boxcar(Ta_YY, 2)
 
 ##inform user that we're plotting
 print('\n')
 print('Plotting bandpass...')
 
+##save variables if desired
+#with open('/users/npingel/FLAG/2017Reduction/PFBTests/M101_centralDipole_fineVars.pickle', 'wb') as f:
+#	pickle.dump([freqAxis, baseTa_XX, baseTa_YY], f)
+
+
 ## Plot data and fit
 pyplot.figure()
-pyplot.plot(freqAxis,Ta_XX, linewidth = 2, label = 'XX-Pol')
-pyplot.plot(freqAxis, Ta_YY, linewidth = 2, label = 'YY-Pol')
+pyplot.plot(freqAxis,baseTa_XX, linewidth = 2, label = 'XX-Pol')
+pyplot.plot(freqAxis, baseTa_YY, linewidth = 2, label = 'YY-Pol')
 pyplot.ylabel(r'T$_A$ [K]')
-pyplot.title('HI Spectrum of M31 Cloud6 (3rd On/Off)',fontsize='small' )
+pyplot.title('Fine HI Spectrum of M101 (Central Dipole)',fontsize='small' )
 pyplot.xlabel('Frequency [MHz]')
-#pyplot.ylim(-.2,.5)
-#pyplot.xlim(1410,1430)
+pyplot.axhline(0, color='black', linewidth=2)
+pyplot.ylim(-.5,5)
+pyplot.xlim(1410,1425)
 pyplot.legend(loc = 0, prop = {'size':15})
-#pyplot.savefig('/users/npingel/GBT16B-400/Plots/HI_M31_Cloud6_cenralDipole_GBT16B_400_05_Fine_03.pdf')
+#pyplot.savefig('/users/npingel/FLAG/2017Reduction/PFBTests/Plots/HI_M101_cenralDipole_GBT16B_400_03_Fine_BC.pdf')
 pyplot.show()

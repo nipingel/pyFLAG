@@ -3,9 +3,9 @@
 Unpacks binary files containing beamforming weights from FLAG (phased array feed for the GBT). One command line argument is required
 which is the directory to the binary weight files. The second argument is either 'FRB', 'Spectral', or 'Calibration'
 Usage: 
-ipython weightFiller.py full_path_to_binaries CorrMode
+ipython weightFiller.py full_path_to_binaries
 Example:
-ipython weightFiller.py Users/npingel/Desktop/Research/data/GBT/GBT16B_400/AGBT16B_400_04/weight_files/ 'Calibration'
+ipython weightFiller.py Users/npingel/Desktop/Research/data/GBT/GBT16B_400/AGBT16B_400_04/ 
 __author__ = "Nick Pingel"
 __version__ = "1.0"
 __email__ = "nipingel@mix.wvu.edu"
@@ -44,8 +44,9 @@ def progressBar(value, endvalue,bar_length=20):
 
 # TODO: input exceptions
 
-binList = glob.glob(binDir + '*.bfw')
-
+binList = glob.glob(binDir + 'w*11_12*.bfw')
+binList.sort()
+binList = binList[0:20]
 for i in range(0,len(binList)):
 	progressBar(i,len(binList))
 	file = binList[i]

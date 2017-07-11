@@ -62,6 +62,26 @@ def bandpassSort(xID, dataBuff, bankData):
             bandpassEndChan = bandpassStartChan + 160
             dataBuff[ints, bandpassStartChan:bandpassEndChan] = bankData[ints, :]
     return dataBuff
+
+## DEBUG
+def weightSort(xID, weightBuff, weightData):
+    numChans = weightData.shape[0]
+    if numChans == 25:
+        weightPassStart = xID*5
+        weightPassEnd = weightPassStart+5
+        for i in range(0,5):
+            weightDataStart = i * 5
+            weightDataEnd = weightDataStart + 5
+            weightBuff[weightPassStart:weightPassEnd] = weightData[weightDataStart:weightDataEnd]        
+            weightPassStart += 100
+            weightPassEnd = weightPassStart + 5
+    elif numChans == 160:
+        weightPassStart = xID*160
+        weightPassEnd = weightPassStart + 160
+        weightBuff[weightPassStart:weightPassEnd] = weightData
+    return weightBuff
+## DEBUG       
+
 ##function to determine number of objects observed in session
 def numObjs():        
     goFits = glob.glob(goFitsPath+'/*.fits')
@@ -88,7 +108,6 @@ def numObjs():
 ##function to get number of integrations, integration length, and number of channels
 def getScanInfo(fileName, dataPath):
     fitsLst = glob.glob(dataPath + fileName[:-6] + '*.fits')
-    print(fitsLst)
     hdu = fits.open(fitsLst[0])
     intLen = np.float(hdu[0].header['REQSTI'])
     numInts = np.int(hdu[1].header['NAXIS2'])
@@ -139,9 +158,9 @@ def main():
     objList,fitsList = numObjs()
     print(objList)
     ##TODO: put in logic to sort list of fits files if observer went back to the same source... 
-    for objs in range(3,4):
+    for objs in range(0,1):
         fileList = fitsList[objs]
-        fileList = fileList[-2:]
+        fileList = fileList[10:12]
         print(fileList)
         allBanksList = [] ## master list of all BANKS for all FITS files associated with object
         numBanksList = [] ## number of BANKS associated with FITS file
@@ -170,6 +189,13 @@ def main():
                 ## initialize bank data buffers
                 dataBuff_X = np.zeros([numInts, numSpecChans * numBanks])
                 dataBuff_Y = np.zeros([numInts, numSpecChans * numBanks])
+                
+                ## DEBUG
+                xWeightBuff =  np.zeros([numSpecChans * numBanks], dtype = 'complex64')
+                yWeightBuff =  np.zeros([numSpecChans * numBanks], dtype = 'complex64')
+                ## DEBUG
+                
+                
                 for fileName in bankList:
                     print('\n')                
                     print('Beamforming correlations in: '+fileName[-25:]+', Beam: '+np.str(beam)) 
@@ -185,26 +211,35 @@ def main():
                         ## (cov matrices to a beam-formed bandpass) in both
                         ## XX/YY Pols; returned data are in form: 
                         ## rows: ints, columns: freqChans
-                        xData,yData = bf.getSpectralArray(fileName, data, beam, xID, bank)       
-                        
                         ## DEBUG
-                        ## plot bank bandpasses
+                        ##xData,yData = bf.getSpectralArray(fileName, data, beam, xID, bank)
+                        xData,yData,xWeightBP, yWeightBP = bf.getSpectralArray(fileName, data, beam, xID, bank)       
+                        ## DEBUG
+                          
+                        ## DEBUG
+                        ## plot weight bandpasses
                         #pyplot.figure()
                         #pyplot.title('Beamformed Bank Bandpass; XID: ' + np.str(xID))
-                        #pyplot.plot(np.mean(xData, axis=0), label = 'XX-Pol')
+                        #pyplot.title('Weight Bandpass')
+                        #pyplot.plot(np.abs(xWeightBP), label = 'XX-Pol')
                         #pyplot.plot(np.mean(yData, axis=0), label = 'YY-Pol')
-                        #pyplot.xlabel('Bank Channels')
-                        #pyplot.ylabel('Power')
+                        #pyplot.xlabel('Frequency [MHz]')
+                        #pyplot.ylabel('Magnitude')
                         #pyplot.legend(loc=0)
                         #pyplot.show()
-                        #pyplot.savefig('/users/npingel/FLAG/2017Reduction/Plots/BankBandPass_' + 'XID_' + np.str(xID) + '_' + np.str(objList[objs]) + '.pdf')
+                        #pyplot.savefig('/users/npingel/FLAG/2017Reduction/PFBTests/Plots/BankBandPass_' + 'XID_' + np.str(xID) + '_' + np.str(objList[objs]) + '.pdf')
+                        #pyplot.savefig('/users/npingel/FLAG/2017Reduction/PFBTests/Plots/WeightBandpass_M101_Fine.pdf')
+                        ## DEBUG
+                        
                         ## sort based on xid number for each integration
                         dataBuff_X = bandpassSort(xID, dataBuff_X, xData)
     		        dataBuff_Y = bandpassSort(xID, dataBuff_Y, yData)
-                        #print('\n')
-                        #print('Max X Value: ' + np.str(np.max(xData)))
-                        #print('Max Y Value: ' + np.str(np.max(yData)))
-                        #print('\n')
+                        
+                        ## DEBUG 
+                        xWeightBuff = weightSort(xID,xWeightBuff, xWeightBP)
+                        yWeightBuff = weightSort(xID,yWeightBuff, yWeightBP)
+                        ## DEBUG
+                         
                         ## fill global data bufs
                         globalDataBuff_X[fileIdx,:,:] = dataBuff_X
                         globalDataBuff_Y[fileIdx,:,:] = dataBuff_Y
@@ -213,9 +248,44 @@ def main():
             print('\n')
             if globalDataBuff_X.shape[2] == 3200:
                 pfb = True
+            
+            ## DEBUG 
+            ## magnitude   
+            pyplot.figure()
+            pyplot.title('Weight Magnitude Bandpass (' + projectStr + ')')
+            pyplot.plot(np.abs(xWeightBuff)**2, label = 'XX-Pol')
+            pyplot.plot(np.abs(yWeightBuff)**2, label = 'YY-Pol')
+            pyplot.xlabel('Frequency Chanel')
+            pyplot.ylabel('Magnitude')
+            pyplot.legend(loc=0)
+            pyplot.savefig('/users/npingel/FLAG/2017Reduction/Plots/Weights/' + projectStr + '_weightBandPass_Beam' + np.str(beam) + '_mag.pdf')
+            pyplot.show()
+            
+            ## amplitdue
+            pyplot.figure()
+            pyplot.title('Weight Amplitude Bandpass (' + projectStr + ')')
+            pyplot.plot(np.abs(xWeightBuff), label = 'XX-Pol')
+            pyplot.plot(np.abs(yWeightBuff), label = 'YY-Pol')
+            pyplot.xlabel('Frequency Chanel')
+            pyplot.ylabel('Amplitude')
+            pyplot.legend(loc=0)
+            pyplot.savefig('/users/npingel/FLAG/2017Reduction/Plots/Weights/' + projectStr + '_weightBandPass_Beam' + np.str(beam) + '_amp.pdf')
+            pyplot.show()
+            ## phase
+            pyplot.figure()
+            pyplot.title('Weight Phase Bandpass (' + projectStr + ')')
+            pyplot.plot(np.angle(xWeightBuff), label = 'XX-Pol')
+            pyplot.plot(np.angle(yWeightBuff), label = 'YY-Pol')
+            pyplot.xlabel('Frequency Chanel')
+            pyplot.ylabel('Phase [rad]')
+            pyplot.legend(loc=0)
+            pyplot.savefig('/users/npingel/FLAG/2017Reduction/Plots/Weights/' + projectStr + '_weightBandPass_Beam' + np.str(beam) + '_phase.pdf')
+            pyplot.show()
+
             ## save out important variables TEST
-            #with open('/users/npingel/FLAG/M51Vars_' + np.str(beam) + '.pickle', 'wb') as f:
-            #    pickle.dump([globalDataBuff_X, globalDataBuff_Y, fileList, allBanksList, numBanksList, beam, projectPath, dataPath, pfb],  f)
+            with open('/users/npingel/FLAG/2017Reduction/WeightBandpass_' + projectStr + '_Beam' + np.str(beam) + '.pickle', 'wb') as f:
+                pickle.dump([xWeightBuff, yWeightBuff],  f)
+            ## DEBUG
             ## build metadata; inputs are FITS file for ancillary files, numInts, global data buffers, int length            
             md = MetaDataModule(projectPath, dataPath, fileList, allBanksList, numBanksList, globalDataBuff_X, globalDataBuff_Y, beam, pfb)
             thduList = md.constuctBinTableHeader()
