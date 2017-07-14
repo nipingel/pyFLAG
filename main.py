@@ -158,14 +158,16 @@ def main():
     objList,fitsList = numObjs()
     print(objList)
     ##TODO: put in logic to sort list of fits files if observer went back to the same source... 
-    for objs in range(0,1):
+    for objs in range(1,2):
         fileList = fitsList[objs]
-        fileList = fileList[10:12]
+        fileList = fileList[0:2]
         print(fileList)
         allBanksList = [] ## master list of all BANKS for all FITS files associated with object
         numBanksList = [] ## number of BANKS associated with FITS file
         ## loop over FITS files for one object to construct a single SINGLE DISH binary FITS table
         for beam in range(0,7):
+            allBanksList = []
+            numBanksList = []
             ## above file list does not contain fits files with BANK info
             ## process data per beam
             ## open first FITS file to get relevant parameters
@@ -177,6 +179,7 @@ def main():
             ## TODO: WHAT HAPPENS WHEN WE HAVE DIFFERENT NUMBER OF INTEGRATIONS!!
             globalDataBuff_X = np.zeros([int(len(fileList)), numInts, numChans * numBanks])
             globalDataBuff_Y = np.zeros([int(len(fileList)), numInts, numChans * numBanks])
+            
             fileIdx = 0
             for dataFITSFile in fileList: 
                 numInts, intLen, numSpecChans, bankList = getScanInfo(dataFITSFile, dataPath)
@@ -248,7 +251,7 @@ def main():
             print('\n')
             if globalDataBuff_X.shape[2] == 3200:
                 pfb = True
-            
+            """
             ## DEBUG 
             ## magnitude   
             pyplot.figure()
@@ -286,6 +289,7 @@ def main():
             with open('/users/npingel/FLAG/2017Reduction/WeightBandpass_' + projectStr + '_Beam' + np.str(beam) + '.pickle', 'wb') as f:
                 pickle.dump([xWeightBuff, yWeightBuff],  f)
             ## DEBUG
+            """
             ## build metadata; inputs are FITS file for ancillary files, numInts, global data buffers, int length            
             md = MetaDataModule(projectPath, dataPath, fileList, allBanksList, numBanksList, globalDataBuff_X, globalDataBuff_Y, beam, pfb)
             thduList = md.constuctBinTableHeader()

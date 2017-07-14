@@ -39,7 +39,7 @@ class BeamformingModule:
         corrData = hdu[1].data.field('DATA')
         return corrData      
     def getWeights(self,numChans, xID): ## TODO: finish weights
-        weightFileList = glob.glob(self.dataPath+'weight_files/' + 'w_*.FITS')
+        weightFileList = glob.glob(self.dataPath+'weight_files/' + '*SevenBeam.FITS')
         for wtFile in weightFileList:
             wtHDU = fits.open(wtFile)
             instID = wtHDU[0].header['XENGINE']

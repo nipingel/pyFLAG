@@ -23,7 +23,9 @@ class MetaDataModule:
     ## total BANK files, and creates column object. 
     def __init__(self, projectPath, rawDataPath, fitsList, bankFitsList, numBanksList, dataBuff_X,dataBuff_Y,beamNum, pfb):        
         self.projectPath = projectPath
+        ## list of scan time stamps 
         self.fitsList = fitsList     
+        ## list containing all relevant BANK files
         self.bankFitsList = bankFitsList
         self.numBanksList = numBanksList
         self.dataBuff_X = dataBuff_X
@@ -450,7 +452,6 @@ class MetaDataModule:
                 ## initialize array to store parameter values
                 self.initArr(fileNum, numScanInts, 'str', timeObj[0].isot)
                 timeVal = True
-            bankIdx += self.numBanksList[fileNum]
         
             ## fill in value array for similar values across integrations/polarizations
             if timeVal == True and fileNum == 0:
