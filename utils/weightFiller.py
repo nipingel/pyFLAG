@@ -44,7 +44,7 @@ def progressBar(value, endvalue,bar_length=20):
 
 # TODO: input exceptions
 
-binList = glob.glob(binDir + 'w*11_12*.bfw')
+binList = glob.glob(binDir + 'w_2017_07_28_05:03:43_*.bin')
 binList.sort()
 binList = binList[0:20]
 for i in range(0,len(binList)):
@@ -93,8 +93,8 @@ for i in range(0,len(binList)):
 	offSetArr = np.zeros([2,7],dtype='float32')
 	for off in range(0,7):
 	    offsetIdx = startByte+(off*8)
-            offSetArr[0, off] = struct.unpack('f',data[offsetIdx:offsetIdx+4])[0]
-	    offSetArr[1, off] = struct.unpack('f',data[offsetIdx+4:offsetIdx+8])[0]
+            offSetArr[0, off] = struct.unpack('f',data[offsetIdx:offsetIdx+4])[0]/60. ## go from arcmin to deg
+	    offSetArr[1, off] = struct.unpack('f',data[offsetIdx+4:offsetIdx+8])[0]/60. 
 
 	## update starting byte to get filenames and BF algorithm
 	charStartByte = startByte+(14*4)
@@ -148,7 +148,7 @@ for i in range(0,len(binList)):
 	thdulist = fits.HDUList([priHdu, tbHdu])
 	
 	## generate filename from split path
-        weightFITSName = binDir + '/weight_files/w_' + fileSplit[-3] + '_' + bank +'.FITS'
+        weightFITSName = binDir + '/w_' + fileSplit[-3] + '_' + bank +'_SingleBeam.FITS'
 	thdulist.writeto(weightFITSName)
 ## when finished, print newline character
 print('\n')

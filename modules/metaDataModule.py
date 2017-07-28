@@ -602,6 +602,12 @@ class MetaDataModule:
         bankIdx = 0
         for fileNum in range(0,len(self.fitsList)):            
             antHDU = fits.open(self.projectPath + '/Antenna/' + self.fitsList[fileNum])
+            ## open weight file to get cross-el/el offset
+            weightFiles = glob.glob(self.dataPath + 'weight_files/*SingleBeam.FITS')
+            wHDU = fits.open(weightFiles[0])
+            beamOff_Az = wHDU[1].data['BeamOFF_AZ'][self.beamNum]
+            beamOff_El = wHDU[1].data['BeamOFF_EL'][self.beamNum]
+            ## get Antenna DMJD values
             antDMJD = antHDU[2].data['DMJD']
             ## get integrations this scan
             corrHDU = fits.open(self.bankFitsList[bankIdx])
@@ -610,12 +616,13 @@ class MetaDataModule:
             if param == 'CRVAL2':
                 ## interpolate data time samples to data time samples
                 maj = antHDU[2].data['MAJOR']
-                value = np.interp(corrDMJD, antDMJD,maj)
+                ## add beam offset 
+                value = np.interp(corrDMJD, antDMJD,maj) + beamOff_Az
                 ## initialize array to hold parameter values if first iteration
                 self.initArr(fileNum, numScanInts, 'float32', None)
             elif param == 'CRVAL3':
                 minor = antHDU[2].data['MINOR']
-                value = np.interp(corrDMJD,antDMJD,minor)
+                value = np.interp(corrDMJD,antDMJD,minor) + beamOff_El
                 self.initArr(fileNum, numScanInts, 'float32', None)
             elif param == 'AZIMUTH':
                 az = antHDU[2].data['MNT_AZ']
@@ -841,8 +848,7 @@ class MetaDataModule:
         for fileNum in range(0,len(self.fitsList)):
             corrHDU = fits.open(self.bankFitsList[bankIdx])
             numScanInts = corrHDU[1].header['NAXIS2']
-            weightFiles = glob.glob(self.dataPath + 'weight_files/*.FITS') 
-            ## just open first file since offsets are ubiquitous
+            weightFiles = glob.glob(self.dataPath + 'weight_files/*SingleBeam.FITS') 
             wHDU = fits.open(weightFiles[0])
             if param == 'FEEDXOFF':
                 beamOff_Az = wHDU[1].data['BeamOff_AZ']

@@ -39,7 +39,7 @@ class BeamformingModule:
         corrData = hdu[1].data.field('DATA')
         return corrData      
     def getWeights(self,numChans, xID): ## TODO: finish weights
-        weightFileList = glob.glob(self.dataPath+'weight_files/' + '*SevenBeam.FITS')
+        weightFileList = glob.glob(self.dataPath+'weight_files/' + '*SingleBeam.FITS')
         for wtFile in weightFileList:
             wtHDU = fits.open(wtFile)
             instID = wtHDU[0].header['XENGINE']
@@ -246,9 +246,9 @@ class BeamformingModule:
                     if cnt == 32:
                         absWtIdx += 1
                         cnt = 0
-                    if ints == 0:
-                        weightXBP[z] = np.max(np.abs(xWeightIn))
-                        weightYBP[z] = np.max(np.abs(yWeightIn))
+                    #if ints == 0:
+                    #    weightXBP[z] = np.max(np.abs(xWeightIn))
+                    #    weightYBP[z] = np.max(np.abs(yWeightIn))
                     ## DEBUG         
         return spectrumArr_X,spectrumArr_Y, weightXBP, weightYBP
         

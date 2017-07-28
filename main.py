@@ -107,7 +107,7 @@ def numObjs():
 
 ##function to get number of integrations, integration length, and number of channels
 def getScanInfo(fileName, dataPath):
-    fitsLst = glob.glob(dataPath + fileName[:-6] + '*.fits')
+    fitsLst = glob.glob(dataPath + fileName[:-5] + '*.fits')
     hdu = fits.open(fitsLst[0])
     intLen = np.float(hdu[0].header['REQSTI'])
     numInts = np.int(hdu[1].header['NAXIS2'])
@@ -125,7 +125,6 @@ def main():
     projectPathSplit = projectPath.split('/')
     projectStr = projectPathSplit[-1]
     dataPath = '/lustre/projects/flag/' +  projectStr + '/BF/'
-
     bf = BeamformingModule(dataPath)
     bankDict = {"A" : 0,
              "B" : 1,
