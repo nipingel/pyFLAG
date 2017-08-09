@@ -21,6 +21,16 @@ import matplotlib.pyplot as pyplot
 ## command line inputs
 ##TODO: exception handling
 projectPath = sys.argv[1] ## of the form /home/gbtdata/AGBT16B_400_01
+badScanList = sys.argv[2] ## list of bad timestamps included as a single string (e.g. 
+                          ## '2017_08_01_01:01:01 2017_08_01_02:02:02'
+badBankList = sys.argv[3] ## same format as above, but listing banks which stalled
+## split up by space delimiter
+badScanList = badScanList.split()
+badBankList = badBankList.split()
+
+## loop through and append '.fits' to each element for later ID
+badScanList = [s + '.fits' for s in badScanList]
+badBankList = [s + '.fits' for s in badBankList]
 
 ##global variables
 numGPU = 10
@@ -37,8 +47,8 @@ goFitsPath = projectPath + '/GO'
 def bandpassSort(xID, dataBuff, bankData):
     ## which correlation mode are we in?
     ## determine this based on number of channels 
-    ## in bandpasss (second element in shape)
-    ## Number of integrations are the first element
+    ## in data buff (second element in shape)
+    ## number of integrations is the first element of dataBuff shape
     numInts = bankData.shape[0]
     numChans = bankData.shape[1]
     for ints in range(0, numInts):
@@ -60,10 +70,14 @@ def bandpassSort(xID, dataBuff, bankData):
         elif numChans == 160:
             bandpassStartChan = xID*160
             bandpassEndChan = bandpassStartChan + 160
-            dataBuff[ints, bandpassStartChan:bandpassEndChan] = bankData[ints, :]
+            ## ADDED TO AVOID ERROR THAT BANKA DATA LENGTH IS ZERO
+            if len(bankData[ints,:]) == 0:
+                dataBuff[ints, bandpassStartChan:bandpassEndChan] = np.zeros([160], dtype='float32')
+            else:
+                dataBuff[ints, bandpassStartChan:bandpassEndChan] = bankData[ints, :]
     return dataBuff
 
-## DEBUG
+
 def weightSort(xID, weightBuff, weightData):
     numChans = weightData.shape[0]
     if numChans == 25:
@@ -115,7 +129,7 @@ def getScanInfo(fileName, dataPath):
     data = hdu[1].data['DATA']
     numChans = data.shape[1]/2112
     #numChans = np.int(form/2112)
-    return numInts, intLen, numChans, np.sort(fitsLst)
+    return numInts, intLen, numChans, sorted(fitsLst)
 
 def main():
     ## command line inputs
@@ -126,88 +140,75 @@ def main():
     projectStr = projectPathSplit[-1]
     dataPath = '/lustre/projects/flag/' +  projectStr + '/BF/'
     bf = BeamformingModule(dataPath)
-    bankDict = {"A" : 0,
-             "B" : 1,
-             "C" : 2,
-             "D" : 3,
-	     "E" : 4, 
-	     "F" : 5, 
-             "G" : 6, 
-             "H" : 7,
-             "I" : 8, 
-             "J" : 9,
-             "K" : 10,
-             "L" : 11,
-             "M" : 12,
-             "N" : 13,
-             "O" : 14,
-             "P" : 15,
-             "Q" : 16,
-             "R" : 17,
-             "S" : 18,
-             "T" : 19,
-             }
+
 ##TODO: check current directory permissions -- must have writing access
 ## the only commandline argument should be path to project/session ancillary FITS files    
     pwd = os.getcwd()
     pfb = False
     print('Project directory: ' + np.str(sys.argv[1]))
-    print('Building Primary HDU...')  
-    #os.chdir('/Users/npingel/Desktop/Research/data/FLAG/TGBT16A_508/TGBT16A_508_03/RawData/') 
+    print('Building Primary HDU...')
     objList,fitsList = numObjs()
     print(objList)
     ##TODO: put in logic to sort list of fits files if observer went back to the same source... 
     for objs in range(1,2):
+        ## get source
+        source = objList[objs]
         fileList = fitsList[objs]
         fileList = fileList[0:2]
+        #fileList = fileList[0:41]
+        ## remove bad scans from file list
+        for s in badScanList:
+            try:
+                fileList.remove(s)
+            except ValueError:
+                pass
         print(fileList)
-        allBanksList = [] ## master list of all BANKS for all FITS files associated with object
-        numBanksList = [] ## number of BANKS associated with FITS file
         ## loop over FITS files for one object to construct a single SINGLE DISH binary FITS table
         for beam in range(0,7):
-            allBanksList = []
-            numBanksList = []
+            allBanksList = [] ## list of paths to all good BANK FITS files associated with object
+            numBanksList = [] ## number of good BANKS associated with a scan
             ## above file list does not contain fits files with BANK info
             ## process data per beam
             ## open first FITS file to get relevant parameters
-            numInts, intLen, numChans, bankList = getScanInfo(fileList[0], dataPath)
-            ## structure of global buffer is:
-            ## dim1: scan
-            ## dim2: integrations
-            ## dim3: bandpass
-            ## TODO: WHAT HAPPENS WHEN WE HAVE DIFFERENT NUMBER OF INTEGRATIONS!!
-            globalDataBuff_X = np.zeros([int(len(fileList)), numInts, numChans * numBanks])
-            globalDataBuff_Y = np.zeros([int(len(fileList)), numInts, numChans * numBanks])
             
-            fileIdx = 0
-            for dataFITSFile in fileList: 
+            ## global lists to hold data. Each element of the list contains a numpy array in the shape of (ints, freq chans)
+            globalDataBuff_X_List = []
+            globalDataBuff_Y_List = []
+                
+            fileCnt = 0
+            for dataFITSFile in fileList:
                 numInts, intLen, numSpecChans, bankList = getScanInfo(dataFITSFile, dataPath)
-                ## append master BANK list
-                allBanksList.extend(bankList)
-                ## append number of BANKS
-                numBanksList.append(len(bankList))
-                if fileIdx == 0:
-                    numBanksList[0] = numBanksList[0] - 1          
                 ## initialize bank data buffers
                 dataBuff_X = np.zeros([numInts, numSpecChans * numBanks])
                 dataBuff_Y = np.zeros([numInts, numSpecChans * numBanks])
-                
+                ## remove bad BANKS
+                for s in badBankList:
+                    try:
+                        bankList.remove(dataPath + s)
+                    except ValueError:
+                        pass 
                 ## DEBUG
                 xWeightBuff =  np.zeros([numSpecChans * numBanks], dtype = 'complex64')
                 yWeightBuff =  np.zeros([numSpecChans * numBanks], dtype = 'complex64')
                 ## DEBUG
-                
-                
+                ## set bank counter
+                bankCnt = 0
                 for fileName in bankList:
                     print('\n')                
                     print('Beamforming correlations in: '+fileName[-25:]+', Beam: '+np.str(beam)) 
                     ## bank name is ALWAYS sixth-to-last character in string
                     bank = fileName[-6] 
+                    ## DEBUG
+                    if fileName[-25:] == '2017_07_28_06:22:39Q.fits':
+                        continue
                     ## grab xid from dictionary
                     corrHDU = fits.open(fileName)
                     nRows = corrHDU[1].header['NAXIS2']
                     data = corrHDU[1].data['DATA']
+                    ## DEBUG
+                     
                     xID = np.int(corrHDU[0].header['XID'])
+
                     if nRows != 0:
                         ## Do the beamforming; returns processed BANK data 
                         ## (cov matrices to a beam-formed bandpass) in both
@@ -216,84 +217,37 @@ def main():
                         ## DEBUG
                         ##xData,yData = bf.getSpectralArray(fileName, data, beam, xID, bank)
                         xData,yData,xWeightBP, yWeightBP = bf.getSpectralArray(fileName, data, beam, xID, bank)       
-                        ## DEBUG
-                          
-                        ## DEBUG
-                        ## plot weight bandpasses
-                        #pyplot.figure()
-                        #pyplot.title('Beamformed Bank Bandpass; XID: ' + np.str(xID))
-                        #pyplot.title('Weight Bandpass')
-                        #pyplot.plot(np.abs(xWeightBP), label = 'XX-Pol')
-                        #pyplot.plot(np.mean(yData, axis=0), label = 'YY-Pol')
-                        #pyplot.xlabel('Frequency [MHz]')
-                        #pyplot.ylabel('Magnitude')
-                        #pyplot.legend(loc=0)
-                        #pyplot.show()
-                        #pyplot.savefig('/users/npingel/FLAG/2017Reduction/PFBTests/Plots/BankBandPass_' + 'XID_' + np.str(xID) + '_' + np.str(objList[objs]) + '.pdf')
-                        #pyplot.savefig('/users/npingel/FLAG/2017Reduction/PFBTests/Plots/WeightBandpass_M101_Fine.pdf')
-                        ## DEBUG
-                        
                         ## sort based on xid number for each integration
                         dataBuff_X = bandpassSort(xID, dataBuff_X, xData)
-    		        dataBuff_Y = bandpassSort(xID, dataBuff_Y, yData)
-                        
-                        ## DEBUG 
-                        xWeightBuff = weightSort(xID,xWeightBuff, xWeightBP)
-                        yWeightBuff = weightSort(xID,yWeightBuff, yWeightBP)
-                        ## DEBUG
-                         
+                        dataBuff_Y = bandpassSort(xID, dataBuff_Y, yData)
+                        ## append good BANK file to master list
+                        allBanksList.append(fileName)
+                        ## increment bank counter
+                        bankCnt += 1  
                         ## fill global data bufs
-                        globalDataBuff_X[fileIdx,:,:] = dataBuff_X
-                        globalDataBuff_Y[fileIdx,:,:] = dataBuff_Y
-                ## increment fileIdx for global data buffers
-                fileIdx += 1 
+                        #globalDataBuff_X[fileIdx,:,:] = dataBuff_X
+                        #globalDataBuff_Y[fileIdx,:,:] = dataBuff_Y
+                ## append to global buffer lists
+                globalDataBuff_X_List.append(dataBuff_X)
+                globalDataBuff_Y_List.append(dataBuff_Y)
+                ## append bankCnt to list 
+                numBanksList.append(bankCnt)
             print('\n')
-            if globalDataBuff_X.shape[2] == 3200:
-                pfb = True
-            """
-            ## DEBUG 
-            ## magnitude   
-            pyplot.figure()
-            pyplot.title('Weight Magnitude Bandpass (' + projectStr + ')')
-            pyplot.plot(np.abs(xWeightBuff)**2, label = 'XX-Pol')
-            pyplot.plot(np.abs(yWeightBuff)**2, label = 'YY-Pol')
-            pyplot.xlabel('Frequency Chanel')
-            pyplot.ylabel('Magnitude')
-            pyplot.legend(loc=0)
-            pyplot.savefig('/users/npingel/FLAG/2017Reduction/Plots/Weights/' + projectStr + '_weightBandPass_Beam' + np.str(beam) + '_mag.pdf')
-            pyplot.show()
-            
-            ## amplitdue
-            pyplot.figure()
-            pyplot.title('Weight Amplitude Bandpass (' + projectStr + ')')
-            pyplot.plot(np.abs(xWeightBuff), label = 'XX-Pol')
-            pyplot.plot(np.abs(yWeightBuff), label = 'YY-Pol')
-            pyplot.xlabel('Frequency Chanel')
-            pyplot.ylabel('Amplitude')
-            pyplot.legend(loc=0)
-            pyplot.savefig('/users/npingel/FLAG/2017Reduction/Plots/Weights/' + projectStr + '_weightBandPass_Beam' + np.str(beam) + '_amp.pdf')
-            pyplot.show()
-            ## phase
-            pyplot.figure()
-            pyplot.title('Weight Phase Bandpass (' + projectStr + ')')
-            pyplot.plot(np.angle(xWeightBuff), label = 'XX-Pol')
-            pyplot.plot(np.angle(yWeightBuff), label = 'YY-Pol')
-            pyplot.xlabel('Frequency Chanel')
-            pyplot.ylabel('Phase [rad]')
-            pyplot.legend(loc=0)
-            pyplot.savefig('/users/npingel/FLAG/2017Reduction/Plots/Weights/' + projectStr + '_weightBandPass_Beam' + np.str(beam) + '_phase.pdf')
-            pyplot.show()
 
+            ## loop through global data buffer lists to find max ints for subsequent numpy array
+            numChans = globalDataBuff_X_List[0].shape[1]
+            if numChans == 3200:
+                pfb = True
             ## save out important variables TEST
-            with open('/users/npingel/FLAG/2017Reduction/WeightBandpass_' + projectStr + '_Beam' + np.str(beam) + '.pickle', 'wb') as f:
-                pickle.dump([xWeightBuff, yWeightBuff],  f)
-            ## DEBUG
-            """
+            #if beam == 0:
+            #    with open('/users/npingel/FLAG/2017Reduction/globalDataBuffs_' + projectStr + '_Beam' + np.str(beam) + '.pickle', 'wb') as f:
+            #        pickle.dump([globalDataBuff_X_List, globalDataBuff_Y_List],  f)
+            
             ## build metadata; inputs are FITS file for ancillary files, numInts, global data buffers, int length            
-            md = MetaDataModule(projectPath, dataPath, fileList, allBanksList, numBanksList, globalDataBuff_X, globalDataBuff_Y, beam, pfb)
+            md = MetaDataModule(projectPath, dataPath, fileList, allBanksList, numBanksList, globalDataBuff_X_List, globalDataBuff_Y_List, beam, pfb)
             thduList = md.constuctBinTableHeader()
             dataFITSFile = dataFITSFile[:-6]
-            thduList.writeto(pwd+'/' + projectStr + '_Beam'+str(beam)+'.fits')
+            thduList.writeto(pwd+'/' + projectStr + '_' + source + '_Beam'+str(beam) + '.fits')
     
        
     

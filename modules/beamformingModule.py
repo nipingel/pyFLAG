@@ -39,7 +39,7 @@ class BeamformingModule:
         corrData = hdu[1].data.field('DATA')
         return corrData      
     def getWeights(self,numChans, xID): ## TODO: finish weights
-        weightFileList = glob.glob(self.dataPath+'weight_files/' + '*SingleBeam.FITS')
+        weightFileList = glob.glob(self.dataPath+'weight_files/' + '*FullGrid.FITS')
         for wtFile in weightFileList:
             wtHDU = fits.open(wtFile)
             instID = wtHDU[0].header['XENGINE']
@@ -149,7 +149,35 @@ class BeamformingModule:
                pyplot.close()
                self.ints = 0
            ##DEBUG
-           return retCube
+           
+           ## if in PFB mode (i.e. 160 fine channels), we need to re-stitch the frequency channels as they are
+           ## output in the wrong order from the pfb
+           if numFreqs == 160:
+               ## make 1D vector containing current indices for single 160 channel chunk
+               origIdxArr = np.linspace(0, 159, 160, dtype='int32')
+               ## reshape into a 32 (rows) x 5 (cols) array
+               reshapeIdxArr = np.reshape(origIdxArr, (32,5))
+               ## reshape the transpose back into a 1D vector wherein the indices are correctly ordered to
+               ## restitch each BANK's 160 freq elements
+               stitchIdxArr = np.reshape(reshapeIdxArr.T, (1,160))
+               stitchIdxArr = stitchIdxArr.flatten()
+               ## finally, loop through 40x40x160 cube,apply fft shift to 32 channel chunks, and reverse indices  
+               ## create new cube to sort into and 1D array to hold correct indices
+               newCube = np.zeros([numElem, numElem, numFreqs], dtype= 'complex64')
+               correctIdxArr = np.zeros([160])
+               for idx in range(0, 5):
+                   ## get 32 channel chunk to do fftshift on indices
+                   chunk = np.fft.fftshift(stitchIdxArr[idx*32:idx*32+32])
+                   ## reverse indices in chunk to put in correct order
+                   revChunk = chunk[::-1]
+                   correctIdxArr[idx*32:idx*32 + 32] = revChunk
+               ## finally, loop through cube to re-order freq channels
+               for idx in range(0, 160):
+                   corrIdx = correctIdxArr[idx]
+                   newCube[:,:,idx] = retCube[:,:,corrIdx]
+               return newCube
+           else:
+               return retCube
     
     ##TODO:Remove?    
     ## Put 1D correlation array into 20x20 matrix (element 20,20 irrelevant)

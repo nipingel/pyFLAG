@@ -24,7 +24,7 @@ class MetaDataModule:
     def __init__(self, projectPath, rawDataPath, fitsList, bankFitsList, numBanksList, dataBuff_X,dataBuff_Y,beamNum, pfb):        
         self.projectPath = projectPath
         ## list of scan time stamps 
-        self.fitsList = fitsList     
+        self.fitsList = fitsList  
         ## list containing all relevant BANK files
         self.bankFitsList = bankFitsList
         self.numBanksList = numBanksList
@@ -35,10 +35,23 @@ class MetaDataModule:
         self.pfb = pfb
         self.valueArr = None
         self.newArr = None
-        self.numFreqChans = len(dataBuff_X[0,0,:])
+        ## get numFreq Chans
+        firstRow = dataBuff_X[0]
+        self.numFreqChans = len(firstRow[0,:])
         self.Column = collections.namedtuple('Column',['param','valueArr','comment'])
         self.cols = None
         self.numPhases = 2
+        ## arrays to hold coordinate transformation
+        self.beamOff_CrossEl = None
+        self.beamOff_El = None
+        self.oldRaArr = None
+        self.oldDecArr = None
+        self.oldAzArr = None
+        self.oldElArr = None
+        self.lstArr = None
+        self.GBTLAT  = 38.4331294 * np.pi/180.0 # in radians
+        self.GBTLONG = 79.8398397 * np.pi/180.0 # in radians
+        self.GBTHGT  = 824.36                     # meters above the ellipsoid
 
         ##initialize dictionaries
         self.commentDict = {'OBJECT':'name of source observed',
@@ -50,7 +63,7 @@ class MetaDataModule:
                     'TSYS':'system temperature in Kelvin',                            
                     'OBSID':'observation description',
                     'SCAN':'scan number',
-                    'RESTFRQ':'rest frequency at band center',
+                    'RESTFREQ':'rest frequency at band center',
                     'EQUINOX':'equinox of selected coordinate reference frame',
                     'RADESYS':'Equitorial coordinate system name',
                     'TRGTLONG':'target longitude in coord. ref. frame',
@@ -126,7 +139,7 @@ class MetaDataModule:
                  'OBSERVER':self.getGOFITSParam,
                  'OBSID':self.getGOFITSParam,
                  'SCAN':self.getGOFITSParam,
-                 'RESTFRQ':self.getGOFITSParam,
+                 'RESTFREQ':self.getGOFITSParam, ## TODO: make this general. For now simply set to HI in TOPO frame
                  'EQUINOX':self.getGOFITSParam,
                  'RADESYS':self.getGOFITSParam,
                  'TRGTLONG':self.getGOFITSParam,
@@ -294,7 +307,7 @@ class MetaDataModule:
               'TTYPE34':'HUMIDITY',
               'TFORM34':'1D',
               'TUNIT34':'',
-              'TTYPE35':'RESTFRQ',
+              'TTYPE35':'RESTFREQ',
               'TFORM35':'1D',
               'TUNIT35':'Hz',
               'TTYPE36':'FREQRES', ##TODO finish other COVMODES (Currently only PAF_CAL)
@@ -427,6 +440,16 @@ class MetaDataModule:
                 else:
                     self.newArr = np.empty([self.numPhases * numInts], dtype=dtype)
 
+    ## function to get number of integrations in a scan 
+    def getNumInts(self, idx):
+            ## get associated row for DATA table. numInts 
+            ## is then simply the length of the first dimension. 
+            dataRow = self.dataBuff_Y[idx]
+            numScanInts = len(dataRow[:,0])
+            return numScanInts
+
+    
+
     def getSMKey(self,param):
         ## iterate flag defaults to false. Is set True based on parameter
         iterate = False
@@ -434,7 +457,14 @@ class MetaDataModule:
         timeVal = False
         for fileNum in range(0,len(self.fitsList)):
             corrHDU = fits.open(self.bankFitsList[bankIdx])
-            numScanInts = corrHDU[1].header['NAXIS2']
+            ## get number of ints knowing which scan we're working with
+            numScanInts = self.getNumInts(fileNum)
+            ## if numScanIts is 0, we have a bad file and should skip filling
+            ## metadata. 
+            if numScanInts == 0:
+                ## update BANK index
+                bankIdx += self.numBanksList[fileNum]
+                continue
             ## determine time spent in state (e.g. calOn, calOff); 
             ## since we do no freq sw or cal sw, this is equal to scan time
             if param == 'DURATION':
@@ -448,7 +478,7 @@ class MetaDataModule:
             elif param == 'DATE-OBS':
                 scanDMJD = corrHDU[1].data['DMJD']
                 ## cast DMJD to correct string format
-                timeObj = Time(scanDMJD, format = 'mjd', scale='utc')
+                timeObj = Time(scanDMJD, format = 'mjd', scale='utc', precision=2)
                 ## initialize array to store parameter values
                 self.initArr(fileNum, numScanInts, 'str', timeObj[0].isot)
                 timeVal = True
@@ -487,6 +517,8 @@ class MetaDataModule:
             paramLook = 'DEC'           
         elif param == 'CTYPE2' or param == 'CTYPE3':
             paramLook = 'COORDSYS'
+        elif param == 'RESTFREQ':
+            paramLook = 'RESTFRQ'
         else:
             paramLook = param
         bankIdx = 0
@@ -495,7 +527,11 @@ class MetaDataModule:
             corrHDU = fits.open(self.bankFitsList[bankIdx])
             ## get chansel
             chanSel = np.int(corrHDU[0].header['CHANSEL'])
-            numScanInts = corrHDU[1].header['NAXIS2']
+            numScanInts = self.getNumInts(fileNum)
+            if numScanInts == 0:
+                ## update BANK index
+                bankIdx += self.numBanksList[fileNum]
+                continue
             if paramLook != 'TIMESTAMP' and paramLook != 'OBSMODE':           
                 value = goHDU[0].header[paramLook]
             else:
@@ -552,12 +588,8 @@ class MetaDataModule:
             elif param == 'OBSID':
                 valStr = 'unknown'
                 self.initArr(fileNum, numScanInts, 'str', valStr)
-            elif param == 'RESTFRQ':
-                valStr = 1450.00*1e6##TODO:remove for production
-                if self.pfb == True:
-                    lowEnd = valStr-(250-(chanSel*100))*.30318*1e6
-                    highEnd = valStr-(250-(chanSel*100+100))*.30318*1e6
-                    valStr = highEnd - (highEnd-lowEnd)/2
+            elif param == 'RESTFREQ':
+                valStr = 1420.4057517667*1e6##TODO:remove for production
                 self.initArr(fileNum, numScanInts, 'float32', None)
             elif param == 'SCAN' or param == 'PROCSEQN' or param == 'PROCSIZE':
                 valStr = value
@@ -603,26 +635,33 @@ class MetaDataModule:
         for fileNum in range(0,len(self.fitsList)):            
             antHDU = fits.open(self.projectPath + '/Antenna/' + self.fitsList[fileNum])
             ## open weight file to get cross-el/el offset
-            weightFiles = glob.glob(self.dataPath + 'weight_files/*SingleBeam.FITS')
+            weightFiles = glob.glob(self.dataPath + 'weight_files/*FullGrid.FITS')
             wHDU = fits.open(weightFiles[0])
             beamOff_Az = wHDU[1].data['BeamOFF_AZ'][self.beamNum]
             beamOff_El = wHDU[1].data['BeamOFF_EL'][self.beamNum]
+            ## set offsets if first iteration
+            if fileNum == 0:
+              self.beamOff_CrossEl = beamOff_Az
+              self.beamOff_El = beamOff_El
             ## get Antenna DMJD values
             antDMJD = antHDU[2].data['DMJD']
             ## get integrations this scan
             corrHDU = fits.open(self.bankFitsList[bankIdx])
             corrDMJD = corrHDU[1].data['DMJD']
-            numScanInts = corrHDU[1].header['NAXIS2']
+            numScanInts = self.getNumInts(fileNum)
+            if numScanInts == 0:
+                ## update BANK index
+                bankIdx += self.numBanksList[fileNum]
+                continue
             if param == 'CRVAL2':
                 ## interpolate data time samples to data time samples
                 maj = antHDU[2].data['MAJOR']
-                ## add beam offset 
-                value = np.interp(corrDMJD, antDMJD,maj) + beamOff_Az
+                value = np.interp(corrDMJD, antDMJD,maj)
                 ## initialize array to hold parameter values if first iteration
                 self.initArr(fileNum, numScanInts, 'float32', None)
             elif param == 'CRVAL3':
                 minor = antHDU[2].data['MINOR']
-                value = np.interp(corrDMJD,antDMJD,minor) + beamOff_El
+                value = np.interp(corrDMJD,antDMJD,minor)
                 self.initArr(fileNum, numScanInts, 'float32', None)
             elif param == 'AZIMUTH':
                 az = antHDU[2].data['MNT_AZ']
@@ -661,6 +700,18 @@ class MetaDataModule:
                 self.newArr[1::2] = value
                 self.valueArr = np.concatenate([self.valueArr, self.newArr])
             bankIdx += self.numBanksList[fileNum]
+        ## determine if we need to save valueArr for later correction 
+        if param == 'MAJOR':
+          self.oldRaArr = self.valueArr
+        elif param == 'MINOR':
+          self.oldDecArr = self.valueArr
+        elif param == 'AZIMUTH':
+          self.oldAzArr = self.valueArr
+        elif param == 'ELEVATIO':
+          self.oldElArr = self.valueArr
+        elif param == 'LST':
+          self.lstArr = self.valueArr/3600*15
+
         ## retrieve comment and create column 
         comment = self.commentDict[param]
         self.Column.param = param
@@ -674,7 +725,11 @@ class MetaDataModule:
         bankIdx = 0
         for fileNum in range(0,len(self.fitsList)):            
             corrHDU = fits.open(self.bankFitsList[bankIdx])
-            numScanInts = corrHDU[1].header['NAXIS2']
+            numScanInts = self.getNumInts(fileNum)
+            if numScanInts == 0:
+                ## update BANK index
+                bankIdx += self.numBanksList[fileNum]
+                continue
             self.initArr(fileNum, numScanInts, 'str', valStr)
             if fileNum == 0:
                 self.valueArr[:] = valStr
@@ -695,7 +750,11 @@ class MetaDataModule:
         multiVal = False
         for fileNum in range(0,len(self.fitsList)):
             corrHDU = fits.open(self.bankFitsList[bankIdx])
-            numScanInts = corrHDU[1].header['NAXIS2']           
+            numScanInts = self.getNumInts(fileNum)
+            if numScanInts == 0:
+                ## update BANK index
+                bankIdx += self.numBanksList[fileNum]
+                continue          
             if param == 'TSYS' or param == 'TCAL' or param == 'DOPFREQ':    
                 self.initArr(fileNum, numScanInts, 'float32', None)
                 value = 1.0
@@ -767,11 +826,16 @@ class MetaDataModule:
         multiVal = False
         for fileNum in range(0,len(self.fitsList)):
             corrHDU = fits.open(self.bankFitsList[bankIdx])
-            numScanInts = corrHDU[1].header['NAXIS2']
+            numScanInts = self.getNumInts(fileNum)
+            if numScanInts == 0:
+                ## update BANK index
+                bankIdx += self.numBanksList[fileNum]
+                continue
             if param == 'DATA':
                 self.initArr(fileNum, numScanInts, 'float32', 'DATA')
-                value1 = self.dataBuff_Y[fileNum,:,:]
-                value2 = self.dataBuff_X[fileNum,:,:] 
+                value1 = self.dataBuff_Y[fileNum]
+                value2 = self.dataBuff_X[fileNum]
+                self.initArr(fileNum, numScanInts, 'float32', 'DATA')
                 multiVal = True
             elif param == 'TDIM7':
                 value = '['+np.str(self.numFreqChans)+',1,1,1]'
@@ -814,11 +878,15 @@ class MetaDataModule:
         bankIdx = 0
         for fileNum in range(0,len(self.fitsList)):
             corrHDU = fits.open(self.bankFitsList[bankIdx])
-            numScanInts = corrHDU[1].header['NAXIS2']
             ## get chansel
             chanSel = np.int(corrHDU[0].header['CHANSEL'])
+            numScanInts = self.getNumInts(fileNum)
+            if numScanInts == 0:
+                ## update BANK index
+                bankIdx += self.numBanksList[fileNum]
+                continue
             if param == 'VELDEF':
-                value = 'VRAD-TOP'
+                value = 'OPTI-OBS'
                 self.initArr(fileNum, numScanInts, 'str', value)
             elif param == 'VFRAME' or param == 'RVSYS':
                 value = 0
@@ -847,8 +915,12 @@ class MetaDataModule:
         bankIdx = 0
         for fileNum in range(0,len(self.fitsList)):
             corrHDU = fits.open(self.bankFitsList[bankIdx])
-            numScanInts = corrHDU[1].header['NAXIS2']
-            weightFiles = glob.glob(self.dataPath + 'weight_files/*SingleBeam.FITS') 
+            numScanInts = self.getNumInts(fileNum)
+            if numScanInts == 0:
+                ## update BANK index
+                bankIdx += self.numBanksList[fileNum]
+                continue
+            weightFiles = glob.glob(self.dataPath + 'weight_files/*FullGrid.FITS') 
             wHDU = fits.open(weightFiles[0])
             if param == 'FEEDXOFF':
                 beamOff_Az = wHDU[1].data['BeamOff_AZ']
@@ -869,15 +941,17 @@ class MetaDataModule:
         self.Column.param = param
         self.Column.valueArr = self.valueArr
         self.Column.comment = comment
-            
     
     def getModeDepParams(self,param):
         bankIdx = 0
         for fileNum in range(0,len(self.fitsList)):
             corrHDU = fits.open(self.bankFitsList[bankIdx])
-            numScanInts = corrHDU[1].header['NAXIS2']
+            numScanInts = self.getNumInts(fileNum)
+            if numScanInts == 0:
+                ## update BANK index
+                bankIdx += self.numBanksList[fileNum]
+                continue
             modeName = corrHDU[0].header['MODENAME']
-            
             if param == 'CDELT1' or param == 'FREQRES':
                 if modeName == 'FLAG_CALCORR_MODE':
                     value = 303.18*1000.
@@ -956,6 +1030,46 @@ class MetaDataModule:
         hdu = fits.open(self.projectPath + '/ScanLog.fits')
         return hdu[0].header['PROJID']
 
+    def az2ra(self,LST, Az, El, dec):
+        ## convert all angles to radians
+        azRad = np.deg2rad(360-Az) ## Azimuth of NCP is 0 for GBT. This code assumes 180. 
+        elRad = np.deg2rad(El)
+        decRad = np.deg2rad(dec)
+        ha = -1*np.arccos(1/np.cos(decRad)*(np.sin(elRad)*np.cos(self.GBTLAT) - np.cos(elRad)*np.cos(azRad)*np.sin(self.GBTLAT)))
+        return LST + np.rad2deg(ha)
+
+    def el2dec(self, LST, Az, El):
+        ## convert all angles to radians
+        azRad = np.deg2rad(360 - Az) ## Azimuth of NCP is 0 for GBT. This code assumes 180. 
+        elRad = np.deg2rad(El)
+        return np.rad2deg(np.arcsin(np.sin(elRad)*np.sin(self.GBTLAT) + np.cos(elRad)*np.cos(azRad)*np.cos(self.GBTLAT)))
+
+    def offsetCorrection(self, hdu):
+        newAzArr = np.zeros(len(self.oldAzArr))
+        newElArr = np.zeros([len(self.oldElArr)])
+        newRaArr = np.zeros([len(self.oldElArr)])
+        newDecArr = np.zeros([len(self.oldElArr)])
+        for coordIdx in range(0, len(newAzArr)):
+          ## make conversion from cross-el to azimuth
+          azOffVal = self.beamOff_CrossEl/np.cos(np.deg2rad(self.oldElArr[coordIdx]))
+          elOffVal = self.beamOff_El
+          newAzArr[coordIdx] = self.oldAzArr[coordIdx] + azOffVal
+          newElArr[coordIdx] = self.oldElArr[coordIdx] + elOffVal
+
+          ## now, compute the new ra/dec with az/el/lst in hand...
+          print(self.lstArr)
+          print(len(self.lstArr)) 
+          newDecArr[coordIdx] = self.el2dec(self.lstArr[coordIdx], newAzArr[coordIdx], newElArr[coordIdx])
+          newRaArr[coordIdx] =  self.az2ra(self.lstArr[coordIdx], newAzArr[coordIdx], newElArr[coordIdx], newDecArr[coordIdx])
+          if newRaArr[coordIdx] < 0:
+            newRaArr[coordIdx] = newRaArr[coordIdx] + 360
+        ## update header values
+        hdu.data['CRVAL2'] = newRaArr
+        hdu.data['CRVAL3'] = newDecArr
+        hdu.data['AZIMUTH'] = newAzArr
+        hdu.data['ELEVATIO'] = newElArr
+        return hdu
+
     def constuctBinTableHeader(self):    
         ## construct primary HDU
         prihdu = self.constructPriHDUHeader()   
@@ -963,10 +1077,9 @@ class MetaDataModule:
         ## load list of required SDFITS keywords
         keywordList = np.loadtxt(keywordPath,dtype='str')
         keyWordArr = keywordList.astype(str)
-        ##TODO ??
         commentList = []
         paramList = []
-        
+                
         ##TODO:SDFITS CORE KEYWORDS
         ## loop through each keyword
         for keyIdx in range(0,len(keyWordArr),3):
@@ -994,17 +1107,23 @@ class MetaDataModule:
         ##make preliminary table HDU     
         tblHdu = fits.BinTableHDU.from_columns(self.cols, header = binHeader)
         corrHDU = fits.open(self.bankFitsList[0])
-        numScanInts = corrHDU[1].header['NAXIS2']
+        tblHdu = self.offsetCorrection(tblHdu)
+        ## loop through globalBuffer list to get total number of scans
+        totalInts = 0
+        for idx in range(0,len(self.fitsList)):
+            dataRow = self.dataBuff_Y[idx]
+            totalInts += len(dataRow[:,0])    
 
         ##Now, update comments beginnning of table
         tblHdu.header.set('NAXIS',2, '2-dimensional binary table')
-        rowBytes = tblHdu.size/(2 * numScanInts * len(self.fitsList))
+        rowBytes = tblHdu.size/(2 * totalInts)
         tblHdu.header.set('NAXIS1',int(rowBytes),'width of table in bytes')
-        tblHdu.header.set('NAXIS2',numScanInts * 2 * len(self.fitsList),'number of rows in table')
+        tblHdu.header.set('NAXIS2',totalInts * 2,'number of rows in table')
         tblHdu.header.set('PCOUNT',0,'size of special data area')
         tblHdu.header.set('GCOUNT',1,'one data group (required keyword)')
         tblHdu.header.set('TFIELDS',70,'number of fields in each row')
         tblHdu.header.set('EXTNAME','SINGLE DISH', 'name of this binary table extension')       
+        tblHdu.header.set('XTENSION', 'BINTABLE', 'binary table extension')
         idx = 0        
         for i in range(0,len(keyWordArr),3):
             keyword = keyWordArr[i]
@@ -1029,6 +1148,8 @@ class MetaDataModule:
         tblHdu.header.insert('TTYPE44',('COMMENT', 'Feed offsets ARE included in the CRVAL2 and CRVAL3 columns'))
         tblHdu.header.insert('TFORM70',('COMMENT', 'End of GBT-specific keywords/columns.'))    
         
+        
+
         thduList = fits.HDUList([prihdu, tblHdu])
       
         return thduList
