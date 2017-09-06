@@ -6,12 +6,16 @@ This module (i.e. class) will collate the required metadata to construc the prim
 """
 from astropy.io import fits
 from astropy.time import Time
+import matplotlib.pyplot as pyplot
+import pyslalib as pysla
 import os 
 import numpy as np
 import datetime
 import collections
 import glob
+from . import RadVelCorr
 import sys
+
 
 ##globalPaths
 keywordPath = '/users/npingel/FLAG/SpectralFiller/misc/sdKeywords.txt'
@@ -49,11 +53,14 @@ class MetaDataModule:
         self.oldAzArr = None
         self.oldElArr = None
         self.lstArr = None
-        self.GBTLAT  = 38.4331294 * np.pi/180.0 # in radians
-        self.GBTLONG = 79.8398397 * np.pi/180.0 # in radians
+        self.dataDMJDList = []
+        self.refractList = []
+        self.GBTLAT  = np.deg2rad(38.4331294)
+        self.GBTLONG = np.deg2rad(79.8398397)
         self.GBTHGT  = 824.36                     # meters above the ellipsoid
-
-        ##initialize dictionaries
+        ## initialize radial velocity correction module
+        self.radvelcorrObj = RadVelCorr.RadVelCorr()
+        ## initialize dictionaries
         self.commentDict = {'OBJECT':'name of source observed',
                     'OBSERVER':'name of observer(s)',                            
                     'BANDWID':'bandwidth',
@@ -62,7 +69,7 @@ class MetaDataModule:
                     'EXPOSURE':'effective int time (excludes blanking) in secs',
                     'TSYS':'system temperature in Kelvin',                            
                     'OBSID':'observation description',
-                    'SCAN':'scan number',
+                    'SCAN':'scan number',	
                     'RESTFREQ':'rest frequency at band center',
                     'EQUINOX':'equinox of selected coordinate reference frame',
                     'RADESYS':'Equitorial coordinate system name',
@@ -429,13 +436,13 @@ class MetaDataModule:
                 self.newArr = np.empty([self.numPhases * numInts, self.numFreqChans], dtype=dtype)
         else:
             if fileNum == 0: 
-                if not any([dtype == 'float32', dtype == 'int32', dtype == 'int16']):
+                if not any([dtype == 'float64', dtype == 'int32', dtype == 'int16']):
                     self.valueArr = np.chararray([self.numPhases * numInts], itemsize=len(valStr))
                 else:  
                     self.valueArr = np.empty([self.numPhases * numInts], dtype=dtype)
             ## update self.newArr if we are past the first iteration of the loop over scan FITS files
             else:
-                if not any([dtype == 'float32', dtype == 'int32', dtype == 'int16']):
+                if not any([dtype == 'float64', dtype == 'int32', dtype == 'int16']):
                     self.newArr = np.chararray([self.numPhases * numInts], itemsize=len(valStr))
                 else:
                     self.newArr = np.empty([self.numPhases * numInts], dtype=dtype)
@@ -468,12 +475,12 @@ class MetaDataModule:
             ## determine time spent in state (e.g. calOn, calOff); 
             ## since we do no freq sw or cal sw, this is equal to scan time
             if param == 'DURATION':
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
                 value = corrHDU[0].header['ACTSTI']
             ## retrieve actual integration time
             elif param == 'EXPOSURE':
                 paramLook = 'ACTSTI'
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
                 value = corrHDU[0].header['ACTSTI']
             elif param == 'DATE-OBS':
                 scanDMJD = corrHDU[1].data['DMJD']
@@ -563,10 +570,10 @@ class MetaDataModule:
                 self.initArr(fileNum, numScanInts, 'str', valStr)
             elif param =='TRGTLONG':
                 valStr = value
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             elif param =='TRGTLAT':
                 valStr = value
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             elif param  == 'TIMESTAMP':
                 valStr = self.fitsList[fileNum]
                 valStr = valStr[:-6]
@@ -578,7 +585,7 @@ class MetaDataModule:
                 self.initArr(fileNum, numScanInts, 'str', valStr)
             elif param =='VELOCITY':
                 valStr = value
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             elif param =='OBJECT':
                 valStr = value
                 self.initArr(fileNum, numScanInts, 'str', valStr)
@@ -590,7 +597,7 @@ class MetaDataModule:
                 self.initArr(fileNum, numScanInts, 'str', valStr)
             elif param == 'RESTFREQ':
                 valStr = 1420.4057517667*1e6##TODO:remove for production
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             elif param == 'SCAN' or param == 'PROCSEQN' or param == 'PROCSIZE':
                 valStr = value
                 self.initArr(fileNum, numScanInts, 'int32', None)
@@ -599,7 +606,7 @@ class MetaDataModule:
                 self.initArr(fileNum, numScanInts, 'str', valStr)
             elif param =='EQUINOX':
                 valStr = value
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             elif param == 'LASTON':
                 valStr = value
                 self.initArr(fileNum, numScanInts, 'int16', None)
@@ -639,6 +646,18 @@ class MetaDataModule:
             wHDU = fits.open(weightFiles[0])
             beamOff_Az = wHDU[1].data['BeamOFF_AZ'][self.beamNum]
             beamOff_El = wHDU[1].data['BeamOFF_EL'][self.beamNum]
+            ## get pointing model information 
+            smntAz = antHDU[0].header['SMNTC_AZ']
+            sobscAz = antHDU[0].header['SOBSC_AZ']
+            sobscEl = antHDU[0].header['SOBSC_EL']
+            smntEl = antHDU[0].header['SMNTC_EL']
+            
+            ## calculate pointing model
+            azPt = smntAz - sobscAz
+            elPt = smntEl - sobscEl
+            ## get integrations this scan
+            corrHDU = fits.open(self.bankFitsList[bankIdx])
+            corrDMJD = corrHDU[1].data['DMJD']
             ## set offsets if first iteration
             if fileNum == 0:
               self.beamOff_CrossEl = beamOff_Az
@@ -646,52 +665,60 @@ class MetaDataModule:
             ## get Antenna DMJD values
             antDMJD = antHDU[2].data['DMJD']
             ## get integrations this scan
-            corrHDU = fits.open(self.bankFitsList[bankIdx])
-            corrDMJD = corrHDU[1].data['DMJD']
             numScanInts = self.getNumInts(fileNum)
             if numScanInts == 0:
                 ## update BANK index
                 bankIdx += self.numBanksList[fileNum]
                 continue
             if param == 'CRVAL2':
-                ## interpolate data time samples to data time samples
+                ## interpolate antenna position samples to data time samples
                 maj = antHDU[2].data['MAJOR']
                 value = np.interp(corrDMJD, antDMJD,maj)
                 ## initialize array to hold parameter values if first iteration
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
+                
+                ## interpolate refraction samples to data time samples
+                interpRefract = np.interp(corrDMJD, antDMJD, antHDU[2].data['REFRACT'])
+                ## extend data DMJD list for later use when converting from 
+                ## geocentric apparent to mean J2000.0 Ra/Dec (after beam offsets are applied)
+                self.dataDMJDList.extend(corrDMJD)
+                ## extend list containing refraction corrections for elevation. These are applied
+                ## before converting from geocentric apparent to mean J2000.0
+                self.refractList.extend(interpRefract)
             elif param == 'CRVAL3':
                 minor = antHDU[2].data['MINOR']
                 value = np.interp(corrDMJD,antDMJD,minor)
-                self.initArr(fileNum, numScanInts, 'float32', None)
-            elif param == 'AZIMUTH':
-                az = antHDU[2].data['MNT_AZ']
+                self.initArr(fileNum, numScanInts, 'float64', None)
+            elif param == 'AZIMUTH': 
+                az = antHDU[2].data['MNT_AZ'] - azPt ## subtract pointing model contribution
                 value = np.interp(corrDMJD,antDMJD,az)
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             elif param == 'ELEVATIO':
-                el = antHDU[2].data['MNT_EL']
+                el = antHDU[2].data['MNT_EL'] - elPt ## subtract pointing model contribution
                 value = np.interp(corrDMJD,antDMJD,el)
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             elif param == 'LST':
                 param1 = 'LSTSTART'
                 lstStart = antHDU[0].header[param1]
                 param2 = 'ACTSTI'
                 intLen = np.float(corrHDU[0].header[param2])
-                self.initArr(fileNum, numScanInts, 'float32', None)
-                idx = 0
-                value = np.zeros(numScanInts, dtype='float32')
-                for i in range(0,numScanInts):
-                    value[i] = lstStart + intLen/2+(i*intLen)
+                self.initArr(fileNum, numScanInts, 'float64', None)
+                value = np.zeros(numScanInts, dtype='float64')
+                for idx in range(0,numScanInts):
+                    #value[i] = lstStart + intLen/2+(i*intLen)
+                     val = lstStart + (idx*intLen)
+                     value[idx] = val
             elif param == 'TAMBIENT':
                 value = antHDU[0].header['AMBTEMP']
                 value+=273.0
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             elif param == 'HUMIDITY':
                 value = antHDU[0].header['AMBHUMID']
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             elif param == 'PRESSURE':
                 value = antHDU[0].header['AMBPRESS']
                 value=value*0.75006375541921    
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             if fileNum == 0:
                 self.valueArr[::2] = value
                 self.valueArr[1::2] = value
@@ -701,9 +728,9 @@ class MetaDataModule:
                 self.valueArr = np.concatenate([self.valueArr, self.newArr])
             bankIdx += self.numBanksList[fileNum]
         ## determine if we need to save valueArr for later correction 
-        if param == 'MAJOR':
+        if param == 'CRVAL2':
           self.oldRaArr = self.valueArr
-        elif param == 'MINOR':
+        elif param == 'CRVAL3':
           self.oldDecArr = self.valueArr
         elif param == 'AZIMUTH':
           self.oldAzArr = self.valueArr
@@ -756,10 +783,10 @@ class MetaDataModule:
                 bankIdx += self.numBanksList[fileNum]
                 continue          
             if param == 'TSYS' or param == 'TCAL' or param == 'DOPFREQ':    
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
                 value = 1.0
             elif param == 'BEAM':    
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
                 value = self.beamNum
             elif param == 'FEED' or param == 'SUBREF_STATE' or param == 'QD_BAD':
                 self.initArr(fileNum, numScanInts, 'int16', None)
@@ -770,7 +797,7 @@ class MetaDataModule:
                 value2 = -5
                 multiVal = True
             elif param == 'ZEROCHAN' or param =='TWARM' or param =='TCOLD' or param == 'QD_XEL' or param == 'QD_EL' or param == 'CALPOSITION':
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
                 value = np.nan
             elif param == 'FDNUM' or param == 'IFNUM':
                 self.initArr(fileNum, numScanInts, 'int16', None)
@@ -798,7 +825,7 @@ class MetaDataModule:
                 self.initArr(fileNum, numScanInts, 'str', value)
             elif param == 'DOPFREQ':
                 value = 1450*1e6 ##TODO: fix for production. 
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
 
             if multiVal == True and fileNum == 0:
                 self.valueArr[0::2] = value1
@@ -832,10 +859,10 @@ class MetaDataModule:
                 bankIdx += self.numBanksList[fileNum]
                 continue
             if param == 'DATA':
-                self.initArr(fileNum, numScanInts, 'float32', 'DATA')
+                self.initArr(fileNum, numScanInts, 'float64', 'DATA')
                 value1 = self.dataBuff_Y[fileNum]
                 value2 = self.dataBuff_X[fileNum]
-                self.initArr(fileNum, numScanInts, 'float32', 'DATA')
+                self.initArr(fileNum, numScanInts, 'float64', 'DATA')
                 multiVal = True
             elif param == 'TDIM7':
                 value = '['+np.str(self.numFreqChans)+',1,1,1]'
@@ -897,7 +924,7 @@ class MetaDataModule:
                     lowEnd = value - (250-(chanSel*100))*.30318*1e6
                     highEnd = value-(250-(chanSel*100+100))*.30318*1e6
                     value = highEnd - (highEnd-lowEnd)/2
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             
             if fileNum == 0:
                  self.valueArr[:] = value
@@ -925,11 +952,11 @@ class MetaDataModule:
             if param == 'FEEDXOFF':
                 beamOff_Az = wHDU[1].data['BeamOff_AZ']
                 value = beamOff_Az[self.beamNum]
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             else:
                 beamOff_El = wHDU[1].data['BeamOff_EL']
                 value = beamOff_El[self.beamNum]
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             if fileNum == 0:
                 self.valueArr[:] = value
             else:
@@ -957,19 +984,19 @@ class MetaDataModule:
                     value = 303.18*1000.
                 elif modeName == 'FLAG_PFBCORR_MODE':
                     value = 303.18*5/160.*1000.
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             elif param == 'CRPIX1':
                 if modeName == 'FLAG_CALCORR_MODE':
                     value = value = 500/2   
                 elif modeName == 'FLAG_PFBCORR_MODE':
                     value = 3200/2
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             elif param == 'BANDWID':
                 if modeName == 'FLAG_CALCORR_MODE':
                     value = 303.18*500*1000.
                 elif modeName == 'FLAG_PFBCORR_MODE':
                     value = 100*303.18*1000
-                self.initArr(fileNum, numScanInts, 'float32', None)
+                self.initArr(fileNum, numScanInts, 'float64', None)
             if fileNum == 0:
                 self.valueArr[:] = value
             else:
@@ -1049,6 +1076,7 @@ class MetaDataModule:
         newElArr = np.zeros([len(self.oldElArr)])
         newRaArr = np.zeros([len(self.oldElArr)])
         newDecArr = np.zeros([len(self.oldElArr)])
+        """
         for coordIdx in range(0, len(newAzArr)):
           ## make conversion from cross-el to azimuth
           azOffVal = self.beamOff_CrossEl/np.cos(np.deg2rad(self.oldElArr[coordIdx]))
@@ -1057,18 +1085,90 @@ class MetaDataModule:
           newElArr[coordIdx] = self.oldElArr[coordIdx] + elOffVal
 
           ## now, compute the new ra/dec with az/el/lst in hand...
-          print(self.lstArr)
-          print(len(self.lstArr)) 
           newDecArr[coordIdx] = self.el2dec(self.lstArr[coordIdx], newAzArr[coordIdx], newElArr[coordIdx])
           newRaArr[coordIdx] =  self.az2ra(self.lstArr[coordIdx], newAzArr[coordIdx], newElArr[coordIdx], newDecArr[coordIdx])
+          ## add systemic offset
+          newRaArr = newRaArr + sysRaOff
+          newDecArr = newDecArr + sysDecOff
           if newRaArr[coordIdx] < 0:
             newRaArr[coordIdx] = newRaArr[coordIdx] + 360
+        """
+        ## we have refract value for a single pol
+        ## extend by 2x to describe both XX and YY pol
+        extRefractArr = np.zeros(len(self.refractList)*2)
+        extRefractArr[0::2] = self.refractList
+        extRefractArr[1::2] = self.refractList 
+        azOffVal = self.beamOff_CrossEl/np.cos(np.deg2rad(self.oldElArr)) #- extRefractArr))
+        elOffVal = self.beamOff_El
+        newAzArr = self.oldAzArr + azOffVal
+        newElArr = self.oldElArr - extRefractArr + elOffVal
+        newDecArr = self.el2dec(self.lstArr, newAzArr, newElArr)
+        newRaArr = self.az2ra(self.lstArr, newAzArr, newElArr, newDecArr)
+        if any(t < 0 for t in newRaArr):
+          newRaArr = newRaArr + 360
+        ## we have data DMJD for a single pol 
+        ## extend by 2x to describe both XX and YY pol 
+        dataDMJDArr = np.zeros(len(self.dataDMJDList)*2)
+        dataDMJDArr[0::2] = self.dataDMJDList
+        dataDMJDArr[1::2] = self.dataDMJDList 
+        for coordIdx in range(0, len(newRaArr)):
+           raVal = newRaArr[coordIdx]
+           decVal = newDecArr[coordIdx]
+           dmjdVal = dataDMJDArr[coordIdx]
+           ## convert from geocentric apparant to mean place (J2000.0) 
+           newRa, newDec = pysla.slalib.sla_amp(np.deg2rad(raVal), np.deg2rad(decVal), dmjdVal, 2000.0)
+           ## convert radians to degrees
+           newRaArr[coordIdx] = np.rad2deg(newRa)
+           newDecArr[coordIdx] = np.rad2deg(newDec)
+        #print(np.mean(newDecArr - self.oldDecArr))
+        #print(np.mean(newRaArr - self.oldRaArr))
+        #pyplot.plot(self.oldDecArr, label='Measured')
+        #pyplot.plot(newDecArr, label='Calculated')
+        #pyplot.xlabel('Coordinate Element')
+        #pyplot.ylabel('RA [deg]')
+        #pyplot.legend(loc=0)
+        #pyplot.savefig('MeasuredVCalculated_Ra_Dec.pdf')
+        #pyplot.show()
+        
         ## update header values
         hdu.data['CRVAL2'] = newRaArr
         hdu.data['CRVAL3'] = newDecArr
+        hdu.data['TRGTLONG'] = newRaArr
+        hdu.data['TRGTLAT'] = newDecArr
         hdu.data['AZIMUTH'] = newAzArr
         hdu.data['ELEVATIO'] = newElArr
         return hdu
+
+    def radVelCorrection(self, hdu):
+        raArr = hdu.data['CRVAL2']
+        decArr = hdu.data['CRVAL3']
+        utDate_Time = hdu.data['DATE-OBS']
+        cenFreqsArr = hdu.data['CRVAL1']
+        restFreqArr = hdu.data['RESTFREQ']
+        c = 299792458.0 ## m/s
+        for velIter in range(0,len(raArr)):
+            raVal = raArr[velIter]
+            decVal = decArr[velIter]
+            utDateTimeVal = utDate_Time[velIter]
+            cenFreqVal = cenFreqsArr[velIter]
+            restFreqVal = restFreqArr[velIter]
+            t = Time(utDateTimeVal, format='isot')
+            utdate = t.iso[0:10]
+            uttime = t.iso[11:]
+            radVelCorrection = self.radvelcorrObj.correctVel(utdate,uttime,raVal,decVal)
+            ## compute optical velocity of ref freq
+            vOpt = c*(1-cenFreqVal/restFreqVal)
+            ## add radial correction
+            newVOpt = vOpt + radVelCorrection
+            ## now convert back to frequency
+            newCenFreq = (1-newVOpt/c)*restFreqVal 
+            ## update reference frequency value
+            cenFreqsArr[velIter] = newCenFreq
+        ## update columns
+        hdu.data['CRVAL1'] = cenFreqsArr
+        hdu.data['OBSFREQ'] = cenFreqsArr
+        hdu.data['VELDEF'] = 'OPTI-BAR'
+        return hdu    
 
     def constuctBinTableHeader(self):    
         ## construct primary HDU
@@ -1107,7 +1207,10 @@ class MetaDataModule:
         ##make preliminary table HDU     
         tblHdu = fits.BinTableHDU.from_columns(self.cols, header = binHeader)
         corrHDU = fits.open(self.bankFitsList[0])
+        ## correct spatial offsets
         tblHdu = self.offsetCorrection(tblHdu)
+        ## with updated RA/Dec, perform doppler correction
+        tblHdu = self.radVelCorrection(tblHdu)       
         ## loop through globalBuffer list to get total number of scans
         totalInts = 0
         for idx in range(0,len(self.fitsList)):

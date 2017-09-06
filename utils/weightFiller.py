@@ -44,7 +44,7 @@ def progressBar(value, endvalue,bar_length=20):
 
 # TODO: input exceptions
 
-binList = glob.glob(binDir + 'w_13_*.bin')
+binList = glob.glob(binDir + 'w_12_*.bin')
 binList.sort()
 binList = binList[0:20]
 print('Using weight files: ')
@@ -92,7 +92,8 @@ for i in range(0,len(binList)):
 
 	##Metadata
 	startByte = totBytes
-	## array to store beam offsets. Rows: Az and El offset, columns (beams)
+        ## offsets are stored like el0, xel0, el1, xel1, ... 
+	## array to store beam offsets. Rows: el and xel offset, columns (beams)
 	offSetArr = np.zeros([2,7],dtype='float32')
 	for off in range(0,7):
 	    offsetIdx = startByte+(off*8)
@@ -143,8 +144,8 @@ for i in range(0,len(binList)):
 	col12 = fits.Column(name='Beam4Y', format='1E', array=weightArr[11,:])
 	col13 = fits.Column(name='Beam5Y', format='1E', array=weightArr[12,:])
 	col14 = fits.Column(name='Beam6Y', format='1E', array=weightArr[13,:])
-	col15 = fits.Column(name='BeamOff_AZ', format='1E', array=offSetArr[0,:])
-	col16 = fits.Column(name='BeamOff_EL', format='1E', array=offSetArr[1,:])
+	col15 = fits.Column(name='BeamOff_AZ', format='1E', array=offSetArr[1,:])
+	col16 = fits.Column(name='BeamOff_EL', format='1E', array=offSetArr[0,:])
 	cols = fits.ColDefs([col1, col2,col3,col4,col5,col6,col7,col8,col9,col10,col11,col12,col13,col14,col15,col16])
 	tbHdu = fits.new_table(cols)
 	tbHdu.header.set('EXTNAME','BF Weights', 'name of this binary table extension')
