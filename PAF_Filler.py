@@ -425,9 +425,6 @@ def main():
         except NameError:
             fileList = allFitsList[objInd]
             pass
-        fileList = fileList[3:45]
-        fileList = fileList[0:1]
-        print(len(fileList))
 	#fileList = fileList[3:45] ## AGBT16B_400_12, HI Grid
         #fileList = fileList[31:85] ## AGBT16B_400_12, 3C295 Grid
         #fileList = fileList[0:41] ## AGBT16B_400_13, HI Grid
@@ -522,7 +519,6 @@ def main():
                     are also returned. The function bandpassSort is then called to place this 1/20th chunk of bandpass at the 
                     correct position in the global data buffers (that will be written in the output FITS file). 
                     """
-                    bankList = bankList[0:1]
                     for fileName in bankList:
                         print('\n')                
                         print('Beamforming correlations in: '+fileName[-25:]+', Beam: ' + bm) 
