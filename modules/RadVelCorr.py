@@ -193,7 +193,7 @@ class RadVelCorr:
     #(hour,last*12.0/math.pi,Rgeo,vcorb,totalhelio,totallsrk,totalgal)
 
     # resulting velocities in km/sec
-    return ((mjdd, last*12.0/math.pi, Rgeo, totalhelio,totalbary, totallsrk,totalgal))
+    return ((mjdd, last*12.0/math.pi, Rgeo, totalhelio,totalbary, totallsrk, totalgal))
 
   #--------------------------------------------------------------
 
@@ -227,9 +227,9 @@ class RadVelCorr:
     radeg  = rarad*180.0/math.pi
     decdeg = dcrad*180.0/math.pi
 
-    print ""
-    print ' %3s %7s %7s %7s %13s %13s %13s' %  \
-          ('UTHr', 'LST', 'Geo', 'Helio', 'Barycentric', 'LSRK', 'Galacto')
+   # print ""
+   # print ' %3s %7s %7s %7s %13s %13s %13s' %  \
+    #      ('UTHr', 'LST', 'Geo', 'Helio', 'Barycentric', 'LSRK', 'Galacto')
 
     # loop through 25 hours
     for i in range(0,25) :
@@ -294,10 +294,11 @@ class RadVelCorr:
     #print('vgalac ' + np.str(vgalac))
 
     ## do frequency conversion
-    vlsrk = vlsrk*1000 ## convert to m/s
-    vhelio = vhelio*1000 
-    
-    return vhelio  
+    vlsrk = vlsrk * 1000 ## convert to m/s
+    vhelio = vhelio * 1000 
+    vgalac = vgalac * 10000
+
+    return vhelio, vlsrk
 
 
 
