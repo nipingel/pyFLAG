@@ -8,7 +8,7 @@ User Inputs:
 ** Note that all list inputs should be space delimited within single quotes
 /path/to/project/directory - path to where ancillary FITS files are (e.g. /home/gbtdata/AGBT16B_400)
 /path/to/weight/FITS/files - path to weights FITS files; recommended to place '*' wild card in the place of specific bank letter identifier 
-restfreq - Rest frequency in MHz (may be phased out once M&C can communicate with IF manager, but now necessary for Doppler corrections)
+restfreq - Rest frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary for Doppler corrections)
 -b 'List of bad timestamps' - (optional; default not defined) a list of bad timestamps the program should ignore (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01') 
 -o 'List of objects' - a list of objects to process (e.g. '3C147 NGC6946’); defaults to all objects contained within the observational session.
 -g 'List of specific time stamps' - a list of specific timestamps to process (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01’); defaults to all time stamps associated with particular observed objects.
@@ -17,7 +17,7 @@ A single FITS file is produced for each processed beam and is output to which ev
 Usage:
 ipython PAF_Filler.py /path/to/project/ /path/to/weight/FITS/files -b 'List of bad timestamps' -o 'List of objects' -g 'List of specific time stamps' -m 'List of beams'
 Eample:
-ipython PAF_Filler.py /home/gbtdata/AGBT17B_360_01 /lustre/project/flag/AGBT17B_360_01/BF/weight_files/w_178_02_*.FITS -b 2018_08_01:00:00 2018_08_01:52:00 -o NGC891  -g 2018_08_01:05:00 2018_08_01:06:00 2018_08_01:07:00 -m 1 3
+ipython PAF_Filler.py /home/gbtdata/AGBT17B_360_01 /lustre/project/flag/AGBT17B_360_01/BF/weight_files/w_178_02_*.FITS 1420.405e6 -b 2018_08_01:00:00 2018_08_01:52:00 -o NGC891  -g 2018_08_01:05:00 2018_08_01:06:00 2018_08_01:07:00 -m 1 3
 __email__ = "nipingel@mix.wvu.edu"
 __status__ = "Production"
 """
@@ -183,7 +183,7 @@ def main():
     ## command line inputs
     projectPath = sys.argv[1] ## of the form /home/gbtdata/AGBT16B_400_01
     weightPath = np.str(sys.argv[2]) ## of the form /lustre/projects/flag.old/AGBT16B_400_01/BF/weight_files/*.FITS
-    restfreq = np.float(sys.argv[3]) ## in units of MHz
+    restfreq = np.float(sys.argv[3]) ## in units of Hz
     ## check if an end '/' was given; if so, remove it
     if projectPath[-1] == '/':
         projectPath = projectPath[:-1]
@@ -405,8 +405,8 @@ def main():
     """
     This is the first of several processing loops. Here we being by looping over the list of objects...
     """
-    for objs in range(0, len(objList)):
-        objInd = allObjList.index(obj)
+    for objs in objList:
+        objInd = allObjList.index(objs)
         source = allObjList[objInd] ## get source
         print('\n')
         print('Processing the source:')
@@ -426,6 +426,8 @@ def main():
             fileList = allFitsList[objInd]
             pass
         fileList = fileList[3:45]
+        fileList = fileList[0:1]
+        print(len(fileList))
 	#fileList = fileList[3:45] ## AGBT16B_400_12, HI Grid
         #fileList = fileList[31:85] ## AGBT16B_400_12, 3C295 Grid
         #fileList = fileList[0:41] ## AGBT16B_400_13, HI Grid
@@ -520,6 +522,7 @@ def main():
                     are also returned. The function bandpassSort is then called to place this 1/20th chunk of bandpass at the 
                     correct position in the global data buffers (that will be written in the output FITS file). 
                     """
+                    bankList = bankList[0:1]
                     for fileName in bankList:
                         print('\n')                
                         print('Beamforming correlations in: '+fileName[-25:]+', Beam: ' + bm) 

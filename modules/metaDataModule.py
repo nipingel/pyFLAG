@@ -1307,7 +1307,9 @@ class MetaDataModule:
     print('\n')
     print('Applying beam offsets...')
     ## extend lists that hold Antenna FITS files by 2x to describe both XX and YY pol
-    extCoordSys = extCoordSys.extend(self.coordSysList)
+    extCoordSys = [self.coordSysList[0]] * 2 * len(self.coordSysList)
+    extCoordSys[0::2] = self.coordSysList
+    extCoordSys[1::2] = self.coordSysList
     extRefractArr = np.zeros(len(self.refractList)*2)
     extXELArr = np.zeros(len(self.refractList)*2)
     extElArr = np.zeros(len(self.refractList)*2)
@@ -1322,12 +1324,12 @@ class MetaDataModule:
     extRaArr[1::2] = self.raList
     extDecArr[0::2] = self.decList
     extDecArr[1::2] = self.decList
-    polMotionXArr[0::2] = self.polMotionXList
-    polMotionXArr[1::2] = self.polMotionXList
-    polMotionYArr[0::2] = self.polMotionYList
-    polMotionYArr[1::2] = self.polMotionYList
-    utCorrArr[0::2] = self.utCorrList
-    utCorrArr[1::2] = self.utCorrList
+    #polMotionXArr[0::2] = self.polMotionXList
+    #polMotionXArr[1::2] = self.polMotionXList
+    #polMotionYArr[0::2] = self.polMotionYList
+    #polMotionYArr[1::2] = self.polMotionYList
+    #utCorrArr[0::2] = self.utCorrList
+    #utCorrArr[1::2] = self.utCorrList
 
     ## we have data DMJD, Maj, Min, Az, El, Ra, Dec, velocity, temp, pressure, & humidity for a single pol 
     ## extend by 2x to describe both XX and YY pol
@@ -1340,7 +1342,7 @@ class MetaDataModule:
     newDecArr = np.zeros(len(self.refractList)*2)
     extRaArr = np.zeros(len(self.refractList)*2)
     extDecArr = np.zeros(len(self.refractList)*2)
-    extLstArr = np.zeros(len(self.self.refractList)*2)
+    extLstArr = np.zeros(len(self.refractList)*2)
     dataDMJDArr = np.zeros(len(self.refractList)*2)
     extvelArr = np.zeros(len(self.refractList)*2)
     dataDMJDArr = np.zeros(len(self.dataDMJDList)*2)
@@ -1362,24 +1364,22 @@ class MetaDataModule:
     extDecArr[0::2] = self.decList
     extDecArr[1::2] = self.decList
 
-    beamElArr = hdu['FEEDEOFF']
-    beamXElArr = hdu['FEEDXOFF']
+    beamElArr = hdu.data['FEEDEOFF']
+    beamXElArr = hdu.data['FEEDXOFF']
 
-    extFreqArr[0::2] = hdu['CRVAL1']
-    extFreqArr[1::2] = hdu['CRVAL1']
+    extFreqArr = hdu.data['CRVAL1']
 
-    velArr[0::2] = hdu['VELOCITY'] / 1000.0 ## km/s
-    velArr[1::2] = hdu['VELOCITY'] / 1000.0
+    velArr = hdu.data['VELOCITY'] / 1000.0 ## km/s
 
-    tempArr = hdu['AMBTEMP']
-    pressArr = hdu['AMBPRESS']
+    tempArr = hdu.data['TAMBIENT']
+    pressArr = hdu.data['PRESSURE']
     pressArr*=1/0.75006375541921 ## mb
-    humArr = hdu['AMBHUMID']
+    humArr = hdu.data['HUMIDITY']
 
     dataDMJDArr[0::2] = self.dataDMJDList
     dataDMJDArr[1::2] = self.dataDMJDList 
 
-    extLstArr = hdu['LST']
+    extLstArr = hdu.data['LST']
     lstStartRads = np.deg2rad(extLstArr/3600.0*15) ## radians
 
 
@@ -1390,9 +1390,9 @@ class MetaDataModule:
       velVal = velArr[coordIdx]
       dmjdVal = dataDMJDArr[coordIdx]
 
-      deltaUT = utCorrArr[coordIdx]
-      polXVal = polMotionXArr[coordIdx]
-      polYVal = polMotionYArr[coordIdx]
+      deltaUT = self.utCorrList[coordIdx]
+      polXVal = self.polMotionXList[coordIdx]
+      polYVal = self.polMotionYList[coordIdx]
       tempVal = tempArr[coordIdx]
       pressVal = pressArr[coordIdx]
       humVal = humArr[coordIdx]
@@ -1404,15 +1404,13 @@ class MetaDataModule:
       ## convert from center-of-earth to observed at GBO
       obsAz, obsZen, obsHA, obsDec, obsRa = pysla.slalib.sla_aop(geoRa, geoDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), np.deg2rad(self.GBTHGT), polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
       ## convert from obs eq to horizontal
-      obsAz, obsEl = pysla.slalib.sla_e2h(obsHA, obsDec, GBTLAT)
+      obsAz, obsEl = pysla.slalib.sla_e2h(obsHA, obsDec, np.deg2rad(self.GBTLAT))
       ## apply refraction correction
       ## apply beam offset corrections
       newElVal = obsEl - beamElArr[coordIdx] + np.deg2rad(extRefractArr[coordIdx])
       newAzVal = obsAz - (beamXElArr[coordIdx] / np.cos(newElVal))
 
       ## place in arrays
-      extAzArr[coordIdx] = np.rad2deg(obsAz)
-      extElArr[coordIdx] = np.rad2deg(obsEl)
       newAzArr[coordIdx] = np.rad2deg(newAzVal)
       newElArr[coordIdx] = np.rad2deg(newElVal)
 
@@ -1422,25 +1420,25 @@ class MetaDataModule:
         newMajArr[coordIdx] = np.rad2deg(newAzVal)
         newMinArr[coordIdx] = np.rad2deg(newElVal)
       else:
-      ## convert from obs horiz to eq 
-      newObsHA, newObsDec = pysla.slalib.sla_h2e(newAzVal, newElVal, GBTLAT)
-      newObsRa = np.deg2rad(lstStartDegs[coordIdx]) - newObsHA
-      ## convert from observed at GBO to geocentric (center of Earth)
-      newGeoRa, newGeoDec = pysla.slalib.sla_oap('R', newObsRa, newObsDec, dmjdVal, deltaUT, GBTLONG, GBTLAT, GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
+        ## convert from obs horiz to eq 
+        newObsHA, newObsDec = pysla.slalib.sla_h2e(newAzVal, newElVal, np.deg2rad(self.GBTLAT))
+        newObsRa = lstStartRads[coordIdx] - newObsHA
+        ## convert from observed at GBO to geocentric (center of Earth)
+        newGeoRa, newGeoDec = pysla.slalib.sla_oap('R', newObsRa, newObsDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
 
-      ## convert from geocenteric to mean
-      newRa, newDec = pysla.slalib.sla_amp(newGeoRa, newGeoDec, dmjdVal, 2000.0)
+        ## convert from geocenteric to mean
+        newRa, newDec = pysla.slalib.sla_amp(newGeoRa, newGeoDec, dmjdVal, 2000.0)
 
-      ## convert radians to degrees
-      newRaArr[coordIdx] = np.rad2deg(newRa)
-      newDecArr[coordIdx] = np.rad2deg(newDec)
-      newMajArr[coordIdx] = np.rad2deg(newRa)
-      newMinArr[coordIdx] = np.rad2deg(newDec)
+        ## convert radians to degrees
+        newRaArr[coordIdx] = np.rad2deg(newRa)
+        newDecArr[coordIdx] = np.rad2deg(newDec)
+        newMajArr[coordIdx] = np.rad2deg(newRa)
+        newMinArr[coordIdx] = np.rad2deg(newDec)
 
-      if extCoordSys[coordIdx] == 'GALACTIC':
-        glon, glat = pysla.slalib.sla_eqgal(newRa, newDec)
-        newMajArr[coordIdx] = glon
-        newMinArr[coordIdx] = glat
+        if extCoordSys[coordIdx] == 'GALACTIC':
+          glon, glat = pysla.slalib.sla_eqgal(newRa, newDec)
+          newMajArr[coordIdx] = glon
+          newMinArr[coordIdx] = glat
 
     ## update ra/dec array to be used for radial velocity correction
     self.newRaArr = newRaArr
@@ -1467,7 +1465,7 @@ class MetaDataModule:
     utDate_Time = hdu.data['DATE-OBS']
     cenFreqsArr = hdu.data['CRVAL1']
     restFreqArr = hdu.data['RESTFREQ']
-    for velIter in range(0,len(raArr)): ## loop through to calculate each integration/polarization's correciton 
+    for velIter in range(0,len(self.newRaArr)): ## loop through to calculate each integration/polarization's correciton 
       raVal = self.newRaArr[velIter] ## RA
       decVal = self.newDecArr[velIter] ## Dec 
       utDateTimeVal = utDate_Time[velIter] ## UT Time
@@ -1478,7 +1476,7 @@ class MetaDataModule:
       t = Time(utDateTimeVal, format='isot')
       utdate = t.iso[0:10]
       uttime = t.iso[11:]
-      radVelCorr_HEL, radVelCorr_LSR = radvelcorrObj.correctVel(utdate,uttime,raVal,decVal) ## calculate correction
+      radVelCorr_HEL, radVelCorr_LSR = self.radvelcorrObj.correctVel(utdate,uttime,raVal,decVal) ## calculate correction
       ## compute optical velocity of ref freq
       vOpt = self.c*(1-cenFreqVal/restFreqVal)
       ## add radial correction
