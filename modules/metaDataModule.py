@@ -1364,8 +1364,8 @@ class MetaDataModule:
     extDecArr[0::2] = self.decList
     extDecArr[1::2] = self.decList
 
-    beamElArr = hdu.data['FEEDEOFF']
-    beamXElArr = hdu.data['FEEDXOFF']
+    beamElArr = np.deg2rad(hdu.data['FEEDEOFF'])
+    beamXElArr = np.deg2rad(hdu.data['FEEDXOFF'])
 
     extFreqArr = hdu.data['CRVAL1']
 

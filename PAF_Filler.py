@@ -430,9 +430,10 @@ def main():
         #fileList = fileList[0:41] ## AGBT16B_400_13, HI Grid
         #fileList = fileList[1] + fileList[10] ## AGBT16B_400_14 3C147 7Pt Cal Scan
         #fileList= fileList[0:96] ## AGBT17B_455_01 -> first 7Pt-Cal Scan
+	fileList = fileList[1:]
         #fileList = fileList[105:-5]
-	   #fileList = fileList[3:117]
-	   #fileList = fileList[117:]
+	#fileList = fileList[3:117]
+	#fileList = fileList[117:]
 	## remove bad scans from file list
         if 'badScanList' in locals():
             for s in badScanList:
