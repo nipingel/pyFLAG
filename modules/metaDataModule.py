@@ -1437,8 +1437,8 @@ class MetaDataModule:
 
         if extCoordSys[coordIdx] == 'GALACTIC':
           glon, glat = pysla.slalib.sla_eqgal(newRa, newDec)
-          newMajArr[coordIdx] = glon
-          newMinArr[coordIdx] = glat
+          newMajArr[coordIdx] = np.rad2deg(glon)
+          newMinArr[coordIdx] = np.rad2deg(glat)
 
     ## update ra/dec array to be used for radial velocity correction
     self.newRaArr = newRaArr
