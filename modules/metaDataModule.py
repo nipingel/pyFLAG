@@ -583,7 +583,6 @@ class MetaDataModule:
       paramLook = param ## parameter exists in current form
     
     bankIdx = 0 ## index to keep track of which BANK file we are on
-    
     for fileNum in range(0,len(self.fitsList)):  ## loop through scan FITS files          
       goHDU = fits.open(self.projectPath + '/GO/' + self.fitsList[fileNum] + '.fits')                
       corrHDU = fits.open(self.bankFitsList[bankIdx]) ## open bank FITS file to get CHANSEL
