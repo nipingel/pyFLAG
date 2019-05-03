@@ -137,6 +137,21 @@ fluxCoeffDict = {'3C48':[1.3253,-0.7553,-0.1914,0.0498,0,0],'3C123':[1.8017,-0.7
 		 'VirgoA':[2.4466,-0.8116,-0.048,0,0,0],'3C286':[1.2481,-0.4507,-0.1798,0.0357,0,0],
 		 '3C295':[1.4701,-0.7658,-0.2780,-0.0347,0.0399,0,0],'3C353':[1.8627,-0.6938,-0.100,-0.032,0,0],
 		 'Cygnus A':[3.3498,-1.0022,-0.225,0.023,0.043,0]}
+## dictionary of Source Coordinates
+srcCoordDict = {'3C48':[1,2]}
+
+## functiont to return indices of minimum ra/dec from source ra/dec coordinates
+def getMinEqInds(sRa, sDec, raArr, decArr):
+	distArr = np.zeros([len(raArr)])
+	for c in range(0, len(raArr)):
+		raVal = raArr[c]
+		decVal = decArr[c]
+		d = np.sqrt((raVal - sRa)**2 + (decVal - sDec)**2)
+		distArr[c] = d
+	minDist = np.min(distArr)
+	## get index of minimum ra/dec values
+	minInd = np.where(distArr == minDist)
+	return minInd
 
 ## compute source Flux
 fluxArr = fluxCoeffDict[src]
@@ -146,7 +161,7 @@ srcFlux = computeFlux(fluxArr[0], fluxArr[1], fluxArr[2], fluxArr[3], fluxArr[4]
 antDir = '/home/gbtdata/' + projectID + '/Antenna/'
 #antDir = '/home/archive/science-data/17B/' + projectID + '/Antenna/'
 dataDir = '/lustre/flag/' + projectID +'/BF/'
-
+#dataDir = '/users/npingel/'
 ## open all BANK files with timestamp 
 fitsList = glob.glob(dataDir + '/' + fileTimeStamp + '*.fits')
 
@@ -173,6 +188,11 @@ for i in range(0, len(fitsList)):
 		## get timestamps
 		dataDMJD = dataHdu[1].data['DMJD']
 		antDMJD = antHdu[2].data['DMJD']
+		antRa = antHdu[2].data['RAJ2000']
+		antDec = antHdu[2].data['RAJ2000']
+
+		## get index that corresponds to minimum distance 
+		minEqInd = getMinEqInds(212.835495, 52.202770, antRa, antDec)
 		
 		## grab positions
 		if direction == 'XEL':
@@ -185,6 +205,7 @@ for i in range(0, len(fitsList)):
 			"""
 			antElPos = antHdu[2].data['MNT_EL']
 			antAzPos = (antHdu[2].data['MNT_AZ'] - antHdu[2].data['OBSC_AZ'])
+
                         
 			## get positions at center of scan, which is needed to remove pointing model contribution
 			sobsc_azArr = antHdu[0].header['SOBSC_AZ']
@@ -201,12 +222,13 @@ for i in range(0, len(fitsList)):
 			antPos = np.zeros([len(antAzPos)])
 			for pos in range(0,len(antAzPos)):
 				antPos[pos] = antAzPos[pos]*np.cos(np.deg2rad(antElPos[pos]))
+
 		if direction == 'EL':
 			antPos = antHdu[2].data['MNT_EL'] - antHdu[2].data['OBSC_EL']
-		        sobsc_elArr = antHdu[0].header['SOBSC_EL']
-                        smntc_elArr = antHdu[0].header['SMNTC_EL']
-                        pointingModel_El = smntc_elArr - sobsc_elArr
-                        antPos = antPos - np.float(pointingModel_El)
+			sobsc_elArr = antHdu[0].header['SOBSC_EL']
+			smntc_elArr = antHdu[0].header['SMNTC_EL']
+			pointingModel_El = smntc_elArr - sobsc_elArr
+			antPos = antPos - np.float(pointingModel_El)
                         
 	## if we have data, (i.e. the players haven't stalled), loop through integrations to create 'continuum' data
 	if not len(freqChanTimeSeriesY) == 0:
@@ -229,6 +251,8 @@ powerArrXScale = dataXInterp - meanBaseValueX
 maxPowerY = np.max(powerArrYScale)
 maxPowerX = np.max(powerArrXScale)
 
+if antPos[0] > 0:
+	antPos = antPos[::-1]
 
 ## determine Tsys estimate (assuming L-Band gain of 1.86 [K/Jy]
 G = 1.86
@@ -244,6 +268,9 @@ powerArrXNorm = powerArrXScale/np.max(powerArrXScale)
 ##fit data
 popt_Y, pcov_Y = curve_fit(fitGauss, antPos[30:-30]*60,powerArrYNorm[30:-30], p0=[1,0,10])
 popt_X, pcov_X = curve_fit(fitGauss, antPos[30:-30]*60,powerArrXNorm[30:-30], p0=[1,0,10])
+
+offset_X = antPos[minEqInd] - popt_X[1] 
+offset_Y = antPos[minEqInd] - popt_Y[1]  
 
 
 ## get uncertainties in fit
@@ -280,7 +307,7 @@ pyplot.plot(antPos[30:-30]*60.,fitGauss(antPos[30:-30]*60,popt_X[0],popt_X[1], p
 pyplot.ylabel('Normalized Power')
 pyplot.title('Power vs. Angular Position ('+ src + ' ' + direction + '); ' + fileTimeStamp,fontsize='small' )
 pyplot.xlabel('Angular Offset [arcmin]')
-pyplot.axvline(0, linestyle = '--', color='black', label='Location of Source', linewidth=2)
+pyplot.axvline(antPos[minEqInd], linestyle = '--', color='black', label='Location of Source', linewidth=2)
 pyplot.axvline((popt_X[1] + popt_Y[1]) / 2, linestyle='--', color='red', label='Ave. Fitted Mean', linewidth=2)	
 pyplot.legend(loc=0, prop={'size':15})
 pyplot.savefig('PeakScan_' + src + '_' + direction + '_' + fileTimeStamp + '.pdf')

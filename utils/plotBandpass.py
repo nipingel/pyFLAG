@@ -61,10 +61,10 @@ if not len(sys.argv[1:]) == 3:
 """
 make sure the project string is valid. Any ancillary FITS files will be in /home/gbtdata/projectID
 """    
-if not os.path.exists('/home/gbtdata/' + projectID):
+#if not os.path.exists('/home/gbtdata/' + projectID):
 #if not os.path.exists('/home/archive/science-data/17B/' + projectID):
-	print('Incorrect path to project directory. Exiting...')
-	sys.exit(1)
+#	print('Incorrect path to project directory. Exiting...')
+#	sys.exit(1)
 
 """
 check time stamp format and if it exists
@@ -73,10 +73,11 @@ if not (timeStamp[4] == '_') and not (timeStamp[7] == '_') and not (timeStamp[-6
 	print('Incorrect format of the time stamp; should be YYYY_MM_DD_HH:MM:SS')
 	sys.exit(1)
 
-if not os.path.isfile('/home/gbtdata/' + projectID + '/Antenna/' + timeStamp + '.fits'):
+#if not os.path.isfile('/home/gbtdata/' + projectID + '/Antenna/' + timeStamp + '.fits'):
 #if not os.path.isfile('/home/archive/science-data/17B/' + projectID + '/Antenna/' + timeStamp + '.fits'):
-	print('This is not a recorded scan; exiting...')
-	sys.exit(1)
+#if not os.path.isfile('/users/npingel/' + timeStamp + '.fits'):
+#	print('This is not a recorded scan; exiting...')
+#	sys.exit(1)
 
 """
 finally, check formatting of input dipole
@@ -110,6 +111,7 @@ elemIdx_Y = elemMapDict[elemY]
 
 ## define data directories
 dataDir = '/lustre/flag/' + projectID + '/BF/'
+#dataDir = '/users/npingel/'
 
 fitsList = glob.glob(dataDir + timeStamp+'*.fits')
 
@@ -184,19 +186,51 @@ for i in range(0, len(fitsList)):
 		
 		## now process if in fine channelization mode 
 		if numChans == 160:
+
+			# make 1D vector containing current indices for single 160 channel chunk
+            		origIdxArr = np.linspace(0, 159, 160, dtype='int32')
+
+            		## reshape into a 32 (rows) x 5 (cols) array; each column contains index for one coarse channels worth of data
+            		reshapeIdxArr = np.reshape(origIdxArr, (32,5))
+
+        		"""   
+        		reshape the transpose back into a 1D vector wherein the indices are correctly ordered to
+        		restitch each BANK's 160 freq elements
+        		"""
+        		stitchIdxArr = np.reshape(reshapeIdxArr.T, (1,160))
+        		stitchIdxArr = stitchIdxArr.flatten()
+
+        		correctIdxArr = np.zeros([160])
+        		for idx in range(0, 5):
+            			## get 32 channel chunk to do fftshift on indices
+            			chunk = np.fft.fftshift(stitchIdxArr[idx*32:idx*32+32])
+
+				## reverse indices in chunk to put in correct order contiguous order
+				revChunk = chunk[::-1]
+				correctIdxArr[idx*32:idx*32 + 32] = revChunk
 			
 			"""
 			loop over integrations to average bandpass in time, then sort into On/Off full bandpass array based on XID and CHANSEL
 			obtain CHANSEL, or which set of 5 contigious channels were selected for PFB
 			"""
 			chanSel = int(dataHdu[0].header['CHANSEL'])
-                        for j in range(0, numInts):
-                                bandpassStartChan = xid*160
-                                bandpassEndChan = bandpassStartChan + 160
+			for j in range(0, numInts):
+
+            			newTimeSeries_XX = np.zeros(numChans, dtype= 'complex64')
+            			newTimeSeries_YY = np.copy(newTimeSeries_XX)
+
+				## finally, loop through cube to re-order freq channels
+                		for idx in range(0, 160):
+                			corrIdx = correctIdxArr[idx]
+                			newTimeSeries_XX[idx] = freqChanTimeSeries_XX[j, corrIdx]
+                			newTimeSeries_YY[idx] = freqChanTimeSeries_YY[j, corrIdx]
+
+				bandpassStartChan = xid*160
+				bandpassEndChan = bandpassStartChan + 160
 				
-								## no need to sort here since all elements in banks are contigious in this mode
-                                fullBandpassArr_XX[j, bandpassStartChan:bandpassEndChan] = np.absolute(freqChanTimeSeries_XX[j,:])
-                                fullBandpassArr_YY[j, bandpassStartChan:bandpassEndChan] = np.absolute(freqChanTimeSeries_YY[j,:])
+				## no need to sort here since all elements in banks are contigious in this mode
+				fullBandpassArr_XX[j, bandpassStartChan:bandpassEndChan] = np.absolute(newTimeSeries_XX)
+				fullBandpassArr_YY[j, bandpassStartChan:bandpassEndChan] = np.absolute(newTimeSeries_YY)
 				
 			## only five coarse channels selected in PFB; centralFreq depends on chunk of channels selected
 			bandWidth = .30318*5*20
@@ -208,7 +242,6 @@ fullBandpassArr_YY = np.mean(fullBandpassArr_YY, axis=0)
 ## frequency axis assuming restfreq of 1450 [MHz]; bandWidth is set in processing above
 cenFreq = 1450. ##[MHz]
 freqAxis = np.linspace(cenFreq-bandWidth/2, cenFreq+bandWidth/2, num = numChans*20)
-
 ## if in PFB mode, shift central Freq
 if numChans == 160:
 	minXid = np.min(xidArr)
@@ -227,10 +260,12 @@ print('Plotting bandpass...')
 pyplot.figure()
 pyplot.plot(freqAxis, fullBandpassArr_XX, linewidth = 2, color = tableau20[2], label = 'XX-Pol')
 pyplot.plot(freqAxis, fullBandpassArr_YY, linewidth = 2, color = tableau20[0], label = 'YY-Pol')
+#pyplot.xlim(1418, 1423)
 pyplot.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
 pyplot.ylabel(r'Counts')
 pyplot.title('Dipole: ' + np.str(intElem) + '; ' + timeStamp, fontsize='small' )
 pyplot.xlabel('Frequency [MHz]')
 pyplot.axhline(0, color='black', linewidth=2)
 pyplot.legend(loc = 0, prop = {'size':15})
+#pyplot.savefig(timeStamp + '_bandpass.pdf')
 pyplot.show()

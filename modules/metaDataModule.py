@@ -50,13 +50,14 @@ class MetaDataModule:
     
   ## initialize function. Opens raw data file, numInts, data buffers (banpasses), beam, freqChans, intLength
   ## total BANK files, and creates column object. 
-  def __init__(self, projectPath, rawDataPath, weightPath, fitsList, restfreq, bankFitsList, numBanksList, dataBuff_X,dataBuff_Y,beamNum, pfb):        
+  def __init__(self, projectPath, rawDataPath, weightPath, fitsList, restfreq, centralfreq, bankFitsList, numBanksList, dataBuff_X,dataBuff_Y,beamNum, pfb):        
     self.projectPath = projectPath
     self.dataPath = rawDataPath
     self.weightPath = weightPath
     ## list of scan time stamps 
     self.fitsList = fitsList  
     self.restfreq = restfreq
+    self.centralfreq = centralfreq
     ## list containing all relevant BANK files
     self.bankFitsList = bankFitsList
     self.numBanksList = numBanksList
@@ -1083,7 +1084,7 @@ class MetaDataModule:
       corrHDU = fits.open(self.bankFitsList[bankIdx]) ## open raw bank FITS file
       chanSel = np.float(corrHDU[0].header['CHANSEL'])
       numScanInts = self.getNumInts(fileNum)
-      LOHdu = fits.open(self.projectPath + '/LO1B/' + self.fitsList[fileNum] + '.fits')
+      #LOHdu = fits.open(self.projectPath + '/LO1B/' + self.fitsList[0] + '.fits')
 
       """
       if numScanIts is 0, we have a bad file and should skip filling
@@ -1107,7 +1108,8 @@ class MetaDataModule:
         """
       elif param == 'CRVAL1' or param == 'OBSFREQ': 
         paramLook = 'RESTFRQ'
-        value = LOHdu[0].header[paramLook] - 10e6 ## subtract 10 MHz
+        #value = LOHdu[0].header[paramLook] - 10e6 ## subtract 10 MHz
+        value = self.centralfreq
         if self.pfb == True: ## if we are in PFB mode, the chanSel is used to determine the frequency values for fine channels
             lowEnd = value - (250-(chanSel*100))*.30318*1e6
             highEnd = value-(250-(chanSel*100+100))*.30318*1e6

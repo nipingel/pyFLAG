@@ -68,7 +68,8 @@ path = sys.argv[1]
 fileTimeStamp = sys.argv[2] ## file time stamp
 
 ## make data path
-dataPath = dataDir + path + '/BF/'
+#dataPath = dataDir + path + '/BF/'
+dataPath = '/users/npingel/'
 
 ## ERROR HANDLING
 ## test the validity of the user provided data path

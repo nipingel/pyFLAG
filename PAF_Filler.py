@@ -9,6 +9,7 @@ User Inputs:
 /path/to/project/directory - path to where ancillary FITS files are (e.g. /home/gbtdata/AGBT16B_400)
 /path/to/weight/FITS/files - path to weights FITS files; recommended to place '*' wild card in the place of specific bank letter identifier 
 restfreq - Rest frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary for Doppler corrections)
+centralFreq - central frequency in HZ (ay be phased out once M&C can communicate with IF manager, but now necessary when LO is taken out of scan coordinator)
 -b 'List of bad timestamps' - (optional; default not defined) a list of bad timestamps the program should ignore (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01') 
 -o 'List of objects' - a list of objects to process (e.g. '3C147 NGC6946’); defaults to all objects contained within the observational session.
 -g 'List of specific time stamps' - a list of specific timestamps to process (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01’); defaults to all time stamps associated with particular observed objects.
@@ -184,6 +185,7 @@ def main():
     projectPath = sys.argv[1] ## of the form /home/gbtdata/AGBT16B_400_01
     weightPath = np.str(sys.argv[2]) ## of the form /lustre/projects/flag.old/AGBT16B_400_01/BF/weight_files/*.FITS
     restfreq = np.float(sys.argv[3]) ## in units of Hz
+    centralfreq = np.float(sys.argv[4]) ## in units of Hz
     ## check if an end '/' was given; if so, remove it
     if projectPath[-1] == '/':
         projectPath = projectPath[:-1]
@@ -434,6 +436,7 @@ def main():
         #fileList = fileList[105:-5]
 	#fileList = fileList[3:117]
 	#fileList = fileList[117:]
+        fileList = fileList[0:2]
 	## remove bad scans from file list
         if 'badScanList' in locals():
             for s in badScanList:
@@ -521,6 +524,7 @@ def main():
                     are also returned. The function bandpassSort is then called to place this 1/20th chunk of bandpass at the 
                     correct position in the global data buffers (that will be written in the output FITS file). 
                     """
+                    bankList = bankList[0:2]
                     for fileName in bankList:
                         print('\n')                
                         print('Beamforming correlations in: '+fileName[-25:]+', Beam: ' + bm) 
@@ -558,7 +562,7 @@ def main():
             build metadata; inputs are path to ancillary FITS files, path to raw BANK FITS files, names of the processed BANK files for this beam
             the global data buffers holding the beamformed spectra, the beam that was processed, and the boolean denoting which spectral mode we're in.          
             """
-            md = MetaDataModule(projectPath, dataPath, weightPath, fileList, restfreq, allBanksList, numBanksList, globalDataBuff_X_List, globalDataBuff_Y_List, bm, pfb)
+            md = MetaDataModule(projectPath, dataPath, weightPath, fileList, restfreq, centralfreq, allBanksList, numBanksList, globalDataBuff_X_List, globalDataBuff_Y_List, bm, pfb)
             thduList = md.constuctBinTableHeader()
             dataFITSFile = dataFITSFile[:-6]
 	    ## save the file
