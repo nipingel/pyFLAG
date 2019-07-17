@@ -26,7 +26,7 @@ __status__ = "beta"
 import cgi
 import sys
 import math
-import slalib as s
+import pyslalib.slalib as s
 import numpy as np
 from astropy.time import Time
 
@@ -36,7 +36,7 @@ class RadVelCorr:
   import cgi
   import sys
   import math
-  import slalib as s
+  import pyslalib.slalib as s
   import numpy as np
   from astropy.time import Time
   from astropy.io import fits
@@ -51,7 +51,7 @@ class RadVelCorr:
       import cgi
       import sys
       import math
-      import slalib as s
+      import pyslalib.slalib as s
       import numpy as np
       from astropy.time import Time
       from astropy.io import fits
@@ -240,8 +240,8 @@ class RadVelCorr:
       rr = self.rvel(mjd1, radeg,decdeg)
       #  ((mjdd, last*12.0/math.pi, Rgeo, totalhelio,totalbary, totallsrk,totalgal))
 
-      print ' %3d %7.3f %7.3f %7.3f %13.3f %13.3f %13.3f' % \
-         (hour,rr[1],rr[2],rr[3],rr[4],rr[5],rr[6])
+      print(' %3d %7.3f %7.3f %7.3f %13.3f %13.3f %13.3f' % \
+         (hour,rr[1],rr[2],rr[3],rr[4],rr[5],rr[6]))
      
   #--------------------------------------------------------------
   # date: 'yyyy/mm/dd', time: 'hh:mm:ss' (in UT time)  

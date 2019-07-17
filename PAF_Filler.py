@@ -135,7 +135,7 @@ def getScanInfo(fitsLst):
     numInts = np.int(hdu[1].header['NAXIS2']) ## total number of integrations
     form = np.float(hdu[1].header['TFORM3'][:-1]) 
     data = hdu[1].data['DATA']
-    numChans = data.shape[1]/2112 ## always 2112 correlations in raw FITS files
+    numChans = np.int(data.shape[1]/2112) ## always 2112 correlations in raw FITS files
     return numInts, intLen, numChans, fitsLst
 
 """
@@ -180,12 +180,12 @@ def main():
             -o \'List of objects\' -g \'List of specific time stamps\' -m \'List of beams\'')
 
         sys.exit()
-    
     ## command line inputs
     projectPath = sys.argv[1] ## of the form /home/gbtdata/AGBT16B_400_01
-    weightPath = np.str(sys.argv[2]) ## of the form /lustre/projects/flag.old/AGBT16B_400_01/BF/weight_files/*.FITS
+    weightPath = sys.argv[2] + '*.FITS' ## of the form /lustre/projects/flag.old/AGBT16B_400_01/BF/weight_files/*.FITS
     restfreq = np.float(sys.argv[3]) ## in units of Hz
     centralfreq = np.float(sys.argv[4]) ## in units of Hz
+   
     ## check if an end '/' was given; if so, remove it
     if projectPath[-1] == '/':
         projectPath = projectPath[:-1]
@@ -366,12 +366,12 @@ def main():
     """
     try:
         #numBeams = len(byuBeamList)   
-        numBeams = len(beamList) 
+        numBeams = int(len(beamList)) 
     except NameError:
         numFields = wtFile[1].header['TFIELDS']
-        numBeams = (numFields - 2) / 2 
+        numBeams = int((numFields - 2) / 2)
         #byuBeamList = range(0, numBeams)
-        beamList = range(0, numBeams)
+        beamList = list(range(0, numBeams))
         #for el in range(0, len(byuBeamList)):
         #   byuBeamList[el] = np.str(el)
         for el in range(0, len(beamList)):
@@ -436,7 +436,6 @@ def main():
         #fileList = fileList[105:-5]
 	#fileList = fileList[3:117]
 	#fileList = fileList[117:]
-        fileList = fileList[0:2]
 	## remove bad scans from file list
         if 'badScanList' in locals():
             for s in badScanList:
@@ -473,7 +472,7 @@ def main():
             to avoid the for loop simply looping over a string (when len of fileList = 1), set if statement
             such that if type of fileList is equal to string, cast into a list
             """
-            if isinstance(fileList, unicode):
+            if isinstance(fileList, str):
                  fileList = [fileList]
             """
             Loop over time stamps associated with current observed object 
@@ -494,7 +493,7 @@ def main():
                     text_file = open("skippedScans.txt", "w")
                     text_file.write(dataFITSFile)
                     text_file.close()
-		    fileList.remove(dataFITSFile)
+                    fileList.remove(dataFITSFile)
                     continue 
                 else:
                     ## get essential info about current timestamp
@@ -524,7 +523,7 @@ def main():
                     are also returned. The function bandpassSort is then called to place this 1/20th chunk of bandpass at the 
                     correct position in the global data buffers (that will be written in the output FITS file). 
                     """
-                    bankList = bankList[0:2]
+                    #bankList = bankList[0:2]
                     for fileName in bankList:
                         print('\n')                
                         print('Beamforming correlations in: '+fileName[-25:]+', Beam: ' + bm) 

@@ -34,7 +34,7 @@ import numpy as np
 import datetime
 import collections
 import glob
-import RadVelCorr
+from . import RadVelCorr
 import sys
 
 
@@ -75,14 +75,21 @@ class MetaDataModule:
     self.numPhases = 2
     ## arrays to hold coordinate transformation
     self.coordSysList = []
+    self.offCoordSysList = []
     self.beamOff_CrossEl = None
     self.beamOff_El = None
     self.newRaArr = None
     self.newDecArr = None
-    self.oldAzArr = None
-    self.oldElArr = None
     self.raList  = []
     self.decList = []
+    self.mntAzList = []
+    self.mntElList = []
+    self.obscAzList = []
+    self.obscElList = []
+    self.smntAzList = []
+    self.smntElList = []
+    self.sobscAzList = []
+    self.sobscElList = []
     self.lstArr = None
     self.dataDMJDList = []
     self.refractList = []
@@ -241,8 +248,8 @@ class MetaDataModule:
       'DOPFREQ':self.getArbParam, 
       'FREQRES':self.getModeDepParams, 
       'LST':self.getAntFITSParam,
-      'CTYPE2':self.getGOFITSParam,
-      'CTYPE3':self.getGOFITSParam,
+      'CTYPE2':self.getAntFITSParam,
+      'CTYPE3':self.getAntFITSParam,
       'CRPIX1':self.getModeDepParams,
       'CDELT1':self.getModeDepParams,
       'BANDWID':self.getModeDepParams,
@@ -609,50 +616,7 @@ class MetaDataModule:
           value = 2000.0
       else:
         value = None
-      if value == 'GALACTIC' and param == 'CTYPE2':
-        valStr = 'GLON'
-
-        ## create temporary list to hold the scan's indicated coordinates system and extend the object list
-        tempCoordList = [value] * numScanInts
-        self.coordSysList.extend(tempCoordList)
-        ## initialize array to hold values if first iteration
-        self.initArr(fileNum, numScanInts, 'str', valStr)
-      elif value == 'GALACTIC' and param == 'CTYPE3': ## Specify that we're in Galactic coordinates
-        valStr = 'GLAT'
-        self.initArr(fileNum, numScanInts, 'str', valStr)
-      elif value == 'RADEC' and param == 'CTYPE2': ## Specify that we're in J2000 Coordinates
-        valStr = 'RA'
-        self.initArr(fileNum, numScanInts, 'str', valStr)
-        tempCoordList = [value] * numScanInts
-        self.coordSysList.extend(tempCoordList)
-      elif value == 'RADEC' and param == 'CTYPE3':
-        valStr = 'DEC'
-        self.initArr(fileNum, numScanInts, 'str', valStr)
-      elif value == 'HADEC' and param == 'CTYPE2': ## Specify that we're in Hour Angle/Dec Coordinates
-        valStr = 'HA'
-        self.initArr(fileNum, numScanInts, 'str', valStr)
-        tempCoordList = [value] * numScanInts
-        self.coordSysList.extend(tempCoordList)
-      elif value == 'HADEC' and param == 'CTYPE3':
-        valStr = 'DEC'
-        self.initArr(fileNum, numScanInts, 'str', valStr) ## Specify that we're in Horizontal Coordinates
-      elif value == 'AZEL' and param == 'CTYPE2':
-        valStr = 'AZ'
-        self.initArr(fileNum, numScanInts, 'str', valStr)
-        tempCoordList = [value] * numScanInts
-        self.coordSysList.extend(tempCoordList)
-      elif value == 'AZEL' and param == 'CTYPE3':
-        valStr = 'EL'
-        self.initArr(fileNum, numScanInts, 'str', valStr)
-      elif value == 'ENCODERAZEL' and param == 'CTYPE2':
-        valStr = 'AZ'
-        self.initArr(fileNum, numScanInts, 'str', valStr)
-        tempCoordList = [value] * numScanInts
-        self.coordSysList.extend(tempCoordList)
-      elif value == 'ENCODERAZEL' and param == 'CTYPE3':
-        valStr = 'EL'
-        self.initArr(fileNum, numScanInts, 'str', valStr)
-      elif param =='TRGTLONG': ## source longitude coordinate
+      if param =='TRGTLONG': ## source longitude coordinate
         valStr = value
         self.initArr(fileNum, numScanInts, 'float64', None)
       elif param =='TRGTLAT': # source latitude coordinate
@@ -730,10 +694,12 @@ class MetaDataModule:
   by the servos
   """  
   def getAntFITSParam(self,param):                      
+    
     bankIdx = 0 ## index to keep track of which BANK file we are on
     for fileNum in range(0,len(self.fitsList)): ## loop through scan FITS files               
       antHDU = fits.open(self.projectPath + '/Antenna/' + self.fitsList[fileNum] + '.fits')
-      
+      numScanInts = self.getNumInts(fileNum) ## get integrations this scan
+
       ## open weight file to get cross-el/el offset
       weightFiles = glob.glob(self.weightPath)
       wHDU = fits.open(weightFiles[0])
@@ -741,17 +707,7 @@ class MetaDataModule:
       ## get beam offsets
       beamOff_XEl = wHDU[1].data['BeamOFF_XEL'][self.beamNum]
       beamOff_El = wHDU[1].data['BeamOFF_EL'][self.beamNum]
-      
-      ## get pointing model information 
-      smntAz = antHDU[0].header['SMNTC_AZ']
-      sobscAz = antHDU[0].header['SOBSC_AZ']
-      sobscEl = antHDU[0].header['SOBSC_EL']
-      smntEl = antHDU[0].header['SMNTC_EL']
           
-      ## calculate pointing model
-      azPt = smntAz - sobscAz
-      elPt = smntEl - sobscEl
-      
       ## get integrations this scan
       corrHDU = fits.open(self.bankFitsList[bankIdx])
       corrDMJD = corrHDU[1].data['DMJD']
@@ -762,7 +718,6 @@ class MetaDataModule:
         self.beamOff_El = beamOff_El
       
       antDMJD = antHDU[2].data['DMJD'] ## get Antenna DMJD values
-      numScanInts = self.getNumInts(fileNum) ## get integrations this scan
       """
       if numScanIts is 0, we have a bad file and should skip filling
       metadata.
@@ -801,12 +756,32 @@ class MetaDataModule:
         value = np.interp(corrDMJD,antDMJD,minor)
         self.initArr(fileNum, numScanInts, 'float64', None)
       elif param == 'AZIMUTH': 
-        az = antHDU[2].data['MNT_AZ'] - azPt ## subtract pointing model contribution
-        value = np.interp(corrDMJD,antDMJD,az)
+        mntAz = antHDU[2].data['MNT_AZ']
+        obscAz = antHDU[2].data['OBSC_AZ']
+
+        ## place pointing model information in list
+        smntAz = antHDU[0].header['SMNTC_AZ']
+        self.smntAzList.extend([smntAz] * numScanInts)
+        sobscAz = antHDU[0].header['SOBSC_AZ']
+        self.sobscAzList.extend([sobscAz] * numScanInts)
+
+        value = np.interp(corrDMJD,antDMJD, mntAz)
+        self.mntAzList.extend(value)
+        self.obscAzList.extend(np.interp(corrDMJD, antDMJD, obscAz))
         self.initArr(fileNum, numScanInts, 'float64', None)
       elif param == 'ELEVATIO':
-        el = antHDU[2].data['MNT_EL'] - elPt ## subtract pointing model contribution
+        el = antHDU[2].data['MNT_EL']
+        obscEl = antHDU[2].data['OBSC_EL']
+
+        ## place pointing model information in list
+        smntEl = antHDU[0].header['SMNTC_EL']
+        self.smntElList.extend([smntEl] * numScanInts)
+        sobscEl = antHDU[0].header['SOBSC_EL']
+        self.sobscElList.extend([sobscEl] * numScanInts)
+
         value = np.interp(corrDMJD,antDMJD,el)
+        self.mntElList.extend(value)
+        self.obscElList.extend(np.interp(corrDMJD, antDMJD, obscEl))
         self.initArr(fileNum, numScanInts, 'float64', None)
         ## now, add in the J2000 coordinates for beam offset applications later on
         antRa = antHDU[2].data['RAJ2000']
@@ -815,7 +790,44 @@ class MetaDataModule:
         interpDec = np.interp(corrDMJD, antDMJD, antDec)
         self.raList.extend(interpRa)
         self.decList.extend(interpDec)
-
+      elif param == 'CTYPE2' or param == 'CTYPE3':
+        value = antHDU[0].header['INDICSYS']
+        ## create temporary list to hold the scan's indicated coordinates system and extend the object list
+        if param == 'CTYPE2':
+          self.coordSysList.extend([value] * numScanInts)
+          self.offCoordSysList.extend([antHDU[0].header['OFFSYS']] * numScanInts)
+        if value == 'GALACTIC' and param == 'CTYPE2':
+          valStr = 'GLON'
+          ## initialize array to hold values if first iteration
+          self.initArr(fileNum, numScanInts, 'str', valStr) 
+        if value == 'GALACTIC' and param == 'CTYPE3':
+          valStr = 'GLAT'
+          self.initArr(fileNum, numScanInts, 'str', valStr)
+        elif value == 'RADEC' and param == 'CTYPE2': ## Specify that we're in J2000 Coordinates
+          valStr = 'RA'
+          self.initArr(fileNum, numScanInts, 'str', valStr)
+        elif value == 'RADEC' and param == 'CTYPE3':
+          valStr = 'DEC'
+          self.initArr(fileNum, numScanInts, 'str', valStr)
+        elif value == 'HADEC' and param == 'CTYPE2': ## Specify that we're in Hour Angle/Dec Coordinates
+          valStr = 'HA'
+          self.initArr(fileNum, numScanInts, 'str', valStr)
+        elif value == 'HADEC' and param == 'CTYPE3':
+          valStr = 'DEC'
+          self.initArr(fileNum, numScanInts, 'str', valStr) ## Specify that we're in Horizontal Coordinates
+        elif value == 'AZEL' and param == 'CTYPE2':
+          valStr = 'AZ'
+          self.initArr(fileNum, numScanInts, 'str', valStr)
+        elif value == 'AZEL' and param == 'CTYPE3':
+          valStr = 'EL'
+          self.initArr(fileNum, numScanInts, 'str', valStr)
+        elif value == 'ENCODERAZEL' and param == 'CTYPE2':
+          valStr = 'AZ'
+          self.initArr(fileNum, numScanInts, 'str', valStr)
+        elif value == 'ENCODERAZEL' and param == 'CTYPE3':
+          valStr = 'EL'
+          self.initArr(fileNum, numScanInts, 'str', valStr)
+        
       ## we will need to calculate this based on LST start time, DMJD value, and scan DATE-OBS (start time) -> all stored in Antenna FITS file
       elif param == 'LST': ## we will need to calculate this based on LST start and integration time
         param1 = 'LSTSTART' ## get LSTSTART value
@@ -862,20 +874,6 @@ class MetaDataModule:
         self.newArr[1::2] = value
         self.valueArr = np.concatenate([self.valueArr, self.newArr]) ## add to FITS column array
       bankIdx += self.numBanksList[fileNum] ## upate BANK index 
-    
-      ## determine if we need to save valueArr for later corrdinate correction 
-      #elif param == 'CRVAL3':
-      #  self.oldMinArr = self.valueArr
-      #elif param = 'RAJ2000'
-      #  self.oldRaArr = self.valueArr
-      #elif param = 'DECJ2000':
-      #  self.oldDecArr = self.valueArr
-    if param == 'AZIMUTH':
-      self.oldAzArr = self.valueArr
-    elif param == 'ELEVATIO':
-      self.oldElArr = self.valueArr
-    elif param == 'LST':
-      self.lstArr = self.valueArr/3600*15 ## convert to degs
 
     ## retrieve comment and create column 
     comment = self.commentDict[param]
@@ -1311,6 +1309,28 @@ class MetaDataModule:
     extCoordSys = [self.coordSysList[0]] * 2 * len(self.coordSysList)
     extCoordSys[0::2] = self.coordSysList
     extCoordSys[1::2] = self.coordSysList
+    extOffCoordSys = [self.offCoordSysList[0]] * 2 * len(self.offCoordSysList)
+    extOffCoordSys[0::2] = self.offCoordSysList
+    extOffCoordSys[1::2] = self.offCoordSysList
+    extObscAzArr = np.zeros(len(self.refractList)*2)
+    extObscAzArr[0::2] = self.obscAzList
+    extObscAzArr[1::2] = self.obscAzList
+    extObscElArr = np.zeros(len(self.refractList)*2)
+    extObscElArr[0::2] = self.obscElList
+    extObscElArr[1::2] = self.obscElList
+    extSMntAzArr = np.zeros(len(self.refractList)*2)
+    extSMntAzArr[0::2] = self.smntAzList
+    extSMntAzArr[1::2] = self.smntAzList   
+    extSMntElArr = np.zeros(len(self.refractList)*2)
+    extSMntElArr[0::2] = self.smntElList
+    extSMntElArr[1::2] = self.smntElList
+    extSObscAzArr = np.zeros(len(self.refractList)*2)
+    extSObscAzArr[0::2] = self.sobscAzList
+    extSObscAzArr[1::2] = self.sobscAzList
+    extSObscElArr = np.zeros(len(self.refractList)*2)
+    extSObscElArr[0::2] = self.sobscElList
+    extSObscElArr[1::2] = self.sobscElList
+
     extRefractArr = np.zeros(len(self.refractList)*2)
     extXELArr = np.zeros(len(self.refractList)*2)
     extElArr = np.zeros(len(self.refractList)*2)
@@ -1319,18 +1339,18 @@ class MetaDataModule:
     utCorrArr = np.zeros(len(self.refractList)*2)
     extRaArr = np.zeros(len(self.refractList)*2)
     extDecArr = np.zeros(len(self.refractList)*2)
+    extMntAzArr = np.zeros(len(self.refractList)*2)
+    extMntAzArr[0::2] = self.mntAzList
+    extMntAzArr[1::2] = self.mntAzList
+    extMntElArr = np.zeros(len(self.refractList)*2)
+    extMntElArr[0::2] = self.mntElList
+    extMntElArr[1::2] = self.mntElList    
     extRefractArr[0::2] = self.refractList
     extRefractArr[1::2] = self.refractList 
     extRaArr[0::2] = self.raList
     extRaArr[1::2] = self.raList
     extDecArr[0::2] = self.decList
     extDecArr[1::2] = self.decList
-    #polMotionXArr[0::2] = self.polMotionXList
-    #polMotionXArr[1::2] = self.polMotionXList
-    #polMotionYArr[0::2] = self.polMotionYList
-    #polMotionYArr[1::2] = self.polMotionYList
-    #utCorrArr[0::2] = self.utCorrList
-    #utCorrArr[1::2] = self.utCorrList
 
     ## we have data DMJD, Maj, Min, Az, El, Ra, Dec, velocity, temp, pressure, & humidity for a single pol 
     ## extend by 2x to describe both XX and YY pol
@@ -1352,18 +1372,6 @@ class MetaDataModule:
     pressArr = np.zeros(len(self.dataDMJDList)*2)
     humArr = np.zeros(len(self.dataDMJDList)*2)
     extFreqArr = np.zeros(len(self.dataDMJDList)*2)
-
-    """
-    azOffVal = self.beamOff_CrossEl/np.cos(np.deg2rad(self.oldElArr)) ## put Cross-El back into Azimuth
-    elOffVal = self.beamOff_El
-    newAzArr = self.oldAzArr + azOffVal ## apply azimuth offset
-    newElArr = self.oldElArr + extRefractArr - elOffVal ## apply elevation offset (and atmospheric refraction)
-    """
-
-    extRaArr[0::2] = self.raList
-    extRaArr[1::2] = self.raList
-    extDecArr[0::2] = self.decList
-    extDecArr[1::2] = self.decList
 
     beamElArr = np.deg2rad(hdu.data['FEEDEOFF'])
     beamXElArr = np.deg2rad(hdu.data['FEEDXOFF'])
@@ -1403,30 +1411,32 @@ class MetaDataModule:
       ## convert J2000 -> geoapparent (center of Earth)
       geoRa, geoDec = pysla.slalib.sla_map(np.deg2rad(raVal), np.deg2rad(decVal), 0.0, 0.0, 0.0, velVal, 2000.0, dmjdVal)
       ## convert from center-of-earth to observed at GBO
-      obsAz, obsZen, obsHA, obsDec, obsRa = pysla.slalib.sla_aop(geoRa, geoDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), np.deg2rad(self.GBTHGT), polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
+      #obsAz, obsZen, obsHA, obsDec, obsRa = pysla.slalib.sla_aop(geoRa, geoDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), np.deg2rad(self.GBTHGT), polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
+      obsHA = lstStartRads[coordIdx] - geoRa
       ## convert from obs eq to horizontal
-      obsAz, obsEl = pysla.slalib.sla_e2h(obsHA, obsDec, np.deg2rad(self.GBTLAT))
+      obsAz, obsEl = pysla.slalib.sla_e2h(obsHA, geoDec, np.deg2rad(self.GBTLAT))
       ## apply refraction correction
       ## apply beam offset corrections
       newElVal = obsEl - beamElArr[coordIdx] + np.deg2rad(extRefractArr[coordIdx])
       newAzVal = obsAz - (beamXElArr[coordIdx] / np.cos(newElVal))
-
       ## place in arrays
       newAzArr[coordIdx] = np.rad2deg(newAzVal)
       newElArr[coordIdx] = np.rad2deg(newElVal)
-
       ## put the major/minor array in the correct coordinate system based on INDICSYS
       if extCoordSys[coordIdx] == 'AZEL':
         # major and minor are az and el
         newMajArr[coordIdx] = np.rad2deg(newAzVal)
         newMinArr[coordIdx] = np.rad2deg(newElVal)
+      ## convert to Cross-Elevation & Elevation by subtracting off pointing model if in engineering coordinates
+      elif extOffCoordSys[coordIdx] == 'AZEL_ENCODER':
+        newMajArr[coordIdx] = ((extMntAzArr[coordIdx] - extObscAzArr[coordIdx]) - (extSMntAzArr[coordIdx] - extSObscAzArr[coordIdx]))*np.cos(newElVal)
+        newMinArr[coordIdx] = (extMntElArr[coordIdx] - extObscElArr[coordIdx]) - (extSMntElArr[coordIdx] - extSObscElArr[coordIdx])
       else:
         ## convert from obs horiz to eq 
         newObsHA, newObsDec = pysla.slalib.sla_h2e(newAzVal, newElVal, np.deg2rad(self.GBTLAT))
         newObsRa = lstStartRads[coordIdx] - newObsHA
         ## convert from observed at GBO to geocentric (center of Earth)
         newGeoRa, newGeoDec = pysla.slalib.sla_oap('R', newObsRa, newObsDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
-
         ## convert from geocenteric to mean
         newRa, newDec = pysla.slalib.sla_amp(newGeoRa, newGeoDec, dmjdVal, 2000.0)
 
@@ -1452,7 +1462,6 @@ class MetaDataModule:
     hdu.data['TRGTLAT'] = newMinArr
     hdu.data['AZIMUTH'] = newAzArr
     hdu.data['ELEVATIO'] = newElArr
-
     ## return SDFITS binary table with updated values
     return hdu
   """

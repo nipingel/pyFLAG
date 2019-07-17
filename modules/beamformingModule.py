@@ -60,7 +60,6 @@ class BeamformingModule:
     ## Returns: complex weight vector in format that can be applied to corr. matrices (i.e. 2D array with freqChansXdipoles)
     def getWeights(self, numChans, xID, beam): ## TODO: finish weights
         weightFileList = glob.glob(self.weightPath)
-
         ## check to make sure we have the correct file (in case A does not map to xID 0, B to 1, etc... )
         for wtFile in weightFileList:
             wtHDU = fits.open(wtFile)
@@ -197,7 +196,7 @@ class BeamformingModule:
     """
     Function that was leftover for use from Anish's backend. Interesting to see how the polarizations were
     mapped to the dipole index. I am therefore keep this in as a reference should it ever be useful. 
-    
+    """ 
     def unpackCorrelations(self,dat): 
         xpol = [0,1,4,5,8,9,12,13,16,17,20,21,24,25,28,29,32,33,36,37]
         xdip = [1,11,2,12,3,13,4,14,5,15,6,16,7,17,8,18,9,19,10,20]
@@ -229,7 +228,7 @@ class BeamformingModule:
         xdat = dat[0:19]
         ydat = dat[20:39]
         return xdat, ydat 
-      """
+      
     
     """
     This is the main function of this module (i.e., makes all the necessary calls to return a beamformed
@@ -240,7 +239,7 @@ class BeamformingModule:
     def getSpectralArray(self, fitsName, dataArr, beam, xID):
         
       ## get number of freq channels
-      numFreqs = dataArr.shape[1] / 2112 ## always 2112 complex pairs per frequency channel
+      numFreqs = np.int(dataArr.shape[1] / 2112) ## always 2112 complex pairs per frequency channel
         
       """
       get CHANSEL for if we are in PFB mode. This selects which chunk of coarse channels were
