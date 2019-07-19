@@ -1,6 +1,6 @@
 """
-3/4/19
-Script to produce the raw time averged spectrum for (i.e., averages all integartions) for a user provided scan for FLAG 
+7/19/19
+Script to produce the raw time averged spectrum for (i.e., averages all integreations) for a user provided scan for FLAG 
 The spectrum is constructed from a user provided element and has units of 'counts'
 Inputs:
 projectName - name of your GBT project and session (e.g. AGBT16B_400_14)
@@ -61,10 +61,10 @@ if not len(sys.argv[1:]) == 3:
 """
 make sure the project string is valid. Any ancillary FITS files will be in /home/gbtdata/projectID
 """    
-#if not os.path.exists('/home/gbtdata/' + projectID):
+if not os.path.exists('/home/gbtdata/' + projectID):
 #if not os.path.exists('/home/archive/science-data/17B/' + projectID):
-#	print('Incorrect path to project directory. Exiting...')
-#	sys.exit(1)
+	print('Incorrect path to project directory. Exiting...')
+	sys.exit(1)
 
 """
 check time stamp format and if it exists
@@ -73,11 +73,10 @@ if not (timeStamp[4] == '_') and not (timeStamp[7] == '_') and not (timeStamp[-6
 	print('Incorrect format of the time stamp; should be YYYY_MM_DD_HH:MM:SS')
 	sys.exit(1)
 
-#if not os.path.isfile('/home/gbtdata/' + projectID + '/Antenna/' + timeStamp + '.fits'):
-#if not os.path.isfile('/home/archive/science-data/17B/' + projectID + '/Antenna/' + timeStamp + '.fits'):
+if not os.path.isfile('/home/gbtdata/' + projectID + '/Antenna/' + timeStamp + '.fits'):
 #if not os.path.isfile('/users/npingel/' + timeStamp + '.fits'):
-#	print('This is not a recorded scan; exiting...')
-#	sys.exit(1)
+	print('This is not a recorded scan; exiting...')
+	sys.exit(1)
 
 """
 finally, check formatting of input dipole
@@ -88,10 +87,17 @@ if (1 > intElem > 19):
 	sys.exit(1)
 
 ## Dictionaries to obtain desired element index in 1D covariance data. 
-elemMapDict = {'1_X':0, '1_Y': 260, '2_X':3, '2_Y': 263, '3_X': 8, '3_Y': 308, '4_X': 11, '4_Y': 311,
-'5_X': 20, '5_Y': 360, '6_X': 23, '6_Y': 363, '7_X': 36, '7_Y': 416, '8_X': 39, '8_Y': 419, '9_X': 56, '9_Y': 476,
-'10_X': 59, '10_Y': 479, '11_X': 80, '11_Y': 540, '12_X': 83, '12_Y': 543, '13_X': 108, '13_Y': 608, '14_X': 111, '14_Y': 611,
-'15_X': 140, '15_Y': 680, '16_X': 143, '16_Y': 683, '17_X': 176, '17_Y': 756, '18_X': 179, '18_Y': 759, '19_X': 216, '19_Y': 836}
+## NEED TO BE UPDATED FOR EACH OBSERVING RUN
+#elemMapDict = {'1_X':0, '1_Y': 260, '2_X':3, '2_Y': 263, '3_X': 8, '3_Y': 308, '4_X': 11, '4_Y': 311,
+#'5_X': 20, '5_Y': 360, '6_X': 23, '6_Y': 363, '7_X': 36, '7_Y': 416, '8_X': 39, '8_Y': 419, '9_X': 56, '9_Y': 476,
+#'10_X': 59, '10_Y': 479, '11_X': 80, '11_Y': 540, '12_X': 83, '12_Y': 543, '13_X': 108, '13_Y': 608, '14_X': 111, '14_Y': 611,
+#'15_X': 140, '15_Y': 680, '16_X': 143, '16_Y': 683, '17_X': 176, '17_Y': 756, '18_X': 179, '18_Y': 759, '19_X': 216, '19_Y': 836}
+## Summer 2019
+elemMapDict = {'1_X':0, '1_Y': 260, '2_X':3, '2_Y': 219, '3_X': 8, '3_Y': 308, '4_X': 11, '4_Y': 311,
+'5_X': 20, '5_Y': 360, '6_X': 23, '6_Y': 363, '7_X': 36, '7_Y': 416, '8_X': 680, '8_Y': 419, '9_X': 56, '9_Y': 476,
+'10_X': 59, '10_Y': 479, '11_X': 80, '11_Y': 540, '12_X': 83, '12_Y': 543, '13_X': 111, '13_Y': 608, '14_X': 108, '14_Y': 611,
+'15_X': 140, '15_Y': 683, '16_X': 143, '16_Y': 756, '17_X': 176, '17_Y': 759, '18_X': 179, '18_Y': 836, '19_X': 216, '19_Y': 836}
+
 
 ## progress bar
 def progressBar(value, endvalue,bar_length=20):
@@ -111,7 +117,6 @@ elemIdx_Y = elemMapDict[elemY]
 
 ## define data directories
 dataDir = '/lustre/flag/' + projectID + '/BF/'
-#dataDir = '/users/npingel/'
 
 fitsList = glob.glob(dataDir + timeStamp+'*.fits')
 
@@ -187,7 +192,7 @@ for i in range(0, len(fitsList)):
 		## now process if in fine channelization mode 
 		if numChans == 160:
 
-			# make 1D vector containing current indices for single 160 channel chunk
+					# make 1D vector containing current indices for single 160 channel chunk
             		origIdxArr = np.linspace(0, 159, 160, dtype='int32')
 
             		## reshape into a 32 (rows) x 5 (cols) array; each column contains index for one coarse channels worth of data
@@ -219,7 +224,7 @@ for i in range(0, len(fitsList)):
             			newTimeSeries_XX = np.zeros(numChans, dtype= 'complex64')
             			newTimeSeries_YY = np.copy(newTimeSeries_XX)
 
-				## finally, loop through cube to re-order freq channels
+						## finally, loop through cube to re-order freq channels
                 		for idx in range(0, 160):
                 			corrIdx = correctIdxArr[idx]
                 			newTimeSeries_XX[idx] = freqChanTimeSeries_XX[j, corrIdx]
