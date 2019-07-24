@@ -59,7 +59,6 @@ if not len(sys.argv[1:]) == 3:
 make sure the project string is valid. Any ancillary FITS files will be in /home/gbtdata/projectID
 """    
 if not os.path.exists('/home/gbtdata/' + projectID):
-#if not os.path.exists('/home/archive/science-data/17B/' + projectID):
     print('Incorrect path to project directory. Exiting...')
     sys.exit(1)
 
@@ -130,7 +129,6 @@ contains fine channels 0-159, BANKB contains fine channels 160 - 319, ... BANK T
 """
 xidArr = np.zeros([len(fitsList)]) ## define array to hold XID value of BANK
 for i in range(0, len(fitsList)):
-    
     ## update progress Bar
     progressBar(i,len(fitsList)-1)
 
