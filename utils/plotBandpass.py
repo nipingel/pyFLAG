@@ -1,6 +1,6 @@
 """
-3/4/19
-Script to produce the raw time averged spectrum for (i.e., averages all integartions) for a user provided scan for FLAG 
+7/19/19
+Script to produce the raw time averged spectrum for (i.e., averages all integreations) for a user provided scan for FLAG 
 The spectrum is constructed from a user provided element and has units of 'counts'
 Inputs:
 projectName - name of your GBT project and session (e.g. AGBT16B_400_14)
@@ -28,9 +28,6 @@ import glob
 import sys
 import pickle
 from scipy.optimize import curve_fit
-matplotlib.rc('font', family='serif') 
-matplotlib.rc('font', serif='Avant Garde') 
-matplotlib.rc('text', usetex='False') 
 matplotlib.rcParams.update({'font.size': 14})
 
 
@@ -56,42 +53,48 @@ elem = sys.argv[3] ## needs to be an integer between 1 and 19
 First, let's check the correct number of inputs were provided
 """
 if not len(sys.argv[1:]) == 3:
-	print('Incorrect number of user provided inputs; usage: python plotBandpass.py Project FITSfilename timeStamp Element')
+    print('Incorrect number of user provided inputs; usage: python plotBandpass.py Project FITSfilename timeStamp Element')
 
 """
 make sure the project string is valid. Any ancillary FITS files will be in /home/gbtdata/projectID
 """    
-#if not os.path.exists('/home/gbtdata/' + projectID):
+if not os.path.exists('/home/gbtdata/' + projectID):
 #if not os.path.exists('/home/archive/science-data/17B/' + projectID):
-#	print('Incorrect path to project directory. Exiting...')
-#	sys.exit(1)
+    print('Incorrect path to project directory. Exiting...')
+    sys.exit(1)
 
 """
 check time stamp format and if it exists
 """
 if not (timeStamp[4] == '_') and not (timeStamp[7] == '_') and not (timeStamp[-6] == ':') and not (timeStamp[-3] == ':'):
-	print('Incorrect format of the time stamp; should be YYYY_MM_DD_HH:MM:SS')
-	sys.exit(1)
+    print('Incorrect format of the time stamp; should be YYYY_MM_DD_HH:MM:SS')
+    sys.exit(1)
 
-#if not os.path.isfile('/home/gbtdata/' + projectID + '/Antenna/' + timeStamp + '.fits'):
-#if not os.path.isfile('/home/archive/science-data/17B/' + projectID + '/Antenna/' + timeStamp + '.fits'):
+if not os.path.isfile('/home/gbtdata/' + projectID + '/Antenna/' + timeStamp + '.fits'):
 #if not os.path.isfile('/users/npingel/' + timeStamp + '.fits'):
-#	print('This is not a recorded scan; exiting...')
-#	sys.exit(1)
+    print('This is not a recorded scan; exiting...')
+    sys.exit(1)
 
 """
 finally, check formatting of input dipole
 """
 intElem = np.int(elem)
 if (1 > intElem > 19):
-	print('No such dipole exists; range of input must be integer between 1 and 19. Exiting...')
-	sys.exit(1)
+    print('No such dipole exists; range of input must be integer between 1 and 19. Exiting...')
+    sys.exit(1)
 
 ## Dictionaries to obtain desired element index in 1D covariance data. 
-elemMapDict = {'1_X':0, '1_Y': 260, '2_X':3, '2_Y': 263, '3_X': 8, '3_Y': 308, '4_X': 11, '4_Y': 311,
-'5_X': 20, '5_Y': 360, '6_X': 23, '6_Y': 363, '7_X': 36, '7_Y': 416, '8_X': 39, '8_Y': 419, '9_X': 56, '9_Y': 476,
-'10_X': 59, '10_Y': 479, '11_X': 80, '11_Y': 540, '12_X': 83, '12_Y': 543, '13_X': 108, '13_Y': 608, '14_X': 111, '14_Y': 611,
-'15_X': 140, '15_Y': 680, '16_X': 143, '16_Y': 683, '17_X': 176, '17_Y': 756, '18_X': 179, '18_Y': 759, '19_X': 216, '19_Y': 836}
+## NEED TO BE UPDATED FOR EACH OBSERVING RUN
+#elemMapDict = {'1_X':0, '1_Y': 260, '2_X':3, '2_Y': 263, '3_X': 8, '3_Y': 308, '4_X': 11, '4_Y': 311,
+#'5_X': 20, '5_Y': 360, '6_X': 23, '6_Y': 363, '7_X': 36, '7_Y': 416, '8_X': 39, '8_Y': 419, '9_X': 56, '9_Y': 476,
+#'10_X': 59, '10_Y': 479, '11_X': 80, '11_Y': 540, '12_X': 83, '12_Y': 543, '13_X': 108, '13_Y': 608, '14_X': 111, '14_Y': 611,
+#'15_X': 140, '15_Y': 680, '16_X': 143, '16_Y': 683, '17_X': 176, '17_Y': 756, '18_X': 179, '18_Y': 759, '19_X': 216, '19_Y': 836}
+## Summer 2019
+elemMapDict = {'1_X':0, '1_Y': 260, '2_X':3, '2_Y': 219, '3_X': 8, '3_Y': 308, '4_X': 11, '4_Y': 311,
+'5_X': 20, '5_Y': 360, '6_X': 23, '6_Y': 363, '7_X': 36, '7_Y': 416, '8_X': 680, '8_Y': 419, '9_X': 56, '9_Y': 476,
+'10_X': 59, '10_Y': 479, '11_X': 80, '11_Y': 540, '12_X': 83, '12_Y': 543, '13_X': 111, '13_Y': 608, '14_X': 108, '14_Y': 611,
+'15_X': 140, '15_Y': 683, '16_X': 143, '16_Y': 756, '17_X': 176, '17_Y': 759, '18_X': 179, '18_Y': 836, '19_X': 216, '19_Y': 836}
+
 
 ## progress bar
 def progressBar(value, endvalue,bar_length=20):
@@ -102,7 +105,7 @@ def progressBar(value, endvalue,bar_length=20):
 
     sys.stdout.write("\rPercent of FITS files processed: [{0}] {1}%".format(arrow + spaces, int(round(percent * 100))))
     sys.stdout.flush()
-	  
+      
 ## grab element Index
 elemX = elem + '_X'
 elemY = elem + '_Y'
@@ -111,14 +114,13 @@ elemIdx_Y = elemMapDict[elemY]
 
 ## define data directories
 dataDir = '/lustre/flag/' + projectID + '/BF/'
-#dataDir = '/users/npingel/'
 
 fitsList = glob.glob(dataDir + timeStamp+'*.fits')
 
 ## check to see if the FITS files were found
 if (len(fitsList) == 0):
-	print('No data files were found; check dataDir variable')
-	sys.exit(1)
+    print('No data files were found; check dataDir variable')
+    sys.exit(1)
 
 """
 loop through on/off banks to construct and extract bandpass based on XID number. If in calibration mode 
@@ -128,112 +130,112 @@ contains fine channels 0-159, BANKB contains fine channels 160 - 319, ... BANK T
 """
 xidArr = np.zeros([len(fitsList)]) ## define array to hold XID value of BANK
 for i in range(0, len(fitsList)):
-	
-	## update progress Bar
-	progressBar(i,len(fitsList)-1)
+    
+    ## update progress Bar
+    progressBar(i,len(fitsList)-1)
 
-	## open files
-	dataHdu = fits.open(fitsList[i])
+    ## open files
+    dataHdu = fits.open(fitsList[i])
 
-	## get correlation data
-	data = dataHdu[1].data['DATA']
-	
-	#Only process banks with good data
-	if len(data) > 0:
+    ## get correlation data
+    data = dataHdu[1].data['DATA']
+    
+    #Only process banks with good data
+    if len(data) > 0:
 
-		## get XID from either header; should be static over session
-		xid = int(dataHdu[0].header['XID'])
-		xidArr[i] = xid ## add to xidArr for book keeping
-		
-		"""
-		get element power and integrations; rows correspond to discrete time samples (i.e. integrations); 
-		columns are frequency channels ordered as described above
-		"""
-		freqChanTimeSeries_XX = data[:, elemIdx_X::2112]
-		freqChanTimeSeries_YY = data[:, elemIdx_Y::2112]
-		numInts = freqChanTimeSeries_XX.shape[0]
-		numChans = freqChanTimeSeries_XX.shape[1]
-		
-		## create full bandpass array if first loop iteration
-		if i == 0:
+        ## get XID from either header; should be static over session
+        xid = int(dataHdu[0].header['XID'])
+        xidArr[i] = xid ## add to xidArr for book keeping
+        
+        """
+        get element power and integrations; rows correspond to discrete time samples (i.e. integrations); 
+        columns are frequency channels ordered as described above
+        """
+        freqChanTimeSeries_XX = data[:, elemIdx_X::2112]
+        freqChanTimeSeries_YY = data[:, elemIdx_Y::2112]
+        numInts = freqChanTimeSeries_XX.shape[0]
+        numChans = freqChanTimeSeries_XX.shape[1]
+        
+        ## create full bandpass array if first loop iteration
+        if i == 0:
 
-			## on's
-			fullBandpassArr_XX = np.zeros([numInts, numChans*20])
-			fullBandpassArr_YY = np.zeros([numInts, numChans*20]) 
-			
-		## based on the mode, we need to alter how the bank files are indexed. For coarse channel, the numChans will equal 25
-		if numChans == 25:
-			## loop over integrations to sort into On/Off full bandpass array based on XID. Sorting is done before moving on to next integration
-			for j in range(0, numInts):
-				
-				## starting bandpass index is determined by XID
-				bandpassStartChan = xid*5
-				bandpassEndChan = bandpassStartChan+5
-				for z in range(0,5):
-					
-					## bankStartChan/bankEndChan are multiples of 5
-					bankStartChan = z*5
-					bankEndChan = bankStartChan + 5
-					fullBandpassArr_XX[j, bandpassStartChan:bandpassEndChan] = np.absolute(freqChanTimeSeries_XX[j,bankStartChan:bankEndChan])
-					fullBandpassArr_YY[j, bandpassStartChan:bandpassEndChan] = np.absolute(freqChanTimeSeries_YY[j,bankStartChan:bankEndChan])
-					
-					## increment bandpassStartChan/bandpassEndChan by 100 for proper position in full bandpass
-					bandpassStartChan += 100
-					bandpassEndChan = bandpassStartChan+5
-			
-			## all 25 coarse channels used
-			bandWidth = .30318*25*20		
-		
-		## now process if in fine channelization mode 
-		if numChans == 160:
+            ## on's
+            fullBandpassArr_XX = np.zeros([numInts, numChans*20])
+            fullBandpassArr_YY = np.zeros([numInts, numChans*20]) 
+            
+        ## based on the mode, we need to alter how the bank files are indexed. For coarse channel, the numChans will equal 25
+        if numChans == 25:
+            ## loop over integrations to sort into On/Off full bandpass array based on XID. Sorting is done before moving on to next integration
+            for j in range(0, numInts):
+                
+                ## starting bandpass index is determined by XID
+                bandpassStartChan = xid*5
+                bandpassEndChan = bandpassStartChan+5
+                for z in range(0,5):
+                    
+                    ## bankStartChan/bankEndChan are multiples of 5
+                    bankStartChan = z*5
+                    bankEndChan = bankStartChan + 5
+                    fullBandpassArr_XX[j, bandpassStartChan:bandpassEndChan] = np.absolute(freqChanTimeSeries_XX[j,bankStartChan:bankEndChan])
+                    fullBandpassArr_YY[j, bandpassStartChan:bandpassEndChan] = np.absolute(freqChanTimeSeries_YY[j,bankStartChan:bankEndChan])
+                    
+                    ## increment bandpassStartChan/bandpassEndChan by 100 for proper position in full bandpass
+                    bandpassStartChan += 100
+                    bandpassEndChan = bandpassStartChan+5
+            
+            ## all 25 coarse channels used
+            bandWidth = .30318*25*20        
+        
+        ## now process if in fine channelization mode 
+        if numChans == 160:
 
-			# make 1D vector containing current indices for single 160 channel chunk
-            		origIdxArr = np.linspace(0, 159, 160, dtype='int32')
+            # make 1D vector containing current indices for single 160 channel chunk
+            origIdxArr = np.linspace(0, 159, 160, dtype='int32')
 
-            		## reshape into a 32 (rows) x 5 (cols) array; each column contains index for one coarse channels worth of data
-            		reshapeIdxArr = np.reshape(origIdxArr, (32,5))
+            ## reshape into a 32 (rows) x 5 (cols) array; each column contains index for one coarse channels worth of data
+            reshapeIdxArr = np.reshape(origIdxArr, (32,5))
 
-        		"""   
-        		reshape the transpose back into a 1D vector wherein the indices are correctly ordered to
-        		restitch each BANK's 160 freq elements
-        		"""
-        		stitchIdxArr = np.reshape(reshapeIdxArr.T, (1,160))
-        		stitchIdxArr = stitchIdxArr.flatten()
+            """   
+            reshape the transpose back into a 1D vector wherein the indices are correctly ordered to
+            restitch each BANK's 160 freq elements
+            """
+            stitchIdxArr = np.reshape(reshapeIdxArr.T, (1,160))
+            stitchIdxArr = stitchIdxArr.flatten()
 
-        		correctIdxArr = np.zeros([160])
-        		for idx in range(0, 5):
-            			## get 32 channel chunk to do fftshift on indices
-            			chunk = np.fft.fftshift(stitchIdxArr[idx*32:idx*32+32])
+            correctIdxArr = np.zeros([160], dtype = 'int')
+            for idx in range(0, 5):
+                ## get 32 channel chunk to do fftshift on indices
+                chunk = np.fft.fftshift(stitchIdxArr[idx*32:idx*32+32])
 
-				## reverse indices in chunk to put in correct order contiguous order
-				revChunk = chunk[::-1]
-				correctIdxArr[idx*32:idx*32 + 32] = revChunk
-			
-			"""
-			loop over integrations to average bandpass in time, then sort into On/Off full bandpass array based on XID and CHANSEL
-			obtain CHANSEL, or which set of 5 contigious channels were selected for PFB
-			"""
-			chanSel = int(dataHdu[0].header['CHANSEL'])
-			for j in range(0, numInts):
+                ## reverse indices in chunk to put in correct order contiguous order
+                revChunk = chunk[::-1]
+                correctIdxArr[idx*32:idx*32 + 32] = revChunk
+            
+            """
+            loop over integrations to average bandpass in time, then sort into On/Off full bandpass array based on XID and CHANSEL
+            obtain CHANSEL, or which set of 5 contigious channels were selected for PFB
+            """
+            chanSel = int(dataHdu[0].header['CHANSEL'])
+            for j in range(0, numInts):
 
-            			newTimeSeries_XX = np.zeros(numChans, dtype= 'complex64')
-            			newTimeSeries_YY = np.copy(newTimeSeries_XX)
+                newTimeSeries_XX = np.zeros(numChans, dtype= 'complex64')
+                newTimeSeries_YY = np.copy(newTimeSeries_XX)
 
-				## finally, loop through cube to re-order freq channels
-                		for idx in range(0, 160):
-                			corrIdx = correctIdxArr[idx]
-                			newTimeSeries_XX[idx] = freqChanTimeSeries_XX[j, corrIdx]
-                			newTimeSeries_YY[idx] = freqChanTimeSeries_YY[j, corrIdx]
+                ## finally, loop through cube to re-order freq channels
+                for idx in range(0, 160):
+                    corrIdx = correctIdxArr[idx]
+                    newTimeSeries_XX[idx] = freqChanTimeSeries_XX[j, corrIdx]
+                    newTimeSeries_YY[idx] = freqChanTimeSeries_YY[j, corrIdx]
 
-				bandpassStartChan = xid*160
-				bandpassEndChan = bandpassStartChan + 160
-				
-				## no need to sort here since all elements in banks are contigious in this mode
-				fullBandpassArr_XX[j, bandpassStartChan:bandpassEndChan] = np.absolute(newTimeSeries_XX)
-				fullBandpassArr_YY[j, bandpassStartChan:bandpassEndChan] = np.absolute(newTimeSeries_YY)
-				
-			## only five coarse channels selected in PFB; centralFreq depends on chunk of channels selected
-			bandWidth = .30318*5*20
+                bandpassStartChan = xid*160
+                bandpassEndChan = bandpassStartChan + 160
+                
+                ## no need to sort here since all elements in banks are contigious in this mode
+                fullBandpassArr_XX[j, bandpassStartChan:bandpassEndChan] = np.absolute(newTimeSeries_XX)
+                fullBandpassArr_YY[j, bandpassStartChan:bandpassEndChan] = np.absolute(newTimeSeries_YY)
+                
+            ## only five coarse channels selected in PFB; centralFreq depends on chunk of channels selected
+            bandWidth = .30318*5*20
 
 ## average bandpasses over integrations
 fullBandpassArr_XX = np.mean(fullBandpassArr_XX, axis=0)
@@ -244,13 +246,13 @@ cenFreq = 1450. ##[MHz]
 freqAxis = np.linspace(cenFreq-bandWidth/2, cenFreq+bandWidth/2, num = numChans*20)
 ## if in PFB mode, shift central Freq
 if numChans == 160:
-	minXid = np.min(xidArr)
-	maxXid = np.max(xidArr)
-	nu0_Coarse = cenFreq - 75.795
-	nu0_Fine = nu0_Coarse + (chanSel*100)*.30318
-	nu1_Fine = nu0_Fine + 100*0.30318
-	cenFreq = nu0_Fine + (nu1_Fine - nu0_Fine)/2
-	freqAxis = np.linspace(cenFreq-bandWidth/2, cenFreq+bandWidth/2, num = numChans*20)
+    minXid = np.min(xidArr)
+    maxXid = np.max(xidArr)
+    nu0_Coarse = cenFreq - 75.795
+    nu0_Fine = nu0_Coarse + (chanSel*100)*.30318
+    nu1_Fine = nu0_Fine + 100*0.30318
+    cenFreq = nu0_Fine + (nu1_Fine - nu0_Fine)/2
+    freqAxis = np.linspace(cenFreq-bandWidth/2, cenFreq+bandWidth/2, num = numChans*20)
 
 ##inform user that we're plotting
 print('\n')
@@ -260,7 +262,6 @@ print('Plotting bandpass...')
 pyplot.figure()
 pyplot.plot(freqAxis, fullBandpassArr_XX, linewidth = 2, color = tableau20[2], label = 'XX-Pol')
 pyplot.plot(freqAxis, fullBandpassArr_YY, linewidth = 2, color = tableau20[0], label = 'YY-Pol')
-#pyplot.xlim(1418, 1423)
 pyplot.ticklabel_format(style='sci', axis='y', scilimits=(0,0))
 pyplot.ylabel(r'Counts')
 pyplot.title('Dipole: ' + np.str(intElem) + '; ' + timeStamp, fontsize='small' )
@@ -268,4 +269,4 @@ pyplot.xlabel('Frequency [MHz]')
 pyplot.axhline(0, color='black', linewidth=2)
 pyplot.legend(loc = 0, prop = {'size':15})
 #pyplot.savefig(timeStamp + '_bandpass.pdf')
-pyplot.show()
+pyplot.show(block = True)
