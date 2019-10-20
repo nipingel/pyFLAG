@@ -1,0 +1,4 @@
+## compiled objects
+*.pyc
+*.pyo
+__pycache__/

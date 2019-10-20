@@ -185,7 +185,7 @@ class BeamformingModule:
            
         ## finally, loop through cube to re-order freq channels
         for idx in range(0, 160):
-          corrIdx = correctIdxArr[idx]
+          corrIdx = np.int(correctIdxArr[idx])
           newCube[:,:,idx] = retCube[:,:,corrIdx]
         ## return the correlation cube
         return newCube

@@ -9,10 +9,9 @@ Example:
 ipython weightFiller.py Users/npingel/Desktop/Research/data/GBT/GBT16B_400/AGBT16B_400_04/ 
 __author__ = "Nick Pingel"
 __version__ = "1.0"
-__email__ = "nipingel@mix.wvu.edu"
+__email__ = ""Nickolas.Pingel@anu.edu.au"
 __status__ = "Production"
 """
-
 ## imports 
 import struct
 import numpy as np
@@ -81,7 +80,7 @@ for i in range(0,len(binList)):
 	file = binList[i]
 	fileSplit = file.split('/')
 	bank = file[-5]
-        with open(file, 'rb') as f:
+	with open(file, 'rb') as f:
 		data=f.read()
 
 	## array to hold weights
@@ -104,7 +103,7 @@ for i in range(0,len(binList)):
 			for idx in range(0, bytesInBeam, 4):
 				absIdx =  polIdx + (byuBeam * bytesInBeam) + idx 
 				wvuBeam = wvuBeamDict[byuBeam]
-				weightArr[wvuBeam, weightIdx] = struct.unpack('f',data[absIdx:absIdx + 4])[0]
+				weightArr[wvuBeam+plNum*7, weightIdx] = struct.unpack('f',data[absIdx:absIdx + 4])[0]
 				weightIdx+=1
 
 	## now, let's unpack the meta data. This portion of the binary file will always have the same number of bytes (4160) with format:
@@ -127,10 +126,10 @@ for i in range(0,len(binList)):
 	offSetArr = np.zeros([2, numBeams],dtype='float32')
 
 	for wvuBeam in range(0, numBeams):
-	    byuBeam = byuBeamDict[wvuBeam]
-	    offsetIdx = startByte+(byuBeam*8)
-            offSetArr[0, wvuBeam] = struct.unpack('f',data[offsetIdx:offsetIdx+4])[0] ## in deg
-	    offSetArr[1, wvuBeam] = struct.unpack('f',data[offsetIdx+4:offsetIdx+8])[0]
+		byuBeam = byuBeamDict[wvuBeam]
+		offsetIdx = startByte+(byuBeam*8)
+		offSetArr[0, wvuBeam] = struct.unpack('f',data[offsetIdx:offsetIdx+4])[0] ## in deg
+		offSetArr[1, wvuBeam] = struct.unpack('f',data[offsetIdx+4:offsetIdx+8])[0]
 
 	## update starting byte to get filenames and BF algorithm
 	charStartByte = startByte+(numBeams*2*4)

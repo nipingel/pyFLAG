@@ -33,7 +33,6 @@ import pickle
 from scipy.optimize import curve_fit
 from scipy import optimize
 from scipy.interpolate import *
-from matplotlib import _cntr as cntr
 import matplotlib.pyplot as pyplot
 import matplotlib 
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter
@@ -103,12 +102,13 @@ def getWeights(xel0, el0, aggWeightFile):
 wvuBeamDict = {'0':'1', '1':'2', '2':'6', '3':'0', '4':'3', '5':'5','6':'4'}
 byuBeamDict = {'1':'0', '2':'1', '6':'2', '0':'3', '3':'4', '5':'5', '4':'6'}
 rowLocDict = {0:(0, 1), 1:(0, 3), 2:(2, 0), 3:(2, 2), 4:(2, 4), 5:(4, 1), 6:(4, 3)}
+rowLocDict = {0:(2,2), 1:(0,1), 2:(0,3), 3:(2,4), 4:(4,3), 5:(4,1), 6:(2,0)}
 
 ## make coordinate dictionary for plotting
 yDict = {0:0, 1:1, 2:0, 3:1, 4:0, 5:1,6:0}
 xDict = {0:0, 1:0, 2:1, 3:1, 4:2, 5:2, 6:3}
 
-matFilePaths = '/Users/npingel/Desktop/Research/FLAG/data/'
+matFilePaths = '/lustre/flag/'
 
 ## get project name 
 projName = sys.argv[1]
@@ -122,7 +122,7 @@ pathToWeights = sys.argv[3]
 ## TODO:
 ## TAKE THIS OUT --- STUPID ELEMENT MAPPING --- MAKE IT READ FROM TXT FILE
 xElemsIndices = np.array([1, 2, 3, 4, 5, 6, 7, 35, 9, 10, 11, 12, 14, 13, 15, 16, 17, 18, 19]) - 1
-yElemsIndices = np.array([21, 20, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 8, 36, 37, 38, 39]) - 1
+yElemsIndices = np.array([21, 20, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38]) - 1
 
 ## really, 8, 13, and 14 but need to provide the subsequent inices 
 badIndsYY = [9, 14, 15] 
@@ -131,12 +131,12 @@ badIndsYY = [9, 14, 15]
 ## try-catch in case file is not found or file is not matlab binary file
 try:
 	projNameSplit = projName.split('_')
-	aggMatFileXX = scipy.io.loadmat(matFilePaths + projNameSplit[0] + '_' + projNameSplit[1] + '/' + projName + '/Tsys/' + projName + '_aggregated_grid_X_' + calType + '.mat' )
-	aggMatFileYY = scipy.io.loadmat(matFilePaths + projNameSplit[0] + '_' + projNameSplit[1] + '/' + projName + '/Tsys/' + projName + '_aggregated_grid_Y_' + calType + '.mat' )
-	tsysMatFileXX = scipy.io.loadmat(matFilePaths + projNameSplit[0] + '_' + projNameSplit[1] + '/' + projName + '/Tsys/' + projName + '_Xpol_tsys_' + calType + '.mat' )
-	tsysMatFileYY = scipy.io.loadmat(matFilePaths + projNameSplit[0] + '_' + projNameSplit[1] + '/' + projName + '/Tsys/' + projName + '_Ypol_tsys_' + calType + '.mat' )
-	aggWeightFileXX = scipy.io.loadmat(matFilePaths + projNameSplit[0] + '_' + projNameSplit[1] + '/' + projName + '/Tsys/' + projName + '_aggregated_weights_X_' + calType + '.mat')
-	aggWeightFileYY = scipy.io.loadmat(matFilePaths + projNameSplit[0] + '_' + projNameSplit[1] + '/' + projName + '/Tsys/' + projName + '_aggregated_weights_Y_' + calType + '.mat')
+	aggMatFileXX = scipy.io.loadmat(matFilePaths + '/' + projName + '/BF/mat/' + projName + '_aggregated_grid_X_' + calType + '.mat' )
+	aggMatFileYY = scipy.io.loadmat(matFilePaths + '/' + projName + '/BF/mat/' + projName + '_aggregated_grid_Y_' + calType + '.mat' )
+	tsysMatFileXX = scipy.io.loadmat(matFilePaths + '/' + projName + '/BF/mat/' + projName + '_Xpol_tsys_' + calType + '.mat' )
+	tsysMatFileYY = scipy.io.loadmat(matFilePaths + '/' + projName + '/BF/mat/' + projName + '_Ypol_tsys_' + calType + '.mat' )
+	aggWeightFileXX = scipy.io.loadmat(matFilePaths + '/' + projName + '/BF/mat/' + projName + '_aggregated_weights_X_' + calType + '.mat')
+	aggWeightFileYY = scipy.io.loadmat(matFilePaths + '/' + projName + '/BF/mat/' + projName + '_aggregated_weights_Y_' + calType + '.mat')
 	"""
 	get the aggregated steering vector arrays, which
 	are shaped as elems X grid points X freq
@@ -171,7 +171,7 @@ elems X beam X freq.
 elems X freq X pol X complex pair
 """
 weightArrXX = np.zeros([19, 7, 500], dtype = 'complex64')
-weightArrYY = np.zeros([19, 7, 500], dtype = 'complex64')
+weightArrYY = np.zeros([17, 7, 500], dtype = 'complex64')
 
 """
 The weights do not correspond to contigious frequency channels. The 
@@ -360,9 +360,9 @@ also shifting each beam to the center to create an 'average' beam.
 cenFreq = 1450
 freqArr = np.linspace(-250 * 0.30318, 250 * 0.30318, 500) + cenFreq
 chan = 100
-extent = np.array([-0.325, 0.325, -0.325, 0.325]) * 60
-xAxis = np.linspace(-0.325 * 60, 0.325 * 60, 200)
-yAxis =  np.linspace(0.325 * 60, -0.325 * 60, 200)
+extent = np.array([-0.25, 0.25, -0.25, 0.25]) * 60
+xAxis = np.linspace(-0.25 * 60, 0.25 * 60, 200)
+yAxis =  np.linspace(0.25 * 60, -0.25 * 60, 200)
 
 ## concatenate coordinate arrays
 coordVec = np.column_stack((aggXElArr, aggElArr))
@@ -391,7 +391,6 @@ meanBeamArr = np.zeros([7, 200, 200])
 
 for cnt in range(0, 7):
 	beamIndex = wvuBeamDict[np.str(cnt)]
-
 	## determine row location span
 	locSeq = rowLocDict[cnt]
 
@@ -443,8 +442,8 @@ cb.ax.tick_params(which = 'major', length = 4)
 cb.ax.minorticks_on()
 fig.text(0.5, 0.04, 'XEL Offset [arcmin]', ha='center')
 fig.text(0.04, 0.5, 'EL Offset [arcmin]', va='center', rotation='vertical')
-pyplot.savefig('/Users/npingel/Desktop/AGBT16B_400_12_FormedBeamPatterns.png', bbox_inches='tight')
-pyplot.show()
+pyplot.savefig(projName + '_FormedBeamPatterns.png', bbox_inches='tight')
+pyplot.show(block=True)
 pyplot.clf()
 pyplot.close()
 
@@ -471,7 +470,6 @@ fig = pyplot.figure(figsize = (12,12))
 
 for cnt in range(0, 7):
 	beamIndex = wvuBeamDict[np.str(cnt)]
-
 	## determine row location span
 	locSeq = rowLocDict[cnt]
 
@@ -498,9 +496,8 @@ for cnt in range(0, 7):
 	xelInitInd = np.where(elCut_Linear == np.nanmax(xelCut_Linear))
 	xelInitMean = xelCut_Linear[xelInitInd]
 	sigma = 9.1
-
-	poptEL, pcovEL = curve_fit(Gauss1D, yAxis, np.nan_to_num(elCut_Linear), p0 = [1, elInitMean, sigma])
-	poptXEL, pcovXEL = curve_fit(Gauss1D, xAxis, np.nan_to_num(xelCut_Linear), p0 = [1, xelInitMean, sigma])
+	poptEL, pcovEL = curve_fit(Gauss1D, yAxis, np.nan_to_num(elCut_Linear))#, p0 = [1, elInitMean, sigma])
+	poptXEL, pcovXEL = curve_fit(Gauss1D, xAxis, np.nan_to_num(xelCut_Linear))#, p0 = [1, xelInitMean, sigma])
 
 	## compute errors
 	perrEL = np.sqrt(np.diag(pcovEL))
@@ -554,8 +551,8 @@ for cnt in range(0, 7):
 fig.subplots_adjust(hspace = 0.4, wspace = 0.4)
 fig.text(0.5, 0.04, 'XEL Offset [arcmin]', ha='center')
 fig.text(0.04, 0.5, 'Normalized Response', va='center', rotation='vertical')
-pyplot.savefig('/Users/npingel/Desktop/AGBT16B_400_12_FormedBeamProfiles.png', bbox_inches='tight')
-pyplot.show()
+pyplot.savefig(projName + '_FormedBeamProfiles.png', bbox_inches='tight')
+pyplot.show(block=True)
 pyplot.clf()
 pyplot.close()
 

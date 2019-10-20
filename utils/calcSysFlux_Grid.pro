@@ -67,8 +67,9 @@ offScans = INDGEN(6)
 FOR i =0, 5 DO BEGIN
   offScans[i] = scan0 + i*6 
 ENDFOR
-offScans = get_scan_numbers(source=sname, procedure='Track')
+;;offScans = get_scan_numbers(source=sname, procedure='Track')
 ;;manually set the off scans if there are 'Track' scans that were not part of the calibration grid
+;;offScans = offScans[19:n_elements(offScans)-1]
 print, 'Calibration Grid Off scans: ', offScans
 
 ;; define dictionaries to hold flux
@@ -213,7 +214,7 @@ print, 'Signal Integration: ', sigInt
 
 ;; Now that we have the signal scan, assign the powerOn values and loop through polarizations to build up a statistical sample to fit a Gaussian to.
 ;; Uncertainty in the power on value will be the rms of that fit
-FOR pl=1,1 DO BEGIN
+FOR pl=0,1 DO BEGIN
     get, scan=sigScan, int=sigInt, plnum=pl
     bandpass=getdata()
     ;; get elevation value for correction
@@ -232,20 +233,20 @@ FOR pl=1,1 DO BEGIN
     ENDIF
 ENDFOR
 
-;;print, 'On Power (YY): ', onPower_YY
+print, 'On Power (YY): ', onPower_YY
 print, 'On Power (XX): ', onPower_XX
 
 ;; fit a gaussian to the 'on' distributions to determine the uncertainty
-;;HISTOGAUSS, onDist_YY, onGaussCoeff_YY
+HISTOGAUSS, onDist_YY, onGaussCoeff_YY
 HISTOGAUSS, onDist_XX, onGaussCoeff_XX
 
 ;; define the associated uncertainties
-;;onPowerErr_YY = onGaussCoeff_YY[2]
+onPowerErr_YY = onGaussCoeff_YY[2]
 onPowerErr_XX = onGaussCoeff_XX[2]
 
 ;; if histogauss fails to converge, then take straight standard devation of the distribution as
 ;; the uncertainty
-;;IF ABS(onPowerErr_YY) GT 100 THEN onPowerErr_YY = STDDEV(onDist_YY)
+IF ABS(onPowerErr_YY) GT 100 THEN onPowerErr_YY = STDDEV(onDist_YY)
 IF ABS(onPowerErr_XX) GT 100 THEN onPowerErr_XX = STDDEV(onDist_XX)
 
 ;; Select reference scan as the closest reference to signal scan/integration
@@ -264,14 +265,13 @@ minIdx = WHERE(refD EQ MIN(refD, /NAN))
 refScan = offScans[minIdx]
 
 print, 'Off scan: ', refScan
-
 info=scan_info(refScan)
 nint=info.n_integrations
 ;; build up statistical sample for reference scan
 sclear, 0
 sclear, 1
 FOR i=0, nint-1 DO BEGIN
-    FOR pl=1, 1 DO BEGIN
+    FOR pl=0, 1 DO BEGIN
         gettp, refScan, int=i, plnum=pl, /quiet
         ;; get elevation value for correction
         elVal = !g.s[0].elevation
@@ -293,38 +293,37 @@ FOR i=0, nint-1 DO BEGIN
 ENDFOR
 
 ;; take average
-;;ave, 0
-;;data = getdata()
-;; offPower_YY = data[150]
+ave, 0
+data = getdata()
+offPower_YY = data[150]
 
 ave, 1
 data = getdata()
 offPower_XX = data[150]
 
 ;; fit gaussian to the 'off' distributions to determine the mean and associated uncertainty
-;;HISTOGAUSS, offDist_YY, offGaussCoeff_YY
+HISTOGAUSS, offDist_YY, offGaussCoeff_YY
 HISTOGAUSS, offDist_XX, offGaussCoeff_XX
 
-
-;;offPowerErr_YY = offGaussCoeff_YY[2]
+offPowerErr_YY = offGaussCoeff_YY[2]
 offPowerErr_XX = offGaussCoeff_XX[2]
 
 ;; if histogauss failed to converge, then take straight standard devation of the distribution as
 ;; the uncertainty
-;;IF ABS(offPowerErr_YY) GT 100 THEN offPowerErr_YY = STDDEV(offDist_YY)
+IF ABS(offPowerErr_YY) GT 100 THEN offPowerErr_YY = STDDEV(offDist_YY)
 IF ABS(offPowerErr_XX) GT 100 THEN offPowerErr_XX = STDDEV(offDist_XX)
 
-;;print, 'Mean Off Power (YY): ', offPower_YY
+print, 'Mean Off Power (YY): ', offPower_YY
 print, 'Mean Off Power (XX): ', offPower_XX
 
 ;; calculate YY system flux
-;;Ssys_YY = calFlux*offPower_YY/(onPower_YY - offPower_YY)
+Ssys_YY = calFlux*offPower_YY/(onPower_YY - offPower_YY)
 ;; calculate YY system flux uncertainties
 ;; first term is from the calibrator flux
-;;firstTerm_YY = ((offPower_YY)/(onPower_YY - offPower_YY))^2*calFluxErr^2
-;;secondTerm_YY = ((calFlux*offPower_YY)/(onPower_YY - offPower_YY)^2)^2*onPowerErr_YY^2
-;;thirdTerm_YY = ((calFlux*onPower_YY)/(onPower_YY - offPower_YY)^2)^2*offPowerErr_YY^2
-;;SsysErr_YY = SQRT(firstTerm_YY + secondTerm_YY + thirdTerm_YY)
+firstTerm_YY = ((offPower_YY)/(onPower_YY - offPower_YY))^2*calFluxErr^2
+secondTerm_YY = ((calFlux*offPower_YY)/(onPower_YY - offPower_YY)^2)^2*onPowerErr_YY^2
+thirdTerm_YY = ((calFlux*onPower_YY)/(onPower_YY - offPower_YY)^2)^2*offPowerErr_YY^2
+SsysErr_YY = SQRT(firstTerm_YY + secondTerm_YY + thirdTerm_YY)
 
 ;; calculate XX system flux
 Ssys_XX = calFlux*offPower_XX/(onPower_XX - offPower_XX)
@@ -334,8 +333,8 @@ firstTerm_XX = ((offPower_XX)/(onPower_XX - offPower_XX))^2*calFluxErr^2
 secondTerm_XX = ((calFlux*offPower_XX)/(onPower_XX - offPower_XX)^2)^2*onPowerErr_XX^2
 thirdTerm_XX = ((calFlux*onPower_XX)/(onPower_XX - offPower_XX)^2)^2*offPowerErr_XX^2
 SsysErr_XX = SQRT(firstTerm_XX + secondTerm_XX + thirdTerm_XX)
-;;print, 'YY System Flux Density: ', Ssys_YY
-;;print, '+/-', SsysErr_YY
+print, 'YY System Flux Density: ', Ssys_YY
+print, '+/-', SsysErr_YY
 
 print, 'XX System Flux Density: ', Ssys_XX
 print, '+/-', SsysErr_XX

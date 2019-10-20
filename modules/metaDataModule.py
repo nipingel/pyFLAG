@@ -14,13 +14,14 @@ dataBuff_X - global data buffer for the sorted beamformed XX polarization data
 dataBuff_Y - global data buffer for the sorted beamformed YY polarization data
 beamNum - beam number that is being processed
 pfb - boolean flag that is True when we are processing data taken in FLAG_PFB_MODE 
+firstIter - boolean flag that is True when processing the first binary FITS table, so a Primary HDU is necessary
 
 PAF_Filler.py will call the method constructBinHeader(), which will drive the creation of the SDFITS files that
 contains all of the necessary SDFITS keywords for use in the GBTIDL computing environment. The method, constructBinHeader(), 
 ultimately returns an HDUList that PAF_Filler.py writes out as an SDFITS file to disk. 
 
 Eample:
-__email__ = "nipingel@mix.wvu.edu"
+__email__ = ""Nickolas.Pingel@anu.edu.au"
 __status__ = "Production"
 """
 from astropy.io import fits
@@ -50,7 +51,7 @@ class MetaDataModule:
     
   ## initialize function. Opens raw data file, numInts, data buffers (banpasses), beam, freqChans, intLength
   ## total BANK files, and creates column object. 
-  def __init__(self, projectPath, rawDataPath, weightPath, fitsList, restfreq, centralfreq, bankFitsList, numBanksList, dataBuff_X,dataBuff_Y,beamNum, pfb):        
+  def __init__(self, projectPath, rawDataPath, weightPath, fitsList, restfreq, centralfreq, bankFitsList, numBanksList, dataBuff_X,dataBuff_Y,beamNum, pfb, firstIter):        
     self.projectPath = projectPath
     self.dataPath = rawDataPath
     self.weightPath = weightPath
@@ -65,6 +66,7 @@ class MetaDataModule:
     self.dataBuff_Y = dataBuff_Y
     self.beamNum = np.int(beamNum) 
     self.pfb = pfb
+    self.firstIter = firstIter
     self.valueArr = None
     self.newArr = None
     ## get numFreq Chans
@@ -592,7 +594,7 @@ class MetaDataModule:
     
     bankIdx = 0 ## index to keep track of which BANK file we are on
     for fileNum in range(0,len(self.fitsList)):  ## loop through scan FITS files          
-      goHDU = fits.open(self.projectPath + '/GO/' + self.fitsList[fileNum] + '.fits')                
+      goHDU = fits.open(self.projectPath + '/GO/' + self.fitsList[fileNum] + '.fits')             
       corrHDU = fits.open(self.bankFitsList[bankIdx]) ## open bank FITS file to get CHANSEL
       chanSel = np.int(corrHDU[0].header['CHANSEL']) ## get CHANSEL
       numScanInts = self.getNumInts(fileNum) ## determine the number of integrations
@@ -758,7 +760,6 @@ class MetaDataModule:
       elif param == 'AZIMUTH': 
         mntAz = antHDU[2].data['MNT_AZ']
         obscAz = antHDU[2].data['OBSC_AZ']
-
         ## place pointing model information in list
         smntAz = antHDU[0].header['SMNTC_AZ']
         self.smntAzList.extend([smntAz] * numScanInts)
@@ -821,10 +822,10 @@ class MetaDataModule:
         elif value == 'AZEL' and param == 'CTYPE3':
           valStr = 'EL'
           self.initArr(fileNum, numScanInts, 'str', valStr)
-        elif value == 'ENCODERAZEL' and param == 'CTYPE2':
+        elif value == 'AZEL_ENCODER' and param == 'CTYPE2':
           valStr = 'AZ'
           self.initArr(fileNum, numScanInts, 'str', valStr)
-        elif value == 'ENCODERAZEL' and param == 'CTYPE3':
+        elif value == 'AZEL_ENCODER' and param == 'CTYPE3':
           valStr = 'EL'
           self.initArr(fileNum, numScanInts, 'str', valStr)
         
@@ -1509,8 +1510,9 @@ class MetaDataModule:
   """
   def constuctBinTableHeader(self):    
         
-    ## construct primary HDU
-    prihdu = self.constructPriHDUHeader()   
+    ## if first iteration, construct primary HDU
+    if self.firstIter:
+      prihdu = self.constructPriHDUHeader()   
     binHeader = fits.Header()
     
     ## load list of required SDFITS keywords
@@ -1603,8 +1605,11 @@ class MetaDataModule:
     tblHdu.header.insert('TTYPE44',('COMMENT', 'Feed offsets ARE included in the CRVAL2 and CRVAL3 columns'))
     tblHdu.header.insert('TFORM70',('COMMENT', 'End of GBT-specific keywords/columns.'))    
     
-    ## finally, create HDU List
-    thduList = fits.HDUList([prihdu, tblHdu])
+    ## finally, create HDU List with primary header if first iteration, else just a HDU list with generated table
+    if self.firstIter == True:
+      thduList = fits.HDUList([prihdu, tblHdu])
+    else: 
+      thduList = tblHdu
 
     ## return finalized HDU to PAF_Filler.py
     return thduList

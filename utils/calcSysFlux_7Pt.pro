@@ -24,9 +24,9 @@ FUNCTION calcFluxErr, errCoeffArr, flux, vG
         RETURN, fluxErr
         END
 
-PRO calcSysFlux_7pt, sname, chan0, chan1, chan2, chan3, scan0
+PRO calcSysFlux_7pt, sname, chan0, chan1, chan2, chan3, scan0, pfb
 ;==============================================================================
-; Nick Pingel ----- 05/21/18
+; Nick Pingel ----- 08/04/19
 ; Program to calculate the system equivalent flux density (SEFD) given a known calibrator.
 ; Ssrc is computed from Equation 1 in Perley & Butler (2017).
 ; The SEFD is computed by determining the maximum power value in all pointed in the hexagonal beam 
@@ -37,16 +37,19 @@ PRO calcSysFlux_7pt, sname, chan0, chan1, chan2, chan3, scan0
 ; two OFF scans ONLY. User needs to provide the eight scans to process.
 ; The final SEFD is given by the equation: SEFD = Ssrc*P_off/(P_on - P_off). 
 ; The program also propogates all uncertainties and gives the final uncertainty in the SEFD.   
-;
+; Finally, if pfb is set to 1, outlying values caused by 3 dB drop in power are dropped form distribution
 ; INPUTS: sname => (string) source name (e.g. 3C295)
 ;   chan0 => first channel denoting the region over which to draw power values
 ;   chan1 => second channel denoting the region over which to draw power values
 ;         chan2 => third channel denoting the region over which to draw power values
 ;         chan3 => fourth channel denoting the region over which to draw power values
 ;   scan0 => scan of the first off, which is used to create an array of the correct scan numbers
-; EXAMPLE: calcSysFlux_7pt, '3C295', 125, 135, 155, 180, 5
+;   pfb => 1 if in pfb mode, 0 if not
+; EXAMPLE: calcSysFlux_7pt, '3C295', 125, 135, 155, 180, 5, 1
 ;===============================================================================
 compile_opt idl2
+;; set pfb to 0 if not provided
+IF NOT KEYWORD_SET(pfb) THEN pfb = 0
 
 ;; global variable defined for calibrator flux equation
 freqVal = 1.420405752 ;; GHz
@@ -210,7 +213,7 @@ PRINT, 'Working on scan: ', sigScan
 info=scan_info(sigScan)
 nint = info.n_integrations
 FOR j=0, nint -1 DO BEGIN
-  FOR pl = 1, 1 DO BEGIN
+  FOR pl = 0, 1 DO BEGIN
     gettp, sigScan, int=j, plnum=1, /quiet
     ;; get elevation value for correction
     elVal = !g.s[0].elevation
@@ -233,27 +236,27 @@ ENDFOR
 
 
 ;; get average value of accumulated bandpasses at channel 150 to use as 'OnPower' value
-;ave, 0
-;data = getdata()
-;onPower_YY = data[150]
+ave, 0
+data = getdata()
+onPower_YY = data[150]
 
 ave, 1
 data = getdata()
 onPower_XX = data[150]
 
-;;print, 'Ave Total Power (YY): ', onPower_YY
+print, 'Ave Total Power (YY): ', onPower_YY
 print, 'Ave Total Power (XX): ', onPower_XX
 
 ;; fit a gaussian to the 'on' distributions to determine the uncertainty
-;;HISTOGAUSS, onDist_YY, onGaussCoeff_YY
+HISTOGAUSS, onDist_YY, onGaussCoeff_YY
 HISTOGAUSS, onDist_XX, onGaussCoeff_XX
 
 ;; define the on power values and associated uncertainties
-;;onPowerErr_YY = onGaussCoeff_YY[2]
+onPowerErr_YY = onGaussCoeff_YY[2]
 onPowerErr_XX = onGaussCoeff_XX[2]
 ;; if histogauss fails to converge, then take straight standard devation of the distribution as
 ;; the uncertainty
-;;IF ABS(onPowerErr_YY) GT 10 THEN onPowerErr_YY = STDDEV(onDist_YY)
+IF ABS(onPowerErr_YY) GT 10 THEN onPowerErr_YY = STDDEV(onDist_YY)
 IF ABS(onPowerErr_XX) GT 10 THEN onPowerErr_XX = STDDEV(onDist_XX)
 
 ;; decide which off scan is closer to use as the reference scan
@@ -289,7 +292,7 @@ sclear, 1
 ;; at channel 150. 
 
 FOR i=0, nint-1 DO BEGIN
-  FOR pl=1,1 DO BEGIN
+  FOR pl=0,1 DO BEGIN
     gettp, refScan, int=i, plnum=pl
       IF pl EQ 0 THEN BEGIN
         offDist_YY = APPEND(offDist_YY, bandpass[chan0:chan1]*atmosCorr)
@@ -304,37 +307,37 @@ FOR i=0, nint-1 DO BEGIN
   ENDFOR
 ENDFOR
 ;; take average
-;;ave, 0
-;; data = getdata()
-;; offPower_YY = data[150]
+ave, 0
+data = getdata()
+offPower_YY = data[150]
 
 ave, 1
 data = getdata()
 offPower_XX = data[150]
 
 ;; fit gaussian to the 'off' distributions to determine the mean and associated uncertainty
-;;HISTOGAUSS, offDist_YY, offGaussCoeff_YY
+HISTOGAUSS, offDist_YY, offGaussCoeff_YY
 HISTOGAUSS, offDist_XX, offGaussCoeff_XX
 
-;;offPowerErr_YY = offGaussCoeff_YY[2]
+offPowerErr_YY = offGaussCoeff_YY[2]
 offPowerErr_XX = offGaussCoeff_XX[2]
 
 ;; if histogauss failed to converge, then take straight standard devation of the distribution as
 ;; the uncertainty
-;;IF ABS(offPowerErr_YY) GT 10 THEN offPowerErr_YY = STDDEV(offDist_YY)
+IF ABS(offPowerErr_YY) GT 10 THEN offPowerErr_YY = STDDEV(offDist_YY)
 IF ABS(offPowerErr_XX) GT 10 THEN offPowerErr_XX = STDDEV(offDist_XX)
 
-;;print, 'Off Power (YY): ', offPower_YY
+print, 'Off Power (YY): ', offPower_YY
 print, 'Off Power (XX): ', offPower_XX
 
 ;; calculate YY system flux
-;;Ssys_YY = calFlux*offPower_YY/(onPower_YY - offPower_YY)
+Ssys_YY = calFlux*offPower_YY/(onPower_YY - offPower_YY)
 ;; calculate YY system flux uncertainties
 ;; first term is from the calibrator flux
-;;firstTerm_YY = ((offPower_YY)/(onPower_YY - offPower_YY))^2*calFluxErr^2
-;;secondTerm_YY = ((calFlux*offPower_YY)/(onPower_YY - offPower_YY)^2)^2*onPowerErr_YY^2
-;;thirdTerm_YY = ((calFlux*onPower_YY)/(onPower_YY - offPower_YY)^2)^2*offPowerErr_YY^2
-;;SsysErr_YY = SQRT(firstTerm_YY + secondTerm_YY + thirdTerm_YY)
+firstTerm_YY = ((offPower_YY)/(onPower_YY - offPower_YY))^2*calFluxErr^2
+secondTerm_YY = ((calFlux*offPower_YY)/(onPower_YY - offPower_YY)^2)^2*onPowerErr_YY^2
+thirdTerm_YY = ((calFlux*onPower_YY)/(onPower_YY - offPower_YY)^2)^2*offPowerErr_YY^2
+SsysErr_YY = SQRT(firstTerm_YY + secondTerm_YY + thirdTerm_YY)
 
 ;; calculate XX system flux
 Ssys_XX = calFlux*offPower_XX/(onPower_XX - offPower_XX)
@@ -345,8 +348,8 @@ firstTerm_XX = ((offPower_XX)/(onPower_XX - offPower_XX))^2*calFluxErr^2
 secondTerm_XX = ((calFlux*offPower_XX)/(onPower_XX - offPower_XX)^2)^2*onPowerErr_XX^2
 thirdTerm_XX = ((calFlux*onPower_XX)/(onPower_XX - offPower_XX)^2)^2*offPowerErr_XX^2
 SsysErr_XX = SQRT(firstTerm_XX + secondTerm_XX + thirdTerm_XX)
-;;print, 'YY System Flux Density: ', Ssys_YY
-;;;print, '+/-', SsysErr_YY
+print, 'YY System Flux Density: ', Ssys_YY
+print, '+/-', SsysErr_YY
 
 print, 'XX System Flux Density: ', Ssys_XX
 print, '+/-', SsysErr_XX

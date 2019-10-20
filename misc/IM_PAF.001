@@ -1,0 +1,197 @@
+
+*
+
+proc init_vars
+
+STRING*3 inf
+STRING*8 dbconout
+STRING*4 outf
+STRING*5 sdout
+STRING*7 beamNum
+STRING*7 nxtBmCh
+SCALAR I, filenr, filenrSD, prevnum, totBeams, rah, ram, ras, dech, decm, decs 
+SCALAR nxtBm
+
+finish
+
+proc IMPAF
+
+filenr=23; 
+totBeams=6;
+rah=12;
+ram=19;
+ras=28.2;
+dech=46;
+decm=46;
+decs=29;
+
+FOR I=0 TO totBeams
+	beamNum=CHAR(I);
+	print beamNum;
+	$ read file in
+	task 'fitld'
+	datain 'DIR:NGC4258_Field_03_Beam' !! beamNum !! '_base.UVFITS';
+	outname 'NGC4258_Bm' !! beamNum;
+	outclass 'UVFITS';
+	go; wait
+
+	$ image individual beam 0 (stokes I)
+	task 'sdgrd'
+	getn filenr; optype '-GLS'; stokes 'I'; 
+	aparm rah ram ras dech decm decs;
+	imsize 128 128; cellsize 105 105; 
+	xparm 550 275 262 2; yparm 550 275 462 2; 
+	xtype -16; ytype -16; 
+	outname 'NGC4258_bm' !! beamNum; outclass 'CUBE';
+	go sdgrd; wait
+
+	$ set new fileNum for saving to disk
+	filenrSD=filenr+1;
+	
+	$ alt-sw and write out
+	tget altsw;
+	getn filenrSD;
+	go altsw;
+
+	task 'fittp'
+	getn filenrSD;
+	dataout 'DIR:NGC4258_Field_03_Beam' !! beamNum !! '_CUBE_base_II.FITS';
+	go fittp; wait
+
+	$ clear and recat
+	getn filenrSD; zap;
+
+	$ image individual beam 0 (XX)
+	task 'sdgrd'
+	getn filenr; optype '-GLS'; stokes 'RR'; 
+	aparm rah ram ras dech decm decs;
+	imsize 128 128; cellsize 105 105; 
+	xparm 550 275 262 2; yparm 550 275 462 2; 
+	outname 'NGC4258_bm' !! beamNum; outclass 'CUBE';
+	go; wait
+
+	$ alt-sw and write out
+	tget altsw;
+	getn filenrSD;
+	go altsw;
+
+	task 'fittp'
+	getn filenrSD;
+	dataout 'DIR:NGC4258_Field_03_Beam' !! beamNum !! '_CUBE_base_XX.FITS';
+	go fittp; wait
+
+	$ clear and recat
+	getn filenrSD; zap;
+
+	$ image individual beams (YY)
+	task 'sdgrd'
+	getn filenr; optype '-GLS'; stokes 'RR'; 
+	aparm rah ram ras dech decm decs;
+	imsize 128 128; cellsize 105 105; 
+	xparm 550 275 262 2; yparm 550 275 462 2; 
+	outname 'NGC4258_bm' !! beamNum; outclass 'CUBE';
+	go; wait
+
+	$ alt-sw and write out
+	tget altsw;
+	getn filenrSD;
+	go altsw;
+
+	task 'fittp'
+	getn filenrSD;
+	dataout 'DIR:NGC4258_Field_03_Beam' !! beamNum !! '_CUBE_base_YY.FITS';
+	go fittp; wait
+
+	$ clear and recat
+	getn filenrSD; zap;
+	
+	IF (I > 0) THEN
+		prevnum=filenr-1;	
+		nxtBm=I+1;
+		nxtBmCh=CHAR(nxtBm);
+		task 'dbcon'
+		getn prevnum; get2n filenr; outname 'NGC4258_' !! beamNum !! '-' !! nxtBmCh;  
+		outclass 'DBCON';
+		go; wait
+	    filenr=filenr+2;
+	ELSE filenr=filenr+1; END
+END
+
+$ image all beams (stokes I)
+filenr=filenr-1;
+print CHAR(filenr);
+task 'sdgrd'
+getn filenr; optype '-GLS'; stokes 'I'; 
+aparm rah ram ras dech decm decs;
+imsize 128 128; cellsize 105 105; 
+xparm 550 275 262 2; yparm 550 275 462 2; 
+outname 'NGC4258_ALL'; outclass 'CUBE';
+go; wait
+
+$ set new fileNum for saving to disk
+filenrSD=filenr+1;
+
+$ alt-sw and write out
+tget altsw;
+getn filenrSD;
+go altsw;
+
+task 'fittp'
+getn filenrSD;
+dataout 'DIR:NGC4258_Field_03_ALL' !! beamNum !! '_CUBE_base_II.FITS';
+go fittp; wait
+
+$ clear and recat
+getn filenrSD; zap;
+
+$ image all beams (stokes XX)
+filenr=filenr-1;
+task 'sdgrd'
+getn filenr; optype '-GLS'; stokes 'RR'; 
+aparm rah ram ras dech decm decs;
+imsize 128 128; cellsize 105 105; 
+xparm 550 275 262 2; yparm 550 275 462 2; 
+outname 'NGC4258_ALL' !! beamNum; outclass 'CUBE';
+go; wait
+
+$ alt-sw and write out
+tget altsw;
+getn filenrSD;
+go altsw;
+
+task 'fittp'
+getn filenrSD;
+dataout 'DIR:NGC4258_Field_03_ALL' !! beamNum !! '_CUBE_base_XX.FITS';
+go fittp; wait
+
+$ clear and recat
+getn filenrSD; zap;
+
+$ image all beams (stokes YY)
+filenr=filenr-1;
+task 'sdgrd'
+getn filenr; optype '-GLS'; stokes 'LL'; 
+aparm rah ram ras dech decm decs;
+imsize 128 128; cellsize 105 105; 
+xparm 550 275 262 2; yparm 550 275 462 2; 
+outname 'NGC4258_ALL' !! beamNum; outclass 'CUBE';
+go; wait
+
+$ alt-sw and write out
+tget altsw;
+getn filenrSD;
+go altsw;
+
+task 'fittp'
+getn filenrSD;
+dataout 'DIR:NGC4258_Field_03_ALL' !! beamNum !! '_CUBE_base_YY.FITS';
+go fittp; wait
+
+$ clear and recat
+getn filenrSD; zap;
+
+finish
+  
+		
+	
+

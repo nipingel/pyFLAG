@@ -1,6 +1,6 @@
 # coding: utf-8
 """
-1/15/18
+7/23/19
 This is the main function for the FLAG spectral line filler. It imports the I/O functionality of astropy,
 numpy, and matplotlib, gathers the necessary metadata from the GBT ancillary FITS files (e.g. Antenna, GO), and
 calls on external modules to perform the beamforming. It then collates these metadata and raw beamformed spectra into a new SDFITS format that is GBTIDL friendly.
@@ -9,17 +9,17 @@ User Inputs:
 /path/to/project/directory - path to where ancillary FITS files are (e.g. /home/gbtdata/AGBT16B_400)
 /path/to/weight/FITS/files - path to weights FITS files; recommended to place '*' wild card in the place of specific bank letter identifier 
 restfreq - Rest frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary for Doppler corrections)
-centralFreq - central frequency in HZ (ay be phased out once M&C can communicate with IF manager, but now necessary when LO is taken out of scan coordinator)
+centralFreq - central frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary when LO is taken out of scan coordinator)
 -b 'List of bad timestamps' - (optional; default not defined) a list of bad timestamps the program should ignore (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01') 
 -o 'List of objects' - a list of objects to process (e.g. '3C147 NGC6946’); defaults to all objects contained within the observational session.
 -g 'List of specific time stamps' - a list of specific timestamps to process (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01’); defaults to all time stamps associated with particular observed objects.
 -m 'List of beams' -  a list of beams to process (e.g. '1 2 3 4 5 6’); defaults to all beams found in associated weight files.
 A single FITS file is produced for each processed beam and is output to which ever directory the call to PAF_Filler is invoked.
 Usage:
-ipython PAF_Filler.py /path/to/project/ /path/to/weight/FITS/files -b 'List of bad timestamps' -o 'List of objects' -g 'List of specific time stamps' -m 'List of beams'
+ipython --c="run PAF_Filler.py /path/to/project/ /path/to/weight/FITS/files restfreq [Hz] centralFreq [Hz] -b 'List of bad timestamps' -o 'List of objects' -g 'List of specific time stamps' -m 'List of beams'""
 Eample:
-ipython PAF_Filler.py /home/gbtdata/AGBT17B_360_01 /lustre/project/flag/AGBT17B_360_01/BF/weight_files/w_178_02_*.FITS 1420.405e6 -b 2018_08_01:00:00 2018_08_01:52:00 -o NGC891  -g 2018_08_01:05:00 2018_08_01:06:00 2018_08_01:07:00 -m 1 3
-__email__ = "nipingel@mix.wvu.edu"
+ipython --c="run PAF_Filler.py /home/gbtdata/AGBT17B_360_01 /lustre/project/flag/AGBT17B_360_01/BF/weight_files/w_178_02_*.FITS 1420.405e6 1450e6 -b 2018_08_01:00:00 2018_08_01:52:00 -o NGC891  -g 2018_08_01:05:00 2018_08_01:06:00 2018_08_01:07:00 -m 1 3"
+__email__ = "Nickolas.Pingel@anu.edu.au"
 __status__ = "Production"
 """
 
@@ -43,6 +43,84 @@ pfb = False
 ## make beam dictionary to map from BYU to WVU convention (e.g. BYU 0 -> WVU 1)
 wvuBeamDict = {'0':'1', '1':'2', '2':'6', '3':'0', '4':'3', '5':'5','6':'4'}
 byuBeamDict = {'1':'0', '2':'1', '6':'2', '0':'3', '3':'4', '5':'5', '4':'6'}
+
+"""
+Takes input lists and sorts them into a 'list-of-lists' that contains the 
+original elements sorted into different observing modes. Each element in the
+returned list-of-lists is the portion of the input lists associated with a 
+particular observing mode.
+"""
+def sortLists(dataXList, dataYList, allFilesList, allBanksList, allNumBanksList):
+    """
+    define lists to store the sorted input lists if needed
+    """
+    allSortedDataX = []
+    allSortedDataY = []
+    allSortedFiles = []
+    allSortedBanks = []
+    allSortedNumBanks = []
+
+    """
+    loop through the global data buffers to determine the mode based on spectral channels 
+    """
+    modeSwIdx = 0
+    for idx in range(0, len(dataXList)):
+        dataArr = dataXList[idx]
+        """
+        If first iteration, set the prevNumChans to value of first element. 
+        Recall that the numpy arrays are of shape [ints, specChans]
+        """
+        if idx == 0:
+            prevNumChans = dataArr.shape[1]
+
+        """
+        Test whether current channel length is equal to previous; 
+        if not, the mode has changed
+        """
+        currNumChans = dataArr.shape[1]
+        if prevNumChans != currNumChans:
+            """
+            Append to sorted lists data from the last mode switch idx to
+            current idx (python indices to one less)
+            """
+            allSortedDataX.append(dataXList[modeSwIdx:idx])
+            allSortedDataY.append(dataYList[modeSwIdx:idx])
+            allSortedFiles.append(allFilesList[modeSwIdx:idx])
+            allSortedNumBanks.append(allNumBanksList[modeSwIdx:idx])
+            
+            """
+            The total number of list elements to add to allSortedBanks
+            list is equal the sum of allNumBanksList elements
+            between 0 and current (if first mode change), or 
+            --- if subsequent iteration --- the sum of allNumBanksList 
+            elements from 0 to the index of last mode change to the sum 
+            of allNumBanksList elements to current index. 
+            """
+            if modeSwIdx == 0:
+                allSortedBanks.append(allBanksList[0:int(np.sum(allNumBanksList[0:idx]))])
+            else:
+                allSortedBanks.append(allBanksList[int(np.sum(allNumBanksList[0:modeSwIdx])):int(np.sum(allNumBanksList[0:modeSwIdx])) + int(np.sum(allNumBanksList[modeSwIdx:idx]))])
+            modeSwIdx = idx
+
+        """
+        upon the last iteration, append everything to sorted lists from
+        last mode switch idx (could still be zero) to current idx + 1 to 
+        ensure last element is not left behind
+        """
+        if idx == len(dataXList) -1:
+            allSortedDataX.append(dataXList[modeSwIdx:idx + 1])
+            allSortedDataY.append(dataYList[modeSwIdx:idx + 1])
+            allSortedFiles.append(allFilesList[modeSwIdx:idx + 1])
+            allSortedNumBanks.append(allNumBanksList[modeSwIdx:idx + 1])
+            if modeSwIdx == 0 and idx == 0:
+                allSortedBanks.append(allBanksList[0:int(np.sum(allNumBanksList[0:idx + 1]))])
+            else:
+                allSortedBanks.append(allBanksList[int(np.sum(allNumBanksList[0:modeSwIdx])):int(np.sum(allNumBanksList[0:modeSwIdx])) + int(np.sum(allNumBanksList[modeSwIdx:idx + 1]))])
+        else:
+            prevNumChans = currNumChans
+    
+    ## return sorted lists
+    return allSortedDataX, allSortedDataY, allSortedFiles, allSortedBanks, allSortedNumBanks
 
 """
 function to map individual BANK data (bankData)
@@ -70,8 +148,13 @@ def bandpassSort(xID, dataBuff, bankData):
             for i in range(0, 5):
                 bankStartChan = i * 5
                 bankEndChan = bankStartChan + 5
-                dataBuff[ints, bandpassStartChan:bandpassEndChan] = bankData[ints, bankStartChan:bankEndChan]
+                try:
+                    dataBuff[ints, bandpassStartChan:bandpassEndChan] = bankData[ints, bankStartChan:bankEndChan]
                 
+                ## in early observations, sometimes an extra integration was recorded in some banks. This pass statement
+                ## will skip any extra integrations  
+                except IndexError:
+                    pass
                 ## increment bandpassStartChan/bandpassEndChan by 100 for proper position in full bandpass
                 bandpassStartChan += 100
                 bandpassEndChan = bandpassStartChan + 5
@@ -125,7 +208,7 @@ def generateObjAndFitsLists(goFitsPath):
     return genObjList, genFitsList
 
 """
-function to get number of integrations, integration length, and number of channels. Inputs identify the current file
+function to get number of integrations, integration length, and number of channels and BANK file list. Input identifies the current file
 to open. 
 """
 def getScanInfo(fitsLst):
@@ -365,7 +448,6 @@ def main():
     get from first weight file header
     """
     try:
-        #numBeams = len(byuBeamList)   
         numBeams = int(len(beamList)) 
     except NameError:
         numFields = wtFile[1].header['TFIELDS']
@@ -427,15 +509,6 @@ def main():
         except NameError:
             fileList = allFitsList[objInd]
             pass
-	#fileList = fileList[3:45] ## AGBT16B_400_12, HI Grid
-        #fileList = fileList[31:85] ## AGBT16B_400_12, 3C295 Grid
-        #fileList = fileList[0:41] ## AGBT16B_400_13, HI Grid
-        #fileList = fileList[1] + fileList[10] ## AGBT16B_400_14 3C147 7Pt Cal Scan
-        #fileList= fileList[0:96] ## AGBT17B_455_01 -> first 7Pt-Cal Scan
-	#fileList = fileList[1:]
-        #fileList = fileList[105:-5]
-	#fileList = fileList[3:117]
-	#fileList = fileList[117:]
 	## remove bad scans from file list
         if 'badScanList' in locals():
             for s in badScanList:
@@ -447,7 +520,6 @@ def main():
                         pass
                     else:
                         continue
-
         print('\n')
         print('Processing scans: ')
         ## loop through and append '.fits' to each element for later ID
@@ -459,8 +531,8 @@ def main():
         """
         Loop over beams to read in files for object of interest and construct a single SINGLE DISH binary FITS table
         """
-        #for bm in byuBeamList:
         for bm in beamList:
+
             allBanksList = [] ## list of paths to all good BANK FITS files associated with object
             numBanksList = [] ## number of good BANKS associated with a scan
 
@@ -474,9 +546,12 @@ def main():
             """
             if isinstance(fileList, str):
                  fileList = [fileList]
+
             """
-            Loop over time stamps associated with current observed object 
+            Loop over time stamps associated with current observed object to make sure
+            data exists. If not, then append these time stamps to a list for removal
             """
+            removeList = []
             for dataFITSFile in fileList:
                 """ 
                 check if '.fits' is at the end of elements in fileList
@@ -489,85 +564,131 @@ def main():
                 if len(testLst) == 0:
                     print('\n')
                     print('No associated data file with time stamp: ' + dataFITSFile)
-                    print('Skipping to next scan...')
                     text_file = open("skippedScans.txt", "w")
                     text_file.write(dataFITSFile)
                     text_file.close()
-                    fileList.remove(dataFITSFile)
-                    continue 
-                else:
-                    ## get essential info about current timestamp
-                    numInts, intLen, numSpecChans, bankList = getScanInfo(testLst)
+                    removeList.append(dataFITSFile)
+            ## remove any scans with no data (probably aborted early)
+            if len(removeList) > 0:
+                for replaceElem in removeList:
+                    fileList.remove(replaceElem)
 
-                    ## check whether we are in PFB (fine channelization) mode. If so, set pfb to True
-                    if numSpecChans == 160:
-                        pfb = True
-                    else:
-                        pfb = False
-                    """
-                    initialize bank data buffers; columrns are total number of spectral channels and rows are 
-                    individual integrations
-                    """
-                    dataBuff_X = np.zeros([numInts, numSpecChans * numBanks])
-                    dataBuff_Y = np.zeros([numInts, numSpecChans * numBanks])
+            """
+            Loop over time stamps associated with current observed object
+            and process
+            """
+            for dataFITSFile in fileList:
+                if dataFITSFile[-5:] == '.fits':
+                    dataFITSFile = dataFITSFile[:-5]
+                ## check if we have bank data for this scan
+                testLst = glob.glob(dataPath + dataFITSFile + '*.fits')
+                ## get essential info about current timestamp
+                numInts, intLen, numSpecChans, bankList = getScanInfo(testLst)
+                
+                """
+                initialize bank data buffers; columns are total number of spectral channels and rows are 
+                individual integrations
+                """
+                dataBuff_X = np.zeros([numInts, numSpecChans * numBanks])
+                dataBuff_Y = np.zeros([numInts, numSpecChans * numBanks])
 
-                    ## initialize weight data buffers in case there is analysis to be done
-                    xWeightBuff =  np.zeros([numSpecChans * numBanks], dtype = 'complex64')
-                    yWeightBuff =  np.zeros([numSpecChans * numBanks], dtype = 'complex64')
+                ## initialize weight data buffers in case there is analysis to be done
+                xWeightBuff =  np.zeros([numSpecChans * numBanks], dtype = 'complex64')
+                yWeightBuff =  np.zeros([numSpecChans * numBanks], dtype = 'complex64')
 
-                    bankCnt = 0 ## set bank counter to keep track of number of bank FITS files processed
-                    """
-                    Loop through list of BANK FITS files to process 1/20th of the bandpass at a time. Once information 
-                    about the scan is retrieved, the 'getSpectralArray' in the bf module is called and a beamformed 
-                    spectrum is returned (rows: inegrations; columns: frequency channels). The weights used in the processing
-                    are also returned. The function bandpassSort is then called to place this 1/20th chunk of bandpass at the 
-                    correct position in the global data buffers (that will be written in the output FITS file). 
-                    """
-                    #bankList = bankList[0:2]
-                    for fileName in bankList:
-                        print('\n')                
-                        print('Beamforming correlations in: '+fileName[-25:]+', Beam: ' + bm) 
-                        ## bank name is ALWAYS sixth-to-last character in string
-                        bank = fileName[-6] 
-                        corrHDU = fits.open(fileName) ## grab xid from dictionary for sorting
+                bankCnt = 0 ## set bank counter to keep track of number of bank FITS files processed
+                """
+                Loop through list of BANK FITS files to process 1/20th of the bandpass at a time. Once information 
+                about the scan is retrieved, the 'getSpectralArray' in the bf module is called and a beamformed 
+                spectrum is returned (rows: inegrations; columns: frequency channels). The weights used in the processing
+                are also returned. The function bandpassSort is then called to place this 1/20th chunk of bandpass at the 
+                correct position in the global data buffers (that will be written in the output FITS file). 
+                """
+                for fileName in bankList:
+                    print('\n')                
+                    print('Beamforming correlations in: '+fileName[-25:]+', Beam: ' + bm) 
+                    ## bank name is ALWAYS sixth-to-last character in string
+                    bank = fileName[-6] 
+                    corrHDU = fits.open(fileName) ## grab xid from dictionary for sorting
 
-                        nRows = corrHDU[1].header['NAXIS2']
-                        data = corrHDU[1].data['DATA']
-                        xID = np.int(corrHDU[0].header['XID'])
+                    nRows = corrHDU[1].header['NAXIS2']
+                    data = corrHDU[1].data['DATA']
+                    xID = np.int(corrHDU[0].header['XID'])
 
-                        if nRows != 0: ## to avoid an empty FITS file
-                            """
-                            Do the beamforming; returns processed BANK data (cov matrices to a beam-formed bandpass) in both
-                            XX/YY Pols; returned data are in form rows: integrations, columns: frequency channels
-                            """
-                            xData, yData = bf.getSpectralArray(fileName, data, bm, xID)
+                    if nRows != 0: ## to avoid an empty FITS file
+                        """
+                        Do the beamforming; returns processed BANK data (cov matrices to a beam-formed bandpass) in both
+                        XX/YY Pols; returned data are in form rows: integrations, columns: frequency channels
+                        """
+                        xData, yData = bf.getSpectralArray(fileName, data, bm, xID)
 
-                            """
-                            Sort the 1/20th chunk based on xid number for each integration. The dataBuff_X/Y variable is constantly
-                            being updated as the individual BANKS are processed
-                            """       
-                            dataBuff_X = bandpassSort(xID, dataBuff_X, xData)
-                            dataBuff_Y = bandpassSort(xID, dataBuff_Y, yData)
-                            allBanksList.append(fileName) ## append good BANK file to master list that is passed to metadataModule
-                            bankCnt += 1 ## increment bank counter
+                        """
+                        Sort the 1/20th chunk based on xid number for each integration. The dataBuff_X/Y variable is constantly
+                        being updated as the individual BANKS are processed
+                        """       
+                        dataBuff_X = bandpassSort(xID, dataBuff_X, xData)
+                        dataBuff_Y = bandpassSort(xID, dataBuff_Y, yData)
+                        allBanksList.append(fileName) ## append good BANK file to master list that is passed to metadataModule
+                        bankCnt += 1 ## increment bank counter
 
-                    globalDataBuff_X_List.append(dataBuff_X) ## append to global buffer lists
-                    globalDataBuff_Y_List.append(dataBuff_Y)
-                    numBanksList.append(bankCnt) ## append bankCnt to list 
+                globalDataBuff_X_List.append(dataBuff_X) ## append to global buffer lists
+                globalDataBuff_Y_List.append(dataBuff_Y)
+                numBanksList.append(bankCnt) ## append bankCnt to list 
 
             print('\n') ## make terminal output look cleaner
-            
+
             """
-            build metadata; inputs are path to ancillary FITS files, path to raw BANK FITS files, names of the processed BANK files for this beam
-            the global data buffers holding the beamformed spectra, the beam that was processed, and the boolean denoting which spectral mode we're in.          
+            Because the same object could have been observed in different modes (i.e., CALCORR or PFBCORR), and  
+            we wish to have a single SDFITS file per beam, we need to check the global data buffers to change in 
+            stored numpy array shape. Send the fileList, global data buffers, allBanksList, and numBanksList to 
+            a sorting function. The returned lists contain the data and other necessary inputs to the metadata module
+            sorted by operating mode
+            contain the data from
             """
-            md = MetaDataModule(projectPath, dataPath, weightPath, fileList, restfreq, centralfreq, allBanksList, numBanksList, globalDataBuff_X_List, globalDataBuff_Y_List, bm, pfb)
-            thduList = md.constuctBinTableHeader()
-            dataFITSFile = dataFITSFile[:-6]
-	    ## save the file
-            thduList.writeto(pwd+'/' + projectStr + '_' + source + '_Beam'+str(bm) + '.fits') ## finally, saves the file.
-    
-       
+            sortedDataBufferList_X, sortedDataBufferList_Y, sortedFileList, sortedBanksList, sortedNumBanksList = sortLists(globalDataBuff_X_List, globalDataBuff_Y_List, fileList, allBanksList, numBanksList)
+            """
+            Loop over the elements of the sorted lists. sortedDataBuffer_X has a single element, there were no mode changes throughout the observation. 
+            In this case, create primary header and write out file. If sortedDataBuffer_X has more than a single element, it means there were multiple mode changes. 
+            In this case, create primary header on first iteration and attach the returned binary FITS tables before writing out. 
+            """
+            for metaIdx in range(0, len(sortedDataBufferList_X)):
+                """
+                build metadata; inputs are path to ancillary FITS files, path to raw BANK FITS files, names of the processed BANK files for this beam
+                the global data buffers holding the beamformed spectra, the beam that was processed, and the boolean denoting which spectral mode we're in.          
+                """
+
+                globalDataBuff_X = sortedDataBufferList_X[metaIdx]
+                globalDataBuff_Y = sortedDataBufferList_Y[metaIdx]
+                sortedFiles = sortedFileList[metaIdx]
+                sortedBanks = sortedBanksList[metaIdx]
+                sortedNumBanks = sortedNumBanksList[metaIdx]
+                
+                ## check whether we are in PFB (fine channelization) mode. If so, set pfb to True
+                specChans = globalDataBuff_X[0].shape[1]
+                if specChans == 3200:
+                    pfb = True
+                else:
+                    pfb = False
+                """
+                Check if first iteration. If so, set firstIter to True to inform metadata instance
+                to create a primary HDU
+                """
+                if metaIdx == 0:
+                    firstIter = True
+                else:
+                    firstIter = False
+                ## instantiate metadata object    
+                md = MetaDataModule(projectPath, dataPath, weightPath, sortedFiles, restfreq, centralfreq, sortedBanks, sortedNumBanks, globalDataBuff_X, globalDataBuff_Y, bm, pfb, firstIter)
+
+                if firstIter == True:                
+                    ## construct the binary table & header
+                    thduList = md.constuctBinTableHeader()
+                else:
+                    nextThduList = md.constuctBinTableHeader()
+                    thduList.append(nextThduList)
+
+	        ## FINALLY, save the file
+            thduList.writeto(pwd+'/' + projectStr + '_' + source + '_Beam'+str(bm) + '.fits')
     
 #run PAF_Filler.py (main) function
 if __name__=="__main__":
