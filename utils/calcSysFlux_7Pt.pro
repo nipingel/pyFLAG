@@ -24,7 +24,7 @@ FUNCTION calcFluxErr, errCoeffArr, flux, vG
         RETURN, fluxErr
         END
 
-PRO calcSysFlux_7pt, sname, chan0, chan1, chan2, chan3, scan0, pfb
+PRO calcSysFlux_7Pt, sname, chan0, chan1, chan2, chan3, scan0, pfb
 ;==============================================================================
 ; Nick Pingel ----- 08/04/19
 ; Program to calculate the system equivalent flux density (SEFD) given a known calibrator.
@@ -50,6 +50,9 @@ PRO calcSysFlux_7pt, sname, chan0, chan1, chan2, chan3, scan0, pfb
 compile_opt idl2
 ;; set pfb to 0 if not provided
 IF NOT KEYWORD_SET(pfb) THEN pfb = 0
+
+;; set constants
+kB = 1.3806e-23
 
 ;; global variable defined for calibrator flux equation
 freqVal = 1.420405752 ;; GHz
@@ -329,6 +332,24 @@ IF ABS(offPowerErr_XX) GT 10 THEN offPowerErr_XX = STDDEV(offDist_XX)
 
 print, 'Off Power (YY): ', offPower_YY
 print, 'Off Power (XX): ', offPower_XX
+
+;; compute YY sensitivity at channel 150
+Sens_YY = 2*kB/(1e-26*calFlux)*onPower_YY/offPower_YY
+
+;;compute YY sensitivity uncertainty
+sig_sens_YY = 2*kB*onPower_YY/(1e-26*calFlux*offPower_YY)*SQRT(onPowerErr_YY^2/onPower_YY^2 + offPowerErr_YY/offPower_YY^2 + calFluxErr^2/calFlux^2)
+
+print, 'YY Sensitivity [m^2 K^-1], ', Sens_YY
+print, '+/-', sig_sens_YY
+
+;; compute XX sensitivity at channel 150
+Sens_XX = 2*kB/(1e-26*calFlux)*onPower_XX/offPower_XX
+
+;;compute XX sensitivity uncertainty
+sig_sens_XX = 2*kB*onPower_XX/(1e-26*calFlux*offPower_XX)*SQRT(onPowerErr_XX^2/onPower_XX^2 + offPowerErr_XX/offPower_XX^2 + calFluxErr^2/calFlux^2)
+
+print, 'XX Sensitivity [m^2 K^-1], ', Sens_XX
+print, '+/-', sig_sens_XX
 
 ;; calculate YY system flux
 Ssys_YY = calFlux*offPower_YY/(onPower_YY - offPower_YY)
