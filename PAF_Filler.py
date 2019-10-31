@@ -1,19 +1,21 @@
 # coding: utf-8
 """
-7/23/19
-This is the main function for the FLAG spectral line filler. It imports the I/O functionality of astropy,
-numpy, and matplotlib, gathers the necessary metadata from the GBT ancillary FITS files (e.g. Antenna, GO), and
-calls on external modules to perform the beamforming. It then collates these metadata and raw beamformed spectra into a new SDFITS format that is GBTIDL friendly.
+10/31/19
+This is the contains the main function for the FLAG spectral line filler. It gathers the necessary metadata from 
+the GBT ancillary FITS files (e.g. Antenna, GO), and calls on external modules to perform the beamforming. The beamforming
+module is called in a multi-process fashion where each core handles a BANK file. It then collates these metadata and raw 
+beamformed spectra into a new SDFITS format that is GBTIDL friendly.
+
 User Inputs:
-** Note that all list inputs should be space delimited within single quotes
-/path/to/project/directory - path to where ancillary FITS files are (e.g. /home/gbtdata/AGBT16B_400)
-/path/to/weight/FITS/files - path to weights FITS files; recommended to place '*' wild card in the place of specific bank letter identifier 
-restfreq - Rest frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary for Doppler corrections)
-centralFreq - central frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary when LO is taken out of scan coordinator)
--b 'List of bad timestamps' - (optional; default not defined) a list of bad timestamps the program should ignore (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01') 
--o 'List of objects' - a list of objects to process (e.g. '3C147 NGC6946’); defaults to all objects contained within the observational session.
--g 'List of specific time stamps' - a list of specific timestamps to process (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01’); defaults to all time stamps associated with particular observed objects.
--m 'List of beams' -  a list of beams to process (e.g. '1 2 3 4 5 6’); defaults to all beams found in associated weight files.
+
+/path/to/project/directory - <required> path to where ancillary FITS files are (e.g. /home/gbtdata/AGBT16B_400)
+/path/to/weight/FITS/files - <required> path to weights FITS files; recommended to place '*' wild card in the place of specific bank letter identifier 
+restfreq - <required> Rest frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary for Doppler corrections)
+centralFreq - <required> central frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary when LO is taken out of scan coordinator)
+-b --badTimes -<optional> a list of bad timestamps the program should ignore (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01'); no default
+-o --objectList - <optional> a list of objects to process (e.g. '3C147 NGC6946’); defaults to all objects contained within the observational session.
+-g  --goodTimes - <optional> a list of specific timestamps to process (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01’); defaults to all time stamps associated with particular observed objects.
+-m --beamList - <optional> a list of beams to process (e.g. '1 2 3 4 5 6’); defaults to all beams found in associated weight files.
 A single FITS file is produced for each processed beam and is output to which ever directory the call to PAF_Filler is invoked.
 Usage:
 ipython --c="run PAF_Filler.py /path/to/project/ /path/to/weight/FITS/files restfreq [Hz] centralFreq [Hz] -b 'List of bad timestamps' -o 'List of objects' -g 'List of specific time stamps' -m 'List of beams'""
@@ -30,6 +32,7 @@ import sys
 import os
 import glob
 import pickle
+import argparse
 from modules.metaDataModule import MetaDataModule
 from modules.beamformingModule import BeamformingModule
 import matplotlib.pyplot as pyplot
@@ -40,7 +43,7 @@ numBanks = numGPU * 2
 pwd = os.getcwd()
 pfb = False
 
-## make beam dictionary to map from BYU to WVU convention (e.g. BYU 0 -> WVU 1)
+## beam dictionaries to map from between BYU to WVU beam name conventions (e.g. BYU 0 -> WVU 1)
 wvuBeamDict = {'0':'1', '1':'2', '2':'6', '3':'0', '4':'3', '5':'5','6':'4'}
 byuBeamDict = {'1':'0', '2':'1', '6':'2', '0':'3', '3':'4', '5':'5', '4':'6'}
 
@@ -235,7 +238,7 @@ def findIndex(elemStr, inputList):
 
 """
 This is the 'main' function that drives the creation of an SDFITS file for the selected beams. After handling the user 
-input, the program processes each requested object in the GBT project by collating all necessary data and ancillary 
+input, the function processes each requested object in the GBT project by collating all necessary data and ancillary 
 FITS files. The beamformer object (bf) is called to perform the beamforming. Several processing functions within this
 main script are called to sort the returned beamform spectrum into its final data container. Once the data are correctly
 formatted, the metadata object (md) is called to correctly format and sort the metadata from the GO and Antennna ancillary
@@ -256,6 +259,24 @@ def main():
     except PermissionError:
         print('Please move to a directory where you have adaquete write permissions; exiting...')
         sys.exit()
+
+    ## define arguement parser
+    parser = argparse.ArgumentParser()
+    ## add positional and required arguments
+    parser.add_argument("projectPath", help="<required> path to ancillary FITS files (e.g. /home/gbtdata/AGBT16B_400)", required = True)
+    parser.add_argument("weightPath", help="<required> path to weights FITS files; recommended to place '*' wild card in the place of specific bank letter identifier", required=True)
+
+
+
+    #/path/to/project/directory - <required> path to where ancillary FITS files are (e.g. /home/gbtdata/AGBT16B_400)
+    #/path/to/weight/FITS/files - <required> path to weights FITS files; recommended to place '*' wild card in the place of specific bank letter identifier 
+    #restfreq - <required> Rest frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary for Doppler corrections)
+    #centralFreq - <required> central frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary when LO is taken out of scan coordinator)
+    #-b --badTimes -<optional> a list of bad timestamps the program should ignore (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01'); no default
+    #-o --objectList - <optional> a list of objects to process (e.g. '3C147 NGC6946’); defaults to all objects contained within the observational session.
+    #-g  --goodTimes - <optional> a list of specific timestamps to process (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01’); defaults to all time stamps associated with particular observed objects.
+    #-m --beamList - <optional> a list of beams to process (e.g. '1 2 3 4 5 6’); defaults to all beams found in associated weight files.
+
 
     ## test for correct number of command line arguments:
     if len(sys.argv) < 3:
