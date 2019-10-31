@@ -1,4 +1,4 @@
-# coding: utf-8
+#### coding: utf-8
 """
 10/31/19
 This is the contains the main function for the FLAG spectral line filler. It gathers the necessary metadata from 
@@ -262,28 +262,22 @@ def main():
 
     ## define arguement parser
     parser = argparse.ArgumentParser()
+
     ## add positional and required arguments
-    parser.add_argument("projectPath", help="<required> path to ancillary FITS files (e.g. /home/gbtdata/AGBT16B_400)", required = True)
-    parser.add_argument("weightPath", help="<required> path to weights FITS files; recommended to place '*' wild card in the place of specific bank letter identifier", required=True)
+    parser.add_argument("projectPath", help="<required> path to ancillary FITS files (e.g. /home/gbtdata/AGBT16B_400)")
+    parser.add_argument("weightPath", help="<required> path to weights FITS files; recommended to place '*' wild card in the place of specific bank letter identifier")
+    parser.add_argument("restFreq", help="<required> rest frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary for Doppler corrections", type = float)
+    parser.add_argument("centralFreq", help="<required> central frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary when LO is taken out of scan coordinator)", type = float)
 
+    ## add optional short options
+    parser.add_argument("-b", "--badTimes", help="<optional> a list of bad timestamps the program should ignore (e.g. -b 2018_01_15_2017_00:00:00 2018_01_15_2017_00:00:01); no default", nargs = "+")
+    parser.add_argument("-o", "--objectList", help="<optional> a list of objects to process (e.g. -o 3C147 NGC6946); defaults to all objects contained within the observational session.", nargs = "+")
+    parser.add_argument("-g", "--goodTimes", help="<optional> a list of specific timestamps to process (e.g. -g 2018_01_15_2017_00:00:00 2018_01_15_2017_00:00:01); defaults to all time stamps associated with particular observed objects", nargs = "+")
+    parser.add_argument("-m", "--beamList", help="<optional> a list of beams to process (e.g. -m 1 2 3 4 5 6); defaults to all beams found in associated weight files.", nargs = "+")
 
+    ## finally, parse arguments
+    args, unknown = parser.parse_known_args()
 
-    #/path/to/project/directory - <required> path to where ancillary FITS files are (e.g. /home/gbtdata/AGBT16B_400)
-    #/path/to/weight/FITS/files - <required> path to weights FITS files; recommended to place '*' wild card in the place of specific bank letter identifier 
-    #restfreq - <required> Rest frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary for Doppler corrections)
-    #centralFreq - <required> central frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary when LO is taken out of scan coordinator)
-    #-b --badTimes -<optional> a list of bad timestamps the program should ignore (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01'); no default
-    #-o --objectList - <optional> a list of objects to process (e.g. '3C147 NGC6946’); defaults to all objects contained within the observational session.
-    #-g  --goodTimes - <optional> a list of specific timestamps to process (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01’); defaults to all time stamps associated with particular observed objects.
-    #-m --beamList - <optional> a list of beams to process (e.g. '1 2 3 4 5 6’); defaults to all beams found in associated weight files.
-
-
-    ## test for correct number of command line arguments:
-    if len(sys.argv) < 3:
-        print('Incorrect number of inputs; usage: ->ipython PAF_Filler.py /path/to/project/ /path/to/weight/FITS/files -b \'List of bad timestamps\' \
-            -o \'List of objects\' -g \'List of specific time stamps\' -m \'List of beams\'')
-
-        sys.exit()
     ## command line inputs
     projectPath = sys.argv[1] ## of the form /home/gbtdata/AGBT16B_400_01
     weightPath = sys.argv[2] + '*.FITS' ## of the form /lustre/projects/flag.old/AGBT16B_400_01/BF/weight_files/*.FITS
