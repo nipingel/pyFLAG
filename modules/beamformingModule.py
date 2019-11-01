@@ -61,20 +61,20 @@ class BeamformingModule:
             if instID == xID:
                 break
 
-        ## get number of beams
-        numBeams = (wtHDU[1].header['TFIELDS'] - 2) / 2
         ## weight array in the form of freqchans, element data, beams
         fullDataArr = wtHDU[0].data ## grab data
         xWeights = np.zeros([25, 40], dtype='complex64')  ## define arrays to hold XX and YY weights
         yWeights = np.zeros([25, 40], dtype='complex64')  ## shape is freqChansxDipoles
-        ## process XX Pol
-        ## define XX/YY beam strings
+
+        ## extract beam data
         beamXStr = 'Beam' + beam + 'X'
         beamYStr = 'Beam' + beam + 'Y'
         wtDataX = wtHDU[1].data[beamXStr]
         wtDataY = wtHDU[1].data[beamYStr]
+        
         ## 64 complex pairs per freq channel
         totalElemInChan = 64 * 2
+        
         ## can drop last 24 correlation pairs as they are unused and zero. First 80 elements are good. 
         ## fill in weight arrays by looping through freq channels
         for chan in range(0,25):
@@ -96,35 +96,39 @@ class BeamformingModule:
     
     """    
     function that reorders correlation bandpass to FISHFITS order;
-    inputs is a covariance bandpass for a single integration and number of freq chans
+    inputs are a covariance bandpass for a single integration and number of freq chans
     Returns: 3D data cube with dimensions DipoleXDipoleXFreqChans
     """
     def getCorrelationCube(self, dataVector, numFreqs):
       """
       Reorder to FISHFITS
-      explicit order is below, but consists of 820 complex pairs*numFreqs
+      explicit order is described below, but consists of 820 complex pairs*numFreqs
       """
       numCorr = 820
       newDataVector= np.zeros([820 * numFreqs], dtype='complex64')
        
       ## set starting index for new data buffer
       FITS_strt_idx = 0
-       
+      
+      ## exapand the map vector to the same size of the 1D correlation vector
+      expMapVector = np.array([self.mapVector + 2112*i for i in range(numFreqs)]).flatten()
+
+      newDataVector = dataVector[expMapVector]
       """
       sort correlations into correct FISHFITS order (dp1Xdp1_freq1, dp1Xdp2_freq1,  ... dp1Xdp40_freq1
       dp2xdp2_freq1, ... dp2xdp40_fre1, dp3xdp3_freq1, ... dp40xdp40_freq1, dpxdp1_freq2, ... dp40x4dp0_freq2,
       ... dp40xdp40_freqN, where N is the total number of freq channels. 
       """
-      for i in range(0, numFreqs * 2112, 2112):
-        singleChanData = dataVector[i: i + 2112] ## grab a single freq. channel worth of correlations
+      #for i in range(0, numFreqs * 2112, 2112):
+        #singleChanData = dataVector[i: i + 2112] ## grab a single freq. channel worth of correlations
            
         """
         loop through and assign new order based on the mapVector attribute, which gives the new index of the 
         raw correlation
         """ 
-        for z in range(0,len(self.mapVector)):
-            newDataVector[z+FITS_strt_idx] = singleChanData[self.mapVector[z]]
-        FITS_strt_idx+=820 ## update starting index
+        #for z in range(0,len(self.mapVector)):
+        #    newDataVector[z+FITS_strt_idx] = singleChanData[self.mapVector[z]]
+        #FITS_strt_idx+=820 ## update starting index
        
       ## Once sorted, we can construct a retCube with dim1 = numElements, dim2 = numElements, dim3 = freqChans
       numElem = 40
@@ -178,9 +182,10 @@ class BeamformingModule:
           correctIdxArr[idx*32:idx*32 + 32] = revChunk
            
         ## finally, loop through cube to re-order freq channels
-        for idx in range(0, 160):
-          corrIdx = np.int(correctIdxArr[idx])
-          newCube[:,:,idx] = retCube[:,:,corrIdx]
+        #for idx in range(0, 160):
+        #  corrIdx = np.int(correctIdxArr[idx])
+        #  newCube[:,:,idx] = retCube[:,:,corrIdx]
+        newCube = retCube[:, :, correctIdxArr]
         ## return the correlation cube
         return newCube
       else:
@@ -222,7 +227,13 @@ class BeamformingModule:
         xdat = dat[0:19]
         ydat = dat[20:39]
         return xdat, ydat 
-      
+    
+    """
+    This is the main function of this module (i.e., makes all the necessary calls to return a beamformed
+    bandpass). This is called from PAF_Filler.py. After obtaining the weights, the bandpasses are beamformed
+    by individual integrations. 
+    Returns: beamformed spectra for XX and YY polarizations (shape: integrations X freqChans)
+    """
     def getSpectralArray(self, fitsName, beam):
 
       ## bank name is ALWAYS sixth-to-last character in string
@@ -243,24 +254,6 @@ class BeamformingModule:
 
       ## get number of freq channels
       numFreqs = np.int(dataArr.shape[1] / 2112) ## always 2112 complex pairs per frequency channel
-
-    """
-    This is the main function of this module (i.e., makes all the necessary calls to return a beamformed
-    bandpass). This is called from PAF_Filler.py. After obtaining the weights, the bandpasses are beamformed
-    by individual integrations. 
-    Returns: beamformed spectra for XX and YY polarizations (shape: integrations X freqChans)
-    """
-    def getSpectralArray(self, fitsName, dataArr, beam, xID):
-        
-
-        
-      """
-      get CHANSEL for if we are in PFB mode. This selects which chunk of coarse channels were
-      sent through PFB. For example, if CHANSEL is 0, coarse channels 0-99 were selected; if
-      CHANSEL is 1, coarse channels 100-199 were selected.
-      """
-      corrHDU = fits.open(fitsName)
-      chanSel = np.int(corrHDU[0].header['CHANSEL'])
         
       ## create bandpass containers. Rows are ints; colums represent bandpasses for that integration
       spectrumArr_X = np.zeros([len(dataArr[:,0]),numFreqs], dtype='float32')    
