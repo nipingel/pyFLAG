@@ -122,10 +122,10 @@ class BeamformingModule:
       #for i in range(0, numFreqs * 2112, 2112):
         #singleChanData = dataVector[i: i + 2112] ## grab a single freq. channel worth of correlations
            
-        """
-        loop through and assign new order based on the mapVector attribute, which gives the new index of the 
-        raw correlation
-        """ 
+       # """
+       # loop through and assign new order based on the mapVector attribute, which gives the new index of the 
+       # raw correlation
+       # """ 
         #for z in range(0,len(self.mapVector)):
         #    newDataVector[z+FITS_strt_idx] = singleChanData[self.mapVector[z]]
         #FITS_strt_idx+=820 ## update starting index
@@ -237,7 +237,7 @@ class BeamformingModule:
     def getSpectralArray(self, fitsName, beam):
 
       ## bank name is ALWAYS sixth-to-last character in string
-      bank = fileName[-6]
+      bank = fitsName[-6]
       corrHDU = fits.open(fitsName)
 
       ## get relevant information from header

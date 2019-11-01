@@ -231,13 +231,16 @@ function that submits list of bank FITS files to the beamformer module for proce
 using multiprocessing's Pool object. Each Bank file is sent to the beamformer object
 using one of the available 32 cores on flag-beam.
 """
-def multiprocessBankList(bf, bankList, data, bm, xID):
+def multiprocessBankList(bf, bankList, bm):
     p = Pool()
-    xDataList, yDataList = p.map(bf.getSpectralArray(), bankList)
+    processList = list(zip(bankList, bm * len(bankList)))
+
+    xDataList, yDataList = p.starmap(bf.getSpectralArray, processList)
     p.close()
     p.join()
 
     print(xDataList.shape)
+    sys.exit()
 
 
 """
@@ -459,6 +462,7 @@ def main():
             """
             if isinstance(fileList, str):
                  fileList = [fileList]
+            fileList = fileList[0:2]
 
             """
             Loop over time stamps associated with current observed object to make sure
@@ -499,7 +503,7 @@ def main():
 
                 bankCnt = 0 ## set bank counter to keep track of number of bank FITS files processed
                 
-                multiprocessBankList(bf, bankList, data, bm, xID)
+                multiprocessBankList(bf, bankList[0:2], bm)
 
 
                 """
