@@ -235,11 +235,10 @@ def multiprocessBankList(bf, bankList, bm):
     p = Pool()
     processList = list(zip(bankList, bm * len(bankList)))
 
-    xDataList, yDataList = p.starmap(bf.getSpectralArray, processList)
+    result = p.starmap(bf.getSpectralArray, processList)
+    print(result[4][2])
     p.close()
     p.join()
-
-    print(xDataList.shape)
     sys.exit()
 
 
@@ -503,7 +502,7 @@ def main():
 
                 bankCnt = 0 ## set bank counter to keep track of number of bank FITS files processed
                 
-                multiprocessBankList(bf, bankList[0:2], bm)
+                multiprocessBankList(bf, bankList[0:5], bm)
 
 
                 """

@@ -172,7 +172,7 @@ class BeamformingModule:
         create new cube to sort into and 1D array to hold correct indices
         """
         newCube = np.zeros([numElem, numElem, numFreqs], dtype= 'complex64')
-        correctIdxArr = np.zeros([160])
+        correctIdxArr = np.zeros([160], dtype = int)
         for idx in range(0, 5):
           ## get 32 channel chunk to do fftshift on indices
           chunk = np.fft.fftshift(stitchIdxArr[idx*32:idx*32+32])
@@ -299,6 +299,7 @@ class BeamformingModule:
               absWtIdx += 1
               cnt = 0 
         
-      ## return beamformed bandpasses       
-      return spectrumArr_X, spectrumArr_Y
+      ## return beamformed bandpasses   
+      print(bank)    
+      return spectrumArr_X, spectrumArr_Y, bank
         
