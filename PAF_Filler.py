@@ -265,7 +265,7 @@ def main():
 
     ## add positional and required arguments
     parser.add_argument("projectPath", help="<required> path to ancillary FITS files (e.g. /home/gbtdata/AGBT16B_400)")
-    parser.add_argument("weightPath", help="<required> path to weights FITS files; recommended to place '*' wild card in the place of specific bank letter identifier")
+    parser.add_argument("weightPath", help="<required> path to weights FITS files")
     parser.add_argument("restFreq", help="<required> rest frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary for Doppler corrections", type = float)
     parser.add_argument("centralFreq", help="<required> central frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary when LO is taken out of scan coordinator)", type = float)
 
@@ -278,168 +278,76 @@ def main():
     ## finally, parse arguments
     args, unknown = parser.parse_known_args()
 
-    ## command line inputs
-    projectPath = sys.argv[1] ## of the form /home/gbtdata/AGBT16B_400_01
-    weightPath = sys.argv[2] + '*.FITS' ## of the form /lustre/projects/flag.old/AGBT16B_400_01/BF/weight_files/*.FITS
-    restfreq = np.float(sys.argv[3]) ## in units of Hz
-    centralfreq = np.float(sys.argv[4]) ## in units of Hz
+    ## assign required command line inputs
+    projectPath = args.projectPath ## of the form /home/gbtdata/AGBT16B_400_01
+    weightPath = args.weightPath + '/*.FITS' ## of the form /lustre/projects/flag.old/AGBT16B_400_01/BF/weight_files/*.FITS
+    restfreq = args.restFreq ## in units of Hz
+    centralfreq = args.centralFreq ## in units of Hz
    
     ## check if an end '/' was given; if so, remove it
     if projectPath[-1] == '/':
         projectPath = projectPath[:-1]
 
     ## test validity of input path
-    if not os.path.exists(projectPath):
-        print('Incorrect path to project directory; exiting...')
-        sys.exit()
+    #if not os.path.exists(projectPath):
+    #    print('Incorrect path to project directory; exiting...')
+    #    sys.exit()
 
     ## test validitiy of the path to the weight FITS files
-    testLst = glob.glob(weightPath)
-    if len(testLst) == 0:
-        print('Incorrect path to weight FITS files; exiting...')
-        sys.exit()
+    #testLst = glob.glob(weightPath)
+    #if len(testLst) == 0:
+    #    print('Incorrect path to weight FITS files; exiting...')
+    #    del testLst
+    #    sys.exit()
     
     """
-    the existance lists of good/bad timestamps (-g/-b flags), objects (-o flag), and beams (-m flag) needs to 
-    determinded with if none are provided. 
+    the existence of optional inputlists of good/bad timestamps (-g/-b flags), objects (-o flag), and beams (-m flag) needs to 
+    determined 
     """
-    ## define list of all flags to compare to later
-    totalflagList = ['-b', '-g', '-o', '-m']
+    
+    ## check if bad time stamps were provided  (-b flag)
+    if args.badTimes not None:
+        badScanList = args.badTimes
 
-    ## define list to append active flags to
-    currFlags = []
-
-    ## get index of -b flag
-    indB = findIndex('-b', sys.argv)
-    ## append to currFlags list if not None type
-    if not indB == None:
-        currFlags.append('-b')
-
-    ## get index of -g flag
-    indG = findIndex('-g', sys.argv)
-    ## append to currFlags list if not None type
-    if not indG == None:
-        currFlags.append('-g')
-
-    ## get index of -o flag 
-    indO = findIndex('-o', sys.argv)
-    ## append to currFlags list if not None type
-    if not indO == None:
-        currFlags.append('-o')
-
-    ## get index of -m flag
-    indM = findIndex('-m', sys.argv)
-    ## append to currFlags list if not None type
-    if not indM == None:
-        currFlags.append('-m')
-
-    ## place all flags indices in a list
-    indList = [indB, indG, indO, indM]
-
-    ## clean list of indices of None type
-    indList = [x for x in indList if x is not None]
-    indList.sort() ## make numeric order so the numeric order is know 
-
-    ## if indList is not empty, we have some flags to process... 
-    if not len(indList) == 0:
-        ## loop through list of flags, collect proceeding list elements between current flag and next one. 
-        ## deal with flag for bad scan timestamps
-        for i, ind in enumerate(indList):
-            
-            ## process if flag is '-b'
-            if ind == indB:
-                """
-                the bad scans will be all elements of the list between this index and the next in indList.                
-                if there is only one element of indList (only one flag was set), or we are on the last element of indList, 
-                just take remaining elments from sys.argv list
-                """
-                if i == len(indList) - 1:
-                    badScanList = sys.argv[ind + 1:]
-                else:
-                    badScanList = sys.argv[ind + 1:indList[i + 1 ]]
-
-                ## loop through and append '.fits' to each element for later ID
-                badScanList = [s + '.fits' for s in badScanList]
+        ## loop through and append '.fits' to each element for later ID
+        badScanList = [s + '.fits' for s in badScanList]
                 
-                ## inform user
-                if len(badScanList) == 0:
-                    print('\n')
-                    print('No bad time stamp list after \'-b\' flag; exiting...')
-                    sys.exit()
-                else:
-                    print('\n')
-                    print('Will remove following timestamps from processing: ')
-                    print('\n'.join('{}'.format(item) for item in badScanList))
+        print('\n')
+        print('Will remove following timestamps from processing: ')
+        print('\n'.join('{}'.format(item) for item in badScanList))
 
-            ## process if flag is '-g'
-            elif ind == indG:
-                if i == len(indList) - 1:
-                    userFitsList = sys.argv[ind + 1:]
-                else:
-                    userFitsList = sys.argv[ind + 1:indList[i + 1 ]]
+    ## check if explicit list of time stamps were provided (-g flag)
+    elif args.goodTimes not None:
+        userFitsList = args.goodTimes
+        print('\n')
+        print('Processing following time stamps: ') 
+        print('\n'.join('{}'.format(item) for item in userFitsList))
 
-                
-                ## inform user
-                if len(userFitsList) == 0:
-                    print('\n')
-                    print('No time stamp list after \'-g\' flag; exiting...')
-                    sys.exit()
-                else:
-                    print('\n')
-                    print('Processing following time stamps: ') 
-                    print('\n'.join('{}'.format(item) for item in userFitsList))
+    ## check if list of objects were provided (-o flag
+    elif args.objectList not None:
+        obsObjectList = args.objectList
+        print('\n')
+        print('Processing following observed objects: ')
+        print('\n'.join('{}'.format(item) for item in obsObjectList))       
 
-            ## process if flag '-o'
-            elif ind == indO:
-                if i == len(indList) - 1:
-                    obsObjectList = sys.argv[ind + 1:]
-                else:
-                    obsObjectList = sys.argv[ind + 1:indList[i + 1 ]]
-                
-                ## inform user
-                if len(obsObjectList) == 0:
-                    print('\n')
-                    print('No observed objects list after \'-o\' flag; exiting...')
-                    sys.exit()
-                else:
-                    print('\n')
-                    print('Processing following observed objects: ')
-                    print('\n'.join('{}'.format(item) for item in obsObjectList))
+    ## check if list of beams were provided (-m flag)
+    elif args.beamList not None:
+        beamList = args.beamList
+        print('\n')
+        print('Processing following beams: ')
+        print('\n'.join('{}'.format(bm) for bm in beamList))
 
-            elif ind == indM:
-                if i == len(indList) - 1:
-                    beamList = sys.argv[ind + 1:]
-                else:
-                    beamList = sys.argv[ind + 1:indList[i + 1 ]]
-                ## loop through beamList to translate from WVU convention to BYU for consistent processing
-                #byuBeamList = []
-                #for bm in beamList:
-                #   byuBeamList.append(byuBeamDict[bm])
-
-                ## inform user
-                if len(beamList) == 0:
-                    print('\n')
-                    print('No beam list after \'-m\' flag; exiting...')
-                    sys.exit()
-                else:
-                    print('\n')
-                    print('Processing following beams: ')
-                    print('\n'.join('{}'.format(bm) for bm in beamList))
-            ## if none of these flags were found, then inform user that an unrecognized flag was given and exit
-            else:
-                print("Unrecognized flag was input. Accepted flags are: -b, -g, -o, and -m. Exiting...")
-                sys.exit()
-    ## one more if block to inform user if any default settings active
-    if not '-b' in currFlags:
+    ## one more if block to inform user if any default settings are active
+    if not args.badTimes:
         print('\n')
         print('No bad time stamps indicated...')
-    if not '-g' in currFlags:
+    if not args.goodTimes:
         print('\n')
         print('Processing all available scans...')
-    if not '-o' in currFlags:
+    if not args.objectList:
         print('\n')
         print('Processing all observed objects in project...')
-    if not '-m' in currFlags:
+    if not args.beamList:
         print('\n')
         print('Processing all available beams...')
 
@@ -467,12 +375,8 @@ def main():
     except NameError:
         numFields = wtFile[1].header['TFIELDS']
         numBeams = int((numFields - 2) / 2)
-        #byuBeamList = range(0, numBeams)
-        beamList = list(range(0, numBeams))
-        #for el in range(0, len(byuBeamList)):
-        #   byuBeamList[el] = np.str(el)
-        for el in range(0, len(beamList)):
-           beamList[el] = np.str(el)
+        ## create list of beam numbers of type str
+        beamList = [str(i) for i in range(numBeams)]
  
     ## generate object and list of FITS files in case user wishes to process all object/timestamps
     allObjList, allFitsList = generateObjAndFitsLists(goFitsPath)
@@ -499,7 +403,7 @@ def main():
     print('Weight file path: ' + weightPath)
     print('Observed objects to process: ')
     print('\n'.join('{}'.format(item) for item in objList))
-
+    
 
     """
     This is the first of several processing loops. Here we being by looping over the list of objects...
