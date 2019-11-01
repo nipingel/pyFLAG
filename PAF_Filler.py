@@ -33,6 +33,8 @@ import os
 import glob
 import pickle
 import argparse
+import time
+from multiprocessing import Pool
 from modules.metaDataModule import MetaDataModule
 from modules.beamformingModule import BeamformingModule
 import matplotlib.pyplot as pyplot
@@ -225,15 +227,17 @@ def getScanInfo(fitsLst):
     return numInts, intLen, numChans, fitsLst
 
 """
-small function to return the index of the indicated string in the provided list. This function is used primarly to parse
-user input
+function that submits list of bank FITS files to the beamformer module for processing
+using multiprocessing's Pool object. Each Bank file is sent to the beamformer object
+using one of the available 32 cores on flag-beam.
 """
-def findIndex(elemStr, inputList):
-    try:
-        index = inputList.index(elemStr)
-        return index
-    except ValueError:
-        return None
+def multiprocessBankList(bf, bankList, data, bm, xID):
+    p = Pool()
+    xDataList, yDataList = p.map(bf.getSpectralArray(), bankList)
+    p.close()
+    p.join()
+
+    print(xDataList.shape)
 
 
 """
@@ -440,7 +444,6 @@ def main():
         """
         Loop over beams to read in files for object of interest and construct a single SINGLE DISH binary FITS table
         """
-        sys.exit()
         for bm in beamList:
 
             allBanksList = [] ## list of paths to all good BANK FITS files associated with object
@@ -461,27 +464,6 @@ def main():
             Loop over time stamps associated with current observed object to make sure
             data exists. If not, then append these time stamps to a list for removal
             """
-            removeList = []
-            for dataFITSFile in fileList:
-                """ 
-                check if '.fits' is at the end of elements in fileList
-                if so, remove it
-                """
-                if dataFITSFile[-5:] == '.fits':
-                    dataFITSFile = dataFITSFile[:-5]
-                ## check if we have bank data for this scan
-                testLst = glob.glob(dataPath + dataFITSFile + '*.fits')
-                if len(testLst) == 0:
-                    print('\n')
-                    print('No associated data file with time stamp: ' + dataFITSFile)
-                    text_file = open("skippedScans.txt", "w")
-                    text_file.write(dataFITSFile)
-                    text_file.close()
-                    removeList.append(dataFITSFile)
-            ## remove any scans with no data (probably aborted early)
-            if len(removeList) > 0:
-                for replaceElem in removeList:
-                    fileList.remove(replaceElem)
 
             """
             Loop over time stamps associated with current observed object
@@ -490,8 +472,17 @@ def main():
             for dataFITSFile in fileList:
                 if dataFITSFile[-5:] == '.fits':
                     dataFITSFile = dataFITSFile[:-5]
-                ## check if we have bank data for this scan
+
+                ## check if we have bank data for this scan. If not, likely scan aborted early
                 testLst = glob.glob(dataPath + dataFITSFile + '*.fits')
+                if len(testLst) == 0:
+                    print('\n')
+                    print('No associated data file with time stamp: ' + dataFITSFile)
+                    text_file = open("skippedScans.txt", "w")
+                    text_file.write(dataFITSFile)
+                    text_file.close()
+                    continue
+
                 ## get essential info about current timestamp
                 numInts, intLen, numSpecChans, bankList = getScanInfo(testLst)
                 
@@ -507,6 +498,10 @@ def main():
                 yWeightBuff =  np.zeros([numSpecChans * numBanks], dtype = 'complex64')
 
                 bankCnt = 0 ## set bank counter to keep track of number of bank FITS files processed
+                
+                multiprocessBankList(bf, bankList, data, bm, xID)
+
+
                 """
                 Loop through list of BANK FITS files to process 1/20th of the bandpass at a time. Once information 
                 about the scan is retrieved, the 'getSpectralArray' in the bf module is called and a beamformed 

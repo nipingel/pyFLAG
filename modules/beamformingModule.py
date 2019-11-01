@@ -1,22 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-2/04/18
-Module containing methods/functions for beamforming. Raw data will be correlations (in FISHFITS order). 
-Since the raw correlations are initially in a long 1D array, they must first be rearranged in matrices. 
-The beamforming weights are then read in and applied to these covariance matrices. The end result, a spectral bandpass
-for each integration within a given scan, is returned to the PAF_Filler.py to sort the frequecny channels and collate metadata.
-The method that drives the beamforming, getSpectralArray(), is called from PAF_Filler.py.
+11/01/19
+This module contains methods/functions for beamforming. The raw 1D correlatoins and weights are read 
+in using the passed in paths. The correlations are sorted into 3D matrices (elemXelemXintegrations). 
+The beamforming weights are then applied to each plane of this 3D array. The resulting array is passed back
+to PAF_Filler.py to sort the frequency channels and collate metadata. The method that drives the beamforming, 
+getSpectralArray(), is called from PAF_Filler.py.
 
-fileName, data, beam, xID, bank)
-Inputs from PAF_Filler.py:
-fileName - The scan name (i.e. time stamp) that is currently being processed
+Inputs from PAF_Filler.py for task getSpectralArray:
+fitsName - The scan name (i.e. time stamp) that is currently being processed
 data - correlation matrices in the form of integrationsx(corrs * numFreqs)
 beam - beam currently being processed
 xID - xID of BANK being processed
-bank - A-T Banks
 
-Eample:
-__email__ = "nipingel@mix.wvu.edu"
+__email__ = "Nickolas.Pingel@anu.edu.au"
 __status__ = "Production"
 """
 
@@ -27,9 +24,6 @@ import sys
 import glob
 import matplotlib.pyplot as pyplot
 
-## make beam dictionary to map from BYU to WVU convention (e.g. BYU 0 -> WVU 1)
-wvuBeamDict = {'0':'1', '1':'2', '2':'6', '3':'0', '4':'3', '5':'5','6':'4'}
-byuBeamDict = {'1':'0', '2':'1', '6':'2', '0':'3', '3':'4', '5':'5', '4':'6'}
 ## class to read in BANK data from FITS; processes each integration to go from raw covariances to beam-formed spectra
 class BeamformingModule:
     ## function to initialize object
@@ -229,7 +223,27 @@ class BeamformingModule:
         ydat = dat[20:39]
         return xdat, ydat 
       
-    
+    def getSpectralArray(self, fitsName, beam):
+
+      ## bank name is ALWAYS sixth-to-last character in string
+      bank = fileName[-6]
+      corrHDU = fits.open(fitsName)
+
+      ## get relevant information from header
+      nRows = corrHDU[1].header['NAXIS2']
+      dataArr = corrHDU[1].data['DATA']
+      xID = np.int(corrHDU[0].header['XID'])
+      
+      """
+      get CHANSEL for if we are in PFB mode. This selects which chunk of coarse channels were
+      sent through PFB. For example, if CHANSEL is 0, coarse channels 0-99 were selected; if
+      CHANSEL is 1, coarse channels 100-199 were selected.
+      """
+      chanSel = np.int(corrHDU[0].header['CHANSEL'])
+
+      ## get number of freq channels
+      numFreqs = np.int(dataArr.shape[1] / 2112) ## always 2112 complex pairs per frequency channel
+
     """
     This is the main function of this module (i.e., makes all the necessary calls to return a beamformed
     bandpass). This is called from PAF_Filler.py. After obtaining the weights, the bandpasses are beamformed
@@ -238,8 +252,7 @@ class BeamformingModule:
     """
     def getSpectralArray(self, fitsName, dataArr, beam, xID):
         
-      ## get number of freq channels
-      numFreqs = np.int(dataArr.shape[1] / 2112) ## always 2112 complex pairs per frequency channel
+
         
       """
       get CHANSEL for if we are in PFB mode. This selects which chunk of coarse channels were
