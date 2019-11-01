@@ -288,17 +288,27 @@ def main():
     if projectPath[-1] == '/':
         projectPath = projectPath[:-1]
 
-    ## test validity of input path
-    #if not os.path.exists(projectPath):
-    #    print('Incorrect path to project directory; exiting...')
-    #    sys.exit()
+    ## split project path to get project name string
+    projectPathSplit = projectPath.split('/')
+    projectStr = projectPathSplit[-1]
+    dataPath = '/lustre/flag/' +  projectStr + '/BF/'
 
-    ## test validitiy of the path to the weight FITS files
-    #testLst = glob.glob(weightPath)
-    #if len(testLst) == 0:
-    #    print('Incorrect path to weight FITS files; exiting...')
-    #    del testLst
-    #    sys.exit()
+    ##Paths to ancillary FITS files
+    goFitsPath = projectPath + '/GO'
+
+    ## test validity of input path
+    if not os.path.exists(projectPath):
+        print('Incorrect path to project directory; exiting...')
+        sys.exit()
+
+    ## get weight FITS files and test validitiy of the path
+    wtFileList = glob.glob(weightPath)
+    if len(wtFileList) == 0:
+        print('Incorrect path to weight FITS files; exiting...')
+        sys.exit()
+
+    ## generate object and list of FITS files in case user wishes to process all object/timestamps
+    allObjList, allFitsList = generateObjAndFitsLists(goFitsPath)
     
     """
     the existence of optional inputlists of good/bad timestamps (-g/-b flags), objects (-o flag), and beams (-m flag) needs to 
@@ -306,7 +316,7 @@ def main():
     """
     
     ## check if bad time stamps were provided  (-b flag)
-    if args.badTimes not None:
+    if args.badTimes:
         badScanList = args.badTimes
 
         ## loop through and append '.fits' to each element for later ID
@@ -317,21 +327,29 @@ def main():
         print('\n'.join('{}'.format(item) for item in badScanList))
 
     ## check if explicit list of time stamps were provided (-g flag)
-    elif args.goodTimes not None:
+    if args.goodTimes:
         userFitsList = args.goodTimes
         print('\n')
         print('Processing following time stamps: ') 
         print('\n'.join('{}'.format(item) for item in userFitsList))
 
-    ## check if list of objects were provided (-o flag
-    elif args.objectList not None:
-        obsObjectList = args.objectList
+    ## check if list of objects were provided (-o flag)
+    if args.objectList:
+        objList = args.objectList
+        """
+        if the user provides a list of particular objects, first test that the source was observed; if not, 
+        program exits. If the user did not provide an object list, process all observed objects. 
+        """
+        for obj in objList: ## loop 
+            if not obj in allObjList:
+                print('Requested object, ' + obj + 'was not observed in this session. Exiting...')
+                sys.exit()
         print('\n')
         print('Processing following observed objects: ')
-        print('\n'.join('{}'.format(item) for item in obsObjectList))       
+        print('\n'.join('{}'.format(item) for item in objList))       
 
     ## check if list of beams were provided (-m flag)
-    elif args.beamList not None:
+    if args.beamList:
         beamList = args.beamList
         print('\n')
         print('Processing following beams: ')
@@ -345,56 +363,27 @@ def main():
         print('\n')
         print('Processing all available scans...')
     if not args.objectList:
+        objList = allObjList
         print('\n')
         print('Processing all observed objects in project...')
     if not args.beamList:
-        print('\n')
-        print('Processing all available beams...')
-
-    ## split project path to get project name string
-    projectPathSplit = projectPath.split('/')
-    projectStr = projectPathSplit[-1]
-    dataPath = '/lustre/flag/' +  projectStr + '/BF/'
-
-    ##Paths to ancillary FITS files
-    goFitsPath = projectPath + '/GO'  
+        """
+        try-except to define number of beams; if beamList not defined, then 
+        get from first weight file header
+        """
+        try:
+            numBeams = int(len(beamList)) 
+        except NameError:
+            wtFile = fits.open(wtFileList[0])
+            numFields = wtFile[1].header['TFIELDS']
+            numBeams = int((numFields - 2) / 2)
+            ## create list of beam numbers of type str
+            beamList = [str(i) for i in range(numBeams)]
+            print('\n')
+            print('Processing all available beams...')  
     
     ## define beamformingModuleObject
     bf = BeamformingModule(dataPath, weightPath) ## creates beamforming module
-    
-    ## open weight file to get number of beams
-    wtFileList = glob.glob(weightPath)
-    wtFile = fits.open(wtFileList[0])
-
-    """
-    try-except to define number of beams; if beamList not defined, then 
-    get from first weight file header
-    """
-    try:
-        numBeams = int(len(beamList)) 
-    except NameError:
-        numFields = wtFile[1].header['TFIELDS']
-        numBeams = int((numFields - 2) / 2)
-        ## create list of beam numbers of type str
-        beamList = [str(i) for i in range(numBeams)]
- 
-    ## generate object and list of FITS files in case user wishes to process all object/timestamps
-    allObjList, allFitsList = generateObjAndFitsLists(goFitsPath)
-
-    """
-    if the user has already provided a list of particular objects, first test that the source was observed; if not, 
-    program exits. If the user did not provide an object list, process all observed objects. 
-    """
-    try:
-        objList = obsObjectList
-        for obj in obsObjectList: ## loop 
-            if not obj in allObjList:
-                print('Requested object, ' + obj + 'was not observed in this session. Exiting...')
-                sys.exit()
-    ## if objObjectList is not defined, we are processing all objects
-    except NameError: 
-        objList = allObjList
-        pass
 
     ## inform user of the inputs and objects to process
     print('\n')
@@ -403,7 +392,7 @@ def main():
     print('Weight file path: ' + weightPath)
     print('Observed objects to process: ')
     print('\n'.join('{}'.format(item) for item in objList))
-    
+
 
     """
     This is the first of several processing loops. Here we being by looping over the list of objects...
@@ -417,7 +406,7 @@ def main():
         
         """
         if user has already provided a list of timestamps for processing, test that the timestamps are valid;
-        if no list was provided, continue processing all timestamps
+        if no list was provided, continue processifng all timestamps
         """
         try:
             fileList = userFitsList
@@ -428,7 +417,8 @@ def main():
         except NameError:
             fileList = allFitsList[objInd]
             pass
-	## remove bad scans from file list
+	   
+        ## remove bad scans from file list
         if 'badScanList' in locals():
             for s in badScanList:
                 fileList.remove(s)
@@ -450,6 +440,7 @@ def main():
         """
         Loop over beams to read in files for object of interest and construct a single SINGLE DISH binary FITS table
         """
+        sys.exit()
         for bm in beamList:
 
             allBanksList = [] ## list of paths to all good BANK FITS files associated with object
