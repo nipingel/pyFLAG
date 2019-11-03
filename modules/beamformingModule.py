@@ -288,5 +288,5 @@ class BeamformingModule:
               cnt = 0 
         
       ## return beamformed bandpasses      
-      return spectrumArr_X, spectrumArr_Y, bank
+      return spectrumArr_X, spectrumArr_Y, xID
         

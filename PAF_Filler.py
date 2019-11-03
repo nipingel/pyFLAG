@@ -244,12 +244,22 @@ def multiprocessBankList(bf, bankList, bm):
     gives access to the XX (0-th index)/YY (index 1) spectra. For now, bank label returned
     as index 2. 
     """
-    result = p.starmap_async(bf.getSpectralArray, processList)
+    result = p.starmap(bf.getSpectralArray, processList)
+
+    ## extract results
+    dataXArr = np.array([result[i][0] for i in range(0, len(bankList))])
+    dataYArr = np.array([result[i][1] for i in range(0, len(bankList))])
+    bankReturnArray = np.array([result[i][2] for i in range(0, len(bankList))])
+    print(bankReturnArray[3])
+
+
     
-    #print(result.get()[4][2])
     p.close()
     p.join()
-    
+
+    ## parse result
+    sys.exit()
+
 
 """
 This is the 'main' function that drives the creation of an SDFITS file for the selected beams. After handling the user 
@@ -511,7 +521,7 @@ def main():
 
                 bankCnt = 0 ## set bank counter to keep track of number of bank FITS files processed
                 
-                multiprocessBankList(bf, bankList[0:1], bm)
+                multiprocessBankList(bf, bankList[0:4], bm)
 
 
                 """
