@@ -128,53 +128,64 @@ def sortLists(dataXList, dataYList, allFilesList, allBanksList, allNumBanksList)
     return allSortedDataX, allSortedDataY, allSortedFiles, allSortedBanks, allSortedNumBanks
 
 """
-function to map individual BANK data (bankData)
-to the full bandpass data buffer (dataBuff) based on XID. 
+function to sort the input data arrays of shape bank X int X channel into a combined
+global data buffer of shape int X full channel range, where full channel range
+is either 25*20 = 500 or 20*160 = 3200 nased on mode
 """
-def bandpassSort(xID, dataBuff, bankData):
-    """
-    Determine the correlation mode by 
-    the number of channels stored in
-    data buff as the second element.
-    Note that the number of integrations dataBuff's first element
-    """
-    numInts = bankData.shape[0]
-    numChans = bankData.shape[1]
-    for ints in range(0, numInts):
+def bandpassSort(dataArrX, dataArrY, xIdList):
+    ## determine size of input arrays
+    numBanks = dataArrX.shape[0]
+    numInts = dataArrX.shape[1]
+    numChans = dataArrX.shape[2]
+
+    ## create arrays to hold data
+    sortedDataBuff_X = np.zeros([numInts, numChans * 20], dtype = 'float')
+    sortedDataBuff_Y = np.zeros([numInts, numChans * 20], dtype = 'float')
+
+    ## loop over array containing the xId and sort based on channel mode
+    for bankIdx in range(0, numBanks):
+        xID = xIdList[bankIdx]
+
+        ## determine mode; if 25 we are in coarse channel mode,
+        ## which requires sorting in a non-contiguous fashion
         if numChans == 25:
             
-            ## coarse channel mode
             ## position in bandpass dictated by xID
+            ## starting position in channel space is
+            ## xID*5
             bandpassStartChan = xID * 5
             bandpassEndChan = bandpassStartChan + 5
-            
+
             ## get each chunk of five contigious channels from BANK data,
             ## and place it in the proper spot in full bandpass
             for i in range(0, 5):
                 bankStartChan = i * 5
                 bankEndChan = bankStartChan + 5
                 try:
-                    dataBuff[ints, bandpassStartChan:bandpassEndChan] = bankData[ints, bankStartChan:bankEndChan]
-                
+                    sortedDataBuff_X[:, bandpassStartChan:bandpassEndChan] = dataArrX[xID, :, bankStartChan:bankEndChan]
+                    sortedDataBuff_Y[:, bandpassStartChan:bandpassEndChan] = dataArrY[xID, :, bankStartChan:bankEndChan]
+            
                 ## in early observations, sometimes an extra integration was recorded in some banks. This pass statement
-                ## will skip any extra integrations  
+                ## will skip any extra integrations 
                 except IndexError:
                     pass
                 ## increment bandpassStartChan/bandpassEndChan by 100 for proper position in full bandpass
+                ## recall each chunk of five coarse channels are spaced by 100 in this mode (xId = 0; chans: 0-4, 100-104, ...)
                 bandpassStartChan += 100
-                bandpassEndChan = bandpassStartChan + 5
+                bandpassEndChan = bandpassStartChan + 5   
+        
+        ## if 160 we are in linear fine 
+        ## frequency mode. Channels can be
+        ## sorted in linear fashion   
         elif numChans == 160:
-            bandpassStartChan = xID * 160
-            bandpassEndChan = bandpassStartChan + 160
 
-            ## Added to avoid error where BANK data length is zero from a stall
-            if len(bankData[ints,:]) == 0:
-                dataBuff[ints, bandpassStartChan:bandpassEndChan] = np.zeros([160], dtype='float32')
-            elif ints >= len(dataBuff[:, 0]):
-                continue
-            else:    
-                dataBuff[ints, bandpassStartChan:bandpassEndChan] = bankData[ints, :]
-    return dataBuff
+            ## 160 fine channels are contiguous (e.g., xId = 1; chans:160-319)
+            bandpassStartChan = xID * 160
+            bandpassEndChan = bandpassStartChan + 160 
+            
+            sortedDataBuff_X[:, bandpassStartChan:bandpassEndChan] = dataArrX[xID, :, :]
+            sortedDataBuff_Y[:, bandpassStartChan:bandpassEndChan] = dataArrY[xID, :, :]
+    return sortedDataBuff_X, sortedDataBuff_Y      
 
 """
 Function that generates and returns list of observed objects and the associated timestamp FITS files. 
@@ -244,21 +255,25 @@ def multiprocessBankList(bf, bankList, bm):
     gives access to the XX (0-th index)/YY (index 1) spectra. For now, bank label returned
     as index 2. 
     """
-    result = p.starmap(bf.getSpectralArray, processList)
+    result = p.starmap_async(bf.getSpectralArray, processList)
 
-    ## extract results
-    dataXArr = np.array([result[i][0] for i in range(0, len(bankList))])
-    dataYArr = np.array([result[i][1] for i in range(0, len(bankList))])
-    bankReturnArray = np.array([result[i][2] for i in range(0, len(bankList))])
-    print(bankReturnArray[3])
-
-
-    
+    ## release worker pool
     p.close()
     p.join()
 
     ## parse result
-    sys.exit()
+    result = np.array(result.get())
+    dataXArr = np.zeros([len(bankList), result[0][0].shape[0], result[0][0].shape[1]])
+    dataYArr = np.zeros([len(bankList), result[0][0].shape[0], result[0][0].shape[1]])
+    xIDReturnArray = np.zeros([len(bankList)], dtype='int')
+    for idx in range(0, len(bankList)):
+        ### ignore if no integrations (stall)
+        if result[idx][0].shape[0] > 0:
+            dataXArr[idx, :, :] = result[idx][0]
+            dataYArr[idx, :, :] = result[idx][1]
+        xIDReturnArray[idx] = result[idx][2]
+    sortedDataBuff_X , sortedDataBuff_Y= bandpassSort(dataXArr, dataYArr, xIDReturnArray)
+    return sortedDataBuff_X, sortedDataBuff_Y
 
 
 """
@@ -480,7 +495,6 @@ def main():
             """
             if isinstance(fileList, str):
                  fileList = [fileList]
-            fileList = fileList[0:2]
 
             """
             Loop over time stamps associated with current observed object to make sure
@@ -521,46 +535,17 @@ def main():
 
                 bankCnt = 0 ## set bank counter to keep track of number of bank FITS files processed
                 
-                multiprocessBankList(bf, bankList[0:4], bm)
+                sortedDataBuff_X, sortedDataBuff_Y = multiprocessBankList(bf, bankList, bm)
+            
+
+                ## add to global data buffers
+                globalDataBuff_X_List.append(sortedDataBuff_X)
+                globalDataBuff_Y_List.append(sortedDataBuff_Y)
+                allBanksList.extend(bankList)
+                numBanksList.append(len(bankList))
 
 
-                """
-                Loop through list of BANK FITS files to process 1/20th of the bandpass at a time. Once information 
-                about the scan is retrieved, the 'getSpectralArray' in the bf module is called and a beamformed 
-                spectrum is returned (rows: inegrations; columns: frequency channels). The weights used in the processing
-                are also returned. The function bandpassSort is then called to place this 1/20th chunk of bandpass at the 
-                correct position in the global data buffers (that will be written in the output FITS file). 
-                """
-                for fileName in bankList:
-                    print('\n')                
-                    print('Beamforming correlations in: '+fileName[-25:]+', Beam: ' + bm) 
-                    ## bank name is ALWAYS sixth-to-last character in string
-                    bank = fileName[-6] 
-                    corrHDU = fits.open(fileName) ## grab xid from dictionary for sorting
-
-                    nRows = corrHDU[1].header['NAXIS2']
-                    data = corrHDU[1].data['DATA']
-                    xID = np.int(corrHDU[0].header['XID'])
-
-                    if nRows != 0: ## to avoid an empty FITS file
-                        """
-                        Do the beamforming; returns processed BANK data (cov matrices to a beam-formed bandpass) in both
-                        XX/YY Pols; returned data are in form rows: integrations, columns: frequency channels
-                        """
-                        xData, yData = bf.getSpectralArray(fileName, data, bm, xID)
-
-                        """
-                        Sort the 1/20th chunk based on xid number for each integration. The dataBuff_X/Y variable is constantly
-                        being updated as the individual BANKS are processed
-                        """       
-                        dataBuff_X = bandpassSort(xID, dataBuff_X, xData)
-                        dataBuff_Y = bandpassSort(xID, dataBuff_Y, yData)
-                        allBanksList.append(fileName) ## append good BANK file to master list that is passed to metadataModule
-                        bankCnt += 1 ## increment bank counter
-
-                globalDataBuff_X_List.append(dataBuff_X) ## append to global buffer lists
-                globalDataBuff_Y_List.append(dataBuff_Y)
-                numBanksList.append(bankCnt) ## append bankCnt to list 
+                sys.exit(0)
 
             print('\n') ## make terminal output look cleaner
 
