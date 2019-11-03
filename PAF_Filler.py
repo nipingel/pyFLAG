@@ -233,14 +233,23 @@ using one of the available 32 cores on flag-beam.
 """
 def multiprocessBankList(bf, bankList, bm):
     p = Pool()
+    ## create zipped list to pass in the arguments for each BANK file
+    ## beam will always be the same
     processList = list(zip(bankList, bm * len(bankList)))
 
-    result = p.starmap(bf.getSpectralArray, processList)
-    print(result[4][2])
+    """
+    start the jobs; result will be a list wherein the
+    first element is acess to the XX/YY beamformed spectra (in order of input);
+    that is, the first list element is always bank A and last is T. The second element
+    gives access to the XX (0-th index)/YY (index 1) spectra. For now, bank label returned
+    as index 2. 
+    """
+    result = p.starmap_async(bf.getSpectralArray, processList)
+    
+    #print(result.get()[4][2])
     p.close()
     p.join()
-    sys.exit()
-
+    
 
 """
 This is the 'main' function that drives the creation of an SDFITS file for the selected beams. After handling the user 
@@ -502,7 +511,7 @@ def main():
 
                 bankCnt = 0 ## set bank counter to keep track of number of bank FITS files processed
                 
-                multiprocessBankList(bf, bankList[0:5], bm)
+                multiprocessBankList(bf, bankList[0:1], bm)
 
 
                 """

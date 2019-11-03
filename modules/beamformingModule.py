@@ -106,9 +106,6 @@ class BeamformingModule:
       """
       numCorr = 820
       newDataVector= np.zeros([820 * numFreqs], dtype='complex64')
-       
-      ## set starting index for new data buffer
-      FITS_strt_idx = 0
       
       ## exapand the map vector to the same size of the 1D correlation vector
       expMapVector = np.array([self.mapVector + 2112*i for i in range(numFreqs)]).flatten()
@@ -119,16 +116,6 @@ class BeamformingModule:
       dp2xdp2_freq1, ... dp2xdp40_fre1, dp3xdp3_freq1, ... dp40xdp40_freq1, dpxdp1_freq2, ... dp40x4dp0_freq2,
       ... dp40xdp40_freqN, where N is the total number of freq channels. 
       """
-      #for i in range(0, numFreqs * 2112, 2112):
-        #singleChanData = dataVector[i: i + 2112] ## grab a single freq. channel worth of correlations
-           
-       # """
-       # loop through and assign new order based on the mapVector attribute, which gives the new index of the 
-       # raw correlation
-       # """ 
-        #for z in range(0,len(self.mapVector)):
-        #    newDataVector[z+FITS_strt_idx] = singleChanData[self.mapVector[z]]
-        #FITS_strt_idx+=820 ## update starting index
        
       ## Once sorted, we can construct a retCube with dim1 = numElements, dim2 = numElements, dim3 = freqChans
       numElem = 40
@@ -150,7 +137,7 @@ class BeamformingModule:
           if row != col :
             retCube[col,row,:] = newDataVector[offset::numCorr].conj()
           offset += 1   
-       
+ 
       ## if in PFB mode (i.e. 160 fine channels), we need to re-stitch the frequency channels as they are
       ## output in a non-contiguous fashion
       if numFreqs == 160:
@@ -290,8 +277,9 @@ class BeamformingModule:
             wtIdx = absWtIdx + (chanSel * 5) ## index for selecting correct weight to apply to the next 32 fine channels
             xWeightIn = xWeight[wtIdx, :]
             yWeightIn = yWeight[wtIdx, :]
-            spectrumArr_X[ints, z] = np.abs(self.processPol(dat, xWeightIn))
+            spectrumArr_X[ints, z] = np.abs(self.processPol(dat, xWeightIn))        
             spectrumArr_Y[ints, z] = np.abs(self.processPol(dat, yWeightIn))
+
             cnt += 1 ## increase number of fine channels processed
 
             ## if we have processed 32 channels, select the weight for the next coarse channel 
@@ -299,7 +287,6 @@ class BeamformingModule:
               absWtIdx += 1
               cnt = 0 
         
-      ## return beamformed bandpasses   
-      print(bank)    
+      ## return beamformed bandpasses      
       return spectrumArr_X, spectrumArr_Y, bank
         
