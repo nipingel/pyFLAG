@@ -50,6 +50,17 @@ wvuBeamDict = {'0':'1', '1':'2', '2':'6', '3':'0', '4':'3', '5':'5','6':'4'}
 byuBeamDict = {'1':'0', '2':'1', '6':'2', '0':'3', '3':'4', '5':'5', '4':'6'}
 
 """
+progress bar function 
+"""
+def progressBar(value, endvalue, beam, bar_length=20):
+    beamName = str(beam)
+    percent = float(value) / endvalue
+    arrow = '-' * int(round(percent * bar_length)-1) + '>'
+    spaces = ' ' * (bar_length - len(arrow))
+    sys.stdout.write("\rPercent of integrations filled in beam "+ beamName +": [{0}] {1}%".format(arrow + spaces, int(round(percent * 100))))
+    sys.stdout.flush()  
+
+"""
 Takes input lists and sorts them into a 'list-of-lists' that contains the 
 original elements sorted into different observing modes. Each element in the
 returned list-of-lists is the portion of the input lists associated with a 
@@ -505,7 +516,11 @@ def main():
             Loop over time stamps associated with current observed object
             and process
             """
+            fileCnt = 0
             for dataFITSFile in fileList:
+                ## inform user of progress
+                progressBar(fileCnt, len(fileList), bm, bar_length=20)
+
                 if dataFITSFile[-5:] == '.fits':
                     dataFITSFile = dataFITSFile[:-5]
 
@@ -532,8 +547,6 @@ def main():
                 ## initialize weight data buffers in case there is analysis to be done
                 xWeightBuff =  np.zeros([numSpecChans * numBanks], dtype = 'complex64')
                 yWeightBuff =  np.zeros([numSpecChans * numBanks], dtype = 'complex64')
-
-                bankCnt = 0 ## set bank counter to keep track of number of bank FITS files processed
                 
                 sortedDataBuff_X, sortedDataBuff_Y = multiprocessBankList(bf, bankList, bm)
             
@@ -544,8 +557,8 @@ def main():
                 allBanksList.extend(bankList)
                 numBanksList.append(len(bankList))
 
-
-                sys.exit(0)
+                ## increment file counter
+                fileCnt += 1
 
             print('\n') ## make terminal output look cleaner
 

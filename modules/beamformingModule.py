@@ -250,9 +250,7 @@ class BeamformingModule:
       xWeight, yWeight = self.getWeights(numFreqs, xID, beam)
 
       ## loop through integrations and process covariance bandpass to beam-formed spectra
-      for ints in range(0, len(dataArr[:,0])):   
-        ## update progress bar for BANK file
-        self.progressBar(ints, len(dataArr[:,0]), beam, xID)           
+      for ints in range(0, len(dataArr[:,0])):             
         
         ## grab a covariance bandpass for a single integration
         dataVector=dataArr[ints, :]
