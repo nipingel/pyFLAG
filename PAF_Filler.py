@@ -143,11 +143,13 @@ function to sort the input data arrays of shape bank X int X channel into a comb
 global data buffer of shape int X full channel range, where full channel range
 is either 25*20 = 500 or 20*160 = 3200 nased on mode
 """
-def bandpassSort(dataArrX, dataArrY, xIdList):
+def bandpassSort(dataXList, dataYList, xIdList):
+
+    ## determine the number of banks
+    numBanks = len(dataXList)
     ## determine size of input arrays
-    numBanks = dataArrX.shape[0]
-    numInts = dataArrX.shape[1]
-    numChans = dataArrX.shape[2]
+    numInts = dataXList[0].shape[0]
+    numChans = dataXList[0].shape[1]
 
     ## create arrays to hold data
     sortedDataBuff_X = np.zeros([numInts, numChans * 20], dtype = 'float')
@@ -173,17 +175,21 @@ def bandpassSort(dataArrX, dataArrY, xIdList):
                 bankStartChan = i * 5
                 bankEndChan = bankStartChan + 5
                 try:
-                    sortedDataBuff_X[:, bandpassStartChan:bandpassEndChan] = dataArrX[xID, :, bankStartChan:bankEndChan]
-                    sortedDataBuff_Y[:, bandpassStartChan:bandpassEndChan] = dataArrY[xID, :, bankStartChan:bankEndChan]
+                    sortedDataBuff_X[:, bandpassStartChan:bandpassEndChan] = dataXList[xID][:, bankStartChan:bankEndChan]
+                    sortedDataBuff_Y[:, bandpassStartChan:bandpassEndChan] = dataYList[xID][:, bankStartChan:bankEndChan]
             
                 ## in early observations, sometimes an extra integration was recorded in some banks. This pass statement
                 ## will skip any extra integrations 
                 except IndexError:
                     pass
+
+                ## if a bank stalled, the integrations may not be equal to defined array size. Just skip 
+                except ValueError:
+                    pass
                 ## increment bandpassStartChan/bandpassEndChan by 100 for proper position in full bandpass
                 ## recall each chunk of five coarse channels are spaced by 100 in this mode (xId = 0; chans: 0-4, 100-104, ...)
                 bandpassStartChan += 100
-                bandpassEndChan = bandpassStartChan + 5   
+                bandpassEndChan = bandpassStartChan + 5 
         
         ## if 160 we are in linear fine 
         ## frequency mode. Channels can be
@@ -194,8 +200,8 @@ def bandpassSort(dataArrX, dataArrY, xIdList):
             bandpassStartChan = xID * 160
             bandpassEndChan = bandpassStartChan + 160 
             
-            sortedDataBuff_X[:, bandpassStartChan:bandpassEndChan] = dataArrX[xID, :, :]
-            sortedDataBuff_Y[:, bandpassStartChan:bandpassEndChan] = dataArrY[xID, :, :]
+            sortedDataBuff_X[:, bandpassStartChan:bandpassEndChan] = dataXList[xID][:, :]
+            sortedDataBuff_Y[:, bandpassStartChan:bandpassEndChan] = dataYList[xID][:, :]
     return sortedDataBuff_X, sortedDataBuff_Y      
 
 """
@@ -274,16 +280,21 @@ def multiprocessBankList(bf, bankList, bm):
 
     ## parse result
     result = np.array(result.get())
+
+    dataXList  = []
+    dataYList = []
     dataXArr = np.zeros([len(bankList), result[0][0].shape[0], result[0][0].shape[1]])
     dataYArr = np.zeros([len(bankList), result[0][0].shape[0], result[0][0].shape[1]])
     xIDReturnArray = np.zeros([len(bankList)], dtype='int')
     for idx in range(0, len(bankList)):
         ### ignore if no integrations (stall)
         if result[idx][0].shape[0] > 0:
-            dataXArr[idx, :, :] = result[idx][0]
-            dataYArr[idx, :, :] = result[idx][1]
+            #dataXArr[idx, :, :] = result[idx][0]
+            #dataYArr[idx, :, :] = result[idx][1]
+            dataXList.append(result[idx][0])
+            dataYList.append(result[idx][1])
         xIDReturnArray[idx] = result[idx][2]
-    sortedDataBuff_X , sortedDataBuff_Y= bandpassSort(dataXArr, dataYArr, xIDReturnArray)
+    sortedDataBuff_X , sortedDataBuff_Y= bandpassSort(dataXList, dataYList, xIDReturnArray)
     return sortedDataBuff_X, sortedDataBuff_Y
 
 
