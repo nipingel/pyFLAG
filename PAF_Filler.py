@@ -506,7 +506,6 @@ def main():
             """
             if isinstance(fileList, str):
                  fileList = [fileList]
-            fileList = fileList[0:2]
             """
             Loop over time stamps associated with current observed object to make sure
             data exists. If not, then append these time stamps to a list for removal

@@ -1474,6 +1474,7 @@ class MetaDataModule:
       utdate = t.iso[0:10]
       uttime = t.iso[11:]
       radVelCorr_HEL, radVelCorr_LSR = self.radvelcorrObj.correctVel(utdate,uttime,raVal,decVal) ## calculate correction
+
       ## compute optical velocity of ref freq
       vOpt = self.c*(1-cenFreqVal/restFreqVal)
       ## add radial correction
