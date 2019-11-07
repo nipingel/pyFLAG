@@ -1399,8 +1399,8 @@ class MetaDataModule:
       geoRa, geoDec = pysla.slalib.sla_map(np.deg2rad(raVal), np.deg2rad(decVal), 0.0, 0.0, 0.0, velVal, 2000.0, dmjdVal)
       ## convert from center-of-earth to observed at GBO
       obsAz, obsZen, obsHA, obsDec, obsRa = pysla.slalib.sla_aop(geoRa, geoDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
-      ## convert from obs eq to horizontal
-      obsAz, obsEl = pysla.slalib.sla_e2h(obsHA, obsDec, np.deg2rad(self.GBTLAT)) #geoDec
+      ## convert from obs eq to horizontal (use local definitation of hour angle)
+      obsAz, obsEl = pysla.slalib.sla_e2h(lstStartRads[coordIdx] - obsRa, obsDec, np.deg2rad(self.GBTLAT))
       ## apply refraction correction
       ## apply beam offset corrections
       newElVal = obsEl - beamElArr[coordIdx] + np.deg2rad(extRefractArr[coordIdx])
@@ -1408,6 +1408,7 @@ class MetaDataModule:
       ## place in arrays
       newAzArr[coordIdx] = np.rad2deg(newAzVal)
       newElArr[coordIdx] = np.rad2deg(newElVal)
+
       ## put the major/minor array in the correct coordinate system based on INDICSYS
       if extCoordSys[coordIdx] == 'AZEL':
         # major and minor are az and el
@@ -1423,7 +1424,7 @@ class MetaDataModule:
         newObsRa = lstStartRads[coordIdx] - newObsHA
 
         ## convert from observed at GBO to geocentric (center of Earth)
-        newGeoRa, newGeoDec = pysla.slalib.sla_oap('H', newObsHA, newObsDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
+        newGeoRa, newGeoDec = pysla.slalib.sla_oap('R', newObsRa, newObsDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
         ## convert from geocenteric to mean
         newRa, newDec = pysla.slalib.sla_amp(newGeoRa, newGeoDec, dmjdVal, 2000.0)
 
@@ -1449,6 +1450,7 @@ class MetaDataModule:
     hdu.data['TRGTLAT'] = newMinArr
     hdu.data['AZIMUTH'] = newAzArr
     hdu.data['ELEVATIO'] = newElArr
+
     ## return SDFITS binary table with updated values
     return hdu
   """
@@ -1551,6 +1553,8 @@ class MetaDataModule:
     
     ## with updated RA/Dec, perform doppler correction
     tblHdu = self.radVelCorrection(tblHdu)       
+
+    print(tblHdu.data['ELEVATIO'][0:10])
     
     ## loop through globalBuffer list to get total number of scans
     totalInts = 0
