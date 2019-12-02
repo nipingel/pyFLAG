@@ -828,6 +828,7 @@ class MetaDataModule:
         elif value == 'AZEL_ENCODER' and param == 'CTYPE3':
           valStr = 'EL'
           self.initArr(fileNum, numScanInts, 'str', valStr)
+        value = valStr
         
       ## we will need to calculate this based on LST start time, DMJD value, and scan DATE-OBS (start time) -> all stored in Antenna FITS file
       elif param == 'LST': ## we will need to calculate this based on LST start and integration time
@@ -868,6 +869,7 @@ class MetaDataModule:
         value = antHDU[0].header['AMBPRESS']
         value=value*0.75006375541921    
         self.initArr(fileNum, numScanInts, 'float64', None)
+
       if fileNum == 0: 
         self.valueArr[::2] = value ## fill FITS column array
         self.valueArr[1::2] = value
@@ -1398,9 +1400,9 @@ class MetaDataModule:
       ## convert J2000 -> geoapparent (center of Earth)
       geoRa, geoDec = pysla.slalib.sla_map(np.deg2rad(raVal), np.deg2rad(decVal), 0.0, 0.0, 0.0, velVal, 2000.0, dmjdVal)
       ## convert from center-of-earth to observed at GBO
-      obsAz, obsZen, obsHA, obsDec, obsRa = pysla.slalib.sla_aop(geoRa, geoDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
+      #obsAz, obsZen, obsHA, obsDec, obsRa = pysla.slalib.sla_aop(geoRa, geoDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
       ## convert from obs eq to horizontal (use local definitation of hour angle)
-      obsAz, obsEl = pysla.slalib.sla_e2h(lstStartRads[coordIdx] - obsRa, obsDec, np.deg2rad(self.GBTLAT))
+      obsAz, obsEl = pysla.slalib.sla_e2h(lstStartRads[coordIdx] - geoRa, geoDec, np.deg2rad(self.GBTLAT))
       ## apply refraction correction
       ## apply beam offset corrections
       newElVal = obsEl - beamElArr[coordIdx] + np.deg2rad(extRefractArr[coordIdx])
@@ -1424,9 +1426,10 @@ class MetaDataModule:
         newObsRa = lstStartRads[coordIdx] - newObsHA
 
         ## convert from observed at GBO to geocentric (center of Earth)
-        newGeoRa, newGeoDec = pysla.slalib.sla_oap('R', newObsRa, newObsDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
+        #newGeoRa, newGeoDec = pysla.slalib.sla_oap('R', newObsRa, newObsDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
         ## convert from geocenteric to mean
-        newRa, newDec = pysla.slalib.sla_amp(newGeoRa, newGeoDec, dmjdVal, 2000.0)
+        #newRa, newDec = pysla.slalib.sla_amp(newGeoRa, newGeoDec, dmjdVal, 2000.0)
+        newRa, newDec = pysla.slalib.sla_amp(newObsRa, newObsDec, dmjdVal, 2000.0)
 
         ## convert radians to degrees
         newRaArr[coordIdx] = np.rad2deg(newRa)
@@ -1547,14 +1550,13 @@ class MetaDataModule:
     tblHdu = fits.BinTableHDU.from_columns(self.cols, header = binHeader)
     corrHDU = fits.open(self.bankFitsList[0])
 
+    print(tblHdu.data['CTYPE3'])
 
     ## correct spatial offsets
     tblHdu = self.offsetCorrection(tblHdu)
     
     ## with updated RA/Dec, perform doppler correction
     tblHdu = self.radVelCorrection(tblHdu)       
-
-    print(tblHdu.data['ELEVATIO'][0:10])
     
     ## loop through globalBuffer list to get total number of scans
     totalInts = 0

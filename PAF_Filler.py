@@ -146,7 +146,7 @@ is either 25*20 = 500 or 20*160 = 3200 nased on mode
 def bandpassSort(dataXList, dataYList, xIdList):
 
     ## determine the number of banks
-    numBanks = len(dataXList)
+    numBanks = len(xIdList)
     ## determine size of input arrays
     numInts = dataXList[0].shape[0]
     numChans = dataXList[0].shape[1]
@@ -158,7 +158,6 @@ def bandpassSort(dataXList, dataYList, xIdList):
     ## loop over array containing the xId and sort based on channel mode
     for bankIdx in range(0, numBanks):
         xID = xIdList[bankIdx]
-
         ## determine mode; if 25 we are in coarse channel mode,
         ## which requires sorting in a non-contiguous fashion
         if numChans == 25:
@@ -175,8 +174,8 @@ def bandpassSort(dataXList, dataYList, xIdList):
                 bankStartChan = i * 5
                 bankEndChan = bankStartChan + 5
                 try:
-                    sortedDataBuff_X[:, bandpassStartChan:bandpassEndChan] = dataXList[xID][:, bankStartChan:bankEndChan]
-                    sortedDataBuff_Y[:, bandpassStartChan:bandpassEndChan] = dataYList[xID][:, bankStartChan:bankEndChan]
+                    sortedDataBuff_X[:, bandpassStartChan:bandpassEndChan] = dataXList[bankIdx][:, bankStartChan:bankEndChan]
+                    sortedDataBuff_Y[:, bandpassStartChan:bandpassEndChan] = dataYList[bankIdx][:, bankStartChan:bankEndChan]
             
                 ## in early observations, sometimes an extra integration was recorded in some banks. This pass statement
                 ## will skip any extra integrations 
@@ -200,8 +199,13 @@ def bandpassSort(dataXList, dataYList, xIdList):
             bandpassStartChan = xID * 160
             bandpassEndChan = bandpassStartChan + 160 
             
-            sortedDataBuff_X[:, bandpassStartChan:bandpassEndChan] = dataXList[xID][:, :]
-            sortedDataBuff_Y[:, bandpassStartChan:bandpassEndChan] = dataYList[xID][:, :]
+            ## try-catch to skip over stalled banks
+            try:
+                sortedDataBuff_X[:, bandpassStartChan:bandpassEndChan] = dataXList[bankIdx][:, :]
+                sortedDataBuff_Y[:, bandpassStartChan:bandpassEndChan] = dataYList[bankIdx][:, :]
+            except ValueError:
+                pass
+
     return sortedDataBuff_X, sortedDataBuff_Y      
 
 """
@@ -288,11 +292,11 @@ def multiprocessBankList(bf, bankList, bm):
     xIDReturnArray = np.zeros([len(bankList)], dtype='int')
     for idx in range(0, len(bankList)):
         ### ignore if no integrations (stall)
-        if result[idx][0].shape[0] > 0:
+        #if result[idx][0].shape[0] > 0:
             #dataXArr[idx, :, :] = result[idx][0]
             #dataYArr[idx, :, :] = result[idx][1]
-            dataXList.append(result[idx][0])
-            dataYList.append(result[idx][1])
+        dataXList.append(result[idx][0])
+        dataYList.append(result[idx][1])
         xIDReturnArray[idx] = result[idx][2]
     sortedDataBuff_X , sortedDataBuff_Y= bandpassSort(dataXList, dataYList, xIDReturnArray)
     return sortedDataBuff_X, sortedDataBuff_Y
@@ -498,7 +502,9 @@ def main():
         if tmpVar[-5:] == '.fits':
              fileList = [s[:-5] for s in fileList] 
         print('\n'.join('{}'.format(item) for item in fileList))
-        
+
+        #fileList = fileList[6:8]
+
         """
         Loop over beams to read in files for object of interest and construct a single SINGLE DISH binary FITS table
         """
@@ -546,7 +552,7 @@ def main():
 
                 ## get essential info about current timestamp
                 numInts, intLen, numSpecChans, bankList = getScanInfo(testLst)
-                
+
                 """
                 initialize bank data buffers; columns are total number of spectral channels and rows are 
                 individual integrations
