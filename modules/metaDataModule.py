@@ -1114,7 +1114,7 @@ class MetaDataModule:
         value = self.centralfreq
         if self.pfb == True: ## if we are in PFB mode, the chanSel is used to determine the frequency values for fine channels
             lowEnd = value - (250-(chanSel*100))*.30318*1e6
-            highEnd = value-(250-(chanSel*100+100))*.30318*1e6
+            highEnd = value- (250-(chanSel*100+100))*.30318*1e6
             value = highEnd - (highEnd-lowEnd)/2
         self.initArr(fileNum, numScanInts, 'float64', None) ## initialize FITS column array
       if fileNum == 0:
@@ -1399,12 +1399,14 @@ class MetaDataModule:
 
       ## convert J2000 -> geoapparent (center of Earth)
       geoRa, geoDec = pysla.slalib.sla_map(np.deg2rad(raVal), np.deg2rad(decVal), 0.0, 0.0, 0.0, velVal, 2000.0, dmjdVal)
+      
       ## convert from center-of-earth to observed at GBO
       #obsAz, obsZen, obsHA, obsDec, obsRa = pysla.slalib.sla_aop(geoRa, geoDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
+      
       ## convert from obs eq to horizontal (use local definitation of hour angle)
       obsAz, obsEl = pysla.slalib.sla_e2h(lstStartRads[coordIdx] - geoRa, geoDec, np.deg2rad(self.GBTLAT))
-      ## apply refraction correction
-      ## apply beam offset corrections
+      ## apply refraction correction and beam offsets 
+
       newElVal = obsEl - beamElArr[coordIdx] + np.deg2rad(extRefractArr[coordIdx])
       newAzVal = obsAz - (beamXElArr[coordIdx] / np.cos(newElVal))
       ## place in arrays
@@ -1428,7 +1430,6 @@ class MetaDataModule:
         ## convert from observed at GBO to geocentric (center of Earth)
         #newGeoRa, newGeoDec = pysla.slalib.sla_oap('R', newObsRa, newObsDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
         ## convert from geocenteric to mean
-        #newRa, newDec = pysla.slalib.sla_amp(newGeoRa, newGeoDec, dmjdVal, 2000.0)
         newRa, newDec = pysla.slalib.sla_amp(newObsRa, newObsDec, dmjdVal, 2000.0)
 
         ## convert radians to degrees
@@ -1479,13 +1480,13 @@ class MetaDataModule:
       utdate = t.iso[0:10]
       uttime = t.iso[11:]
       radVelCorr_HEL, radVelCorr_LSR = self.radvelcorrObj.correctVel(utdate,uttime,raVal,decVal) ## calculate correction
-
       ## compute optical velocity of ref freq
-      vOpt = self.c*(1-cenFreqVal/restFreqVal)
+
+      vOpt = self.c*(restFreqVal/cenFreqVal - 1)
       ## add radial correction
       newVOpt = vOpt + radVelCorr_HEL
       ## now convert back to frequency
-      newCenFreq = (1-newVOpt/self.c)*restFreqVal 
+      newCenFreq = restFreqVal/(1+newVOpt/self.c)
       ## update reference frequency value
       cenFreqsArr[velIter] = newCenFreq
     ## update columns
@@ -1549,8 +1550,6 @@ class MetaDataModule:
     ##make preliminary table HDU   
     tblHdu = fits.BinTableHDU.from_columns(self.cols, header = binHeader)
     corrHDU = fits.open(self.bankFitsList[0])
-
-    print(tblHdu.data['CTYPE3'])
 
     ## correct spatial offsets
     tblHdu = self.offsetCorrection(tblHdu)

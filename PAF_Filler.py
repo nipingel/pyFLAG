@@ -522,7 +522,7 @@ def main():
             such that if type of fileList is equal to string, cast into a list
             """
             if isinstance(fileList, str):
-                 fileList = [fileList]
+                fileList = [fileList]
             """
             Loop over time stamps associated with current observed object to make sure
             data exists. If not, then append these time stamps to a list for removal
