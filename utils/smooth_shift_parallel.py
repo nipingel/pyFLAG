@@ -53,7 +53,7 @@ kernel = args.kernel
 if args.beamList:
 	beamList = args.beamList
 if not args.beamList:
-	beamList = [str(i) for i in range(0, 2)]
+	beamList = [str(i) for i in range(0, 7)]
 
 ## pass to processing pool
 p = Pool()
