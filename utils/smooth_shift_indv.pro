@@ -14,7 +14,7 @@ outfile = args[2]
 
 ;; construct Gaussian kernel
 for i=3, N_ELEMENTS(args) - 1 DO BEGIN
-	kernel = APPEND(kernel, args[i])
+	kernel = APPEND(kernel, FLOAT(args[i]))
 ENDFOR
 
 ;; read in file
@@ -39,5 +39,5 @@ for s=0,n_elements(allscans)-1 do begin
 endfor
 
 unfreeze
-
+exit
 end

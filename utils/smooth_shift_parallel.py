@@ -31,6 +31,9 @@ def smoothBeam(fileName, srcStr, outFileName, beam, kern):
 	kernStr = " ".join(kern)
 	## make call to shell
 	os.system("gbtidl -e 'smooth_shift_indv' -args %s %s %s %s" % (fileNameStr, srcStr, outFileStr, kernStr))
+
+	print('Finished smoothing for %s' % fileNameStr)
+
 ## TODO: unpack user arguments
 parser = argparse.ArgumentParser()
 
@@ -50,7 +53,7 @@ kernel = args.kernel
 if args.beamList:
 	beamList = args.beamList
 if not args.beamList:
-	beamList = [str(i) for i in range(0, 7)]
+	beamList = [str(i) for i in range(0, 2)]
 
 ## pass to processing pool
 p = Pool()
