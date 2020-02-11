@@ -17,6 +17,9 @@ for i=3, N_ELEMENTS(args) - 1 DO BEGIN
 	kernel = APPEND(kernel, args[i])
 ENDFOR
 
+;; read in file
+filein, fileName
+
 allscans=get_scan_numbers(source=sname,procedure='*Map')
 
 fileout,outfile
@@ -26,21 +29,12 @@ for s=0,n_elements(allscans)-1 do begin
     info=scan_info(allscans(s))
     nint=info.n_integrations
     for i=0,nint-1 do begin
-	for p=0,1 do begin
-	    print, allscans(s),i,p
-	    get,scan=allscans(s),int=i,plnum=p
-	    if keyword_set(box) then begin
-		boxcar,box,/decimate 
-	    endif
-	    if keyword_set(kernel)then begin
-		gconvol,kernel/total(kernel)
-		resample,!g.s[0].frequency_interval*total(kernel)
-	    endif
-	    if keyword_set(cshift) then begin
-		gshift,cshift,/spline
-	    endif
-	    keep
-	endfor
+		for p=0,1 do begin
+	    	get,scan=allscans(s),int=i,plnum=p
+			gconvol,kernel/total(kernel)
+			resample,!g.s[0].frequency_interval*total(kernel)
+	    	keep
+		endfor
    endfor
 endfor
 

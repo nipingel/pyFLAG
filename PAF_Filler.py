@@ -503,7 +503,6 @@ def main():
              fileList = [s[:-5] for s in fileList] 
         print('\n'.join('{}'.format(item) for item in fileList))
 
-        #fileList = fileList[6:8]
 
         """
         Loop over beams to read in files for object of interest and construct a single SINGLE DISH binary FITS table
