@@ -59,8 +59,7 @@ chan
 freeze
 
 ;; loop through scans to process each integration separately; first need to build the average 'off' 
-;;for idx = 0, N_ELEMENTS(allScans)-1 DO BEGIN
-FOR idx = 0, 1 DO BEGIN
+for idx = 0, N_ELEMENTS(allScans)-1 DO BEGIN
     goodIdx=allScans(idx)
 
     get, scan=goodIdx, int=0, plnum=0; call scan to get the number of intergrations
