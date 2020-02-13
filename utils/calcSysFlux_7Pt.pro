@@ -217,20 +217,19 @@ info=scan_info(sigScan)
 nint = info.n_integrations
 FOR j=0, nint -1 DO BEGIN
   FOR pl = 0, 1 DO BEGIN
-    gettp, sigScan, int=j, plnum=1, /quiet
+    gettp, sigScan, int=j, plnum=pl, /quiet
     ;; get elevation value for correction
     elVal = !g.s[0].elevation
     ;; compute atmospheric correction factor
     atmosCorr = exp(0.01/sin(elVal*3.14159/180.0))/0.99 ;; numerator is for atmoshperic attenuation; denominator is correction for spillover, ohmic loss, etc...
+
     bandpass = getdata()
     ;; combine the two bandpass into final on distribution (for each polarization)
     IF pl EQ 0 THEN BEGIN
-      accum, 0
       onDist_YY = APPEND(onDist_YY, bandpass[chan0:chan1]*atmosCorr)
       onDist_YY = APPEND(onDist_YY, bandpass[chan2:chan3]*atmosCorr)
     ENDIF
     IF pl EQ 1 THEN BEGIN
-      accum, 1
       onDist_XX = APPEND(onDist_XX, bandpass[chan0:chan1]*atmosCorr)
       onDist_XX = APPEND(onDist_XX, bandpass[chan2:chan3]*atmosCorr)
     ENDIF
@@ -238,14 +237,9 @@ FOR j=0, nint -1 DO BEGIN
 ENDFOR
 
 
-;; get average value of accumulated bandpasses at channel 150 to use as 'OnPower' value
-ave, 0
-data = getdata()
-onPower_YY = data[150]
-
-ave, 1
-data = getdata()
-onPower_XX = data[150]
+;; get average value as 'OnPower' value
+onPower_YY = MEAN(onDist_YY)
+onPower_XX = MEAN(onDist_XX)
 
 print, 'Ave Total Power (YY): ', onPower_YY
 print, 'Ave Total Power (XX): ', onPower_XX
@@ -297,26 +291,26 @@ sclear, 1
 FOR i=0, nint-1 DO BEGIN
   FOR pl=0,1 DO BEGIN
     gettp, refScan, int=i, plnum=pl
+
+    ;; get elevation value for correction
+    elVal = !g.s[0].elevation
+    ;; compute atmospheric correction factor
+    atmosCorr = exp(0.01/sin(elVal*3.14159/180.0))/0.99 ;; numerator is for atmoshperic attenuation; denominator is correction for spillover, ohmic loss, etc...
+    bandpass = getdata()
       IF pl EQ 0 THEN BEGIN
         offDist_YY = APPEND(offDist_YY, bandpass[chan0:chan1]*atmosCorr)
         offDist_YY = APPEND(offDist_YY, bandpass[chan2:chan3]*atmosCorr)
-        accum, 0
       ENDIF
       IF pl EQ 1 THEN BEGIN
         offDist_XX = APPEND(offDist_XX, bandpass[chan0:chan1]*atmosCorr)
         offDist_XX = APPEND(offDist_XX, bandpass[chan2:chan3]*atmosCorr)
-        accum, 1
       ENDIF
   ENDFOR
 ENDFOR
-;; take average
-ave, 0
-data = getdata()
-offPower_YY = data[150]
 
-ave, 1
-data = getdata()
-offPower_XX = data[150]
+;; take average
+offPower_YY = MEAN(offDist_YY)
+offPower_XX = MEAN(offDist_XX)
 
 ;; fit gaussian to the 'off' distributions to determine the mean and associated uncertainty
 HISTOGAUSS, offDist_YY, offGaussCoeff_YY
