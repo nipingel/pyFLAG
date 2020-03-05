@@ -483,7 +483,6 @@ def main():
         except NameError:
             fileList = allFitsList[objInd]
             pass
-	   
         ## remove bad scans from file list
         if 'badScanList' in locals():
             for s in badScanList:

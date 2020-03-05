@@ -1381,7 +1381,6 @@ class MetaDataModule:
 
     lstStartRads = np.deg2rad(extLstArr/3600.0*15) ## radians
 
-
     ## loop through each coordinate to precess from J2000 (mean place) to geoapparent RA/Dec
     for coordIdx in range(0, len(extRaArr)):
       raVal = extRaArr[coordIdx]
@@ -1399,16 +1398,17 @@ class MetaDataModule:
 
       ## convert J2000 -> geoapparent (center of Earth)
       geoRa, geoDec = pysla.slalib.sla_map(np.deg2rad(raVal), np.deg2rad(decVal), 0.0, 0.0, 0.0, velVal, 2000.0, dmjdVal)
-      
+
       ## convert from center-of-earth to observed at GBO
       #obsAz, obsZen, obsHA, obsDec, obsRa = pysla.slalib.sla_aop(geoRa, geoDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
       
       ## convert from obs eq to horizontal (use local definitation of hour angle)
       obsAz, obsEl = pysla.slalib.sla_e2h(lstStartRads[coordIdx] - geoRa, geoDec, np.deg2rad(self.GBTLAT))
-      ## apply refraction correction and beam offsets 
 
+      ## apply refraction correction and beam offsets
       newElVal = obsEl - beamElArr[coordIdx] + np.deg2rad(extRefractArr[coordIdx])
-      newAzVal = obsAz - (beamXElArr[coordIdx] / np.cos(newElVal))
+      newAzVal = obsAz - (beamXElArr[coordIdx] / np.cos(obsEl))
+
       ## place in arrays
       newAzArr[coordIdx] = np.rad2deg(newAzVal)
       newElArr[coordIdx] = np.rad2deg(newElVal)

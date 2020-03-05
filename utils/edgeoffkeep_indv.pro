@@ -40,11 +40,8 @@ ENDFOR
 
 ;; construct raDecLimits array (always last four elements, if given)
 FOR i=n_elements(args) - 4, n_elements(args) - 1 DO BEGIN
-    raDecLimits = APPEND(chanRange, FLOAT(args[i]))
+    raDecLimits = APPEND(raDecLimits, FLOAT(args[i]))
 ENDFOR 
-
-;; check if raDecLimits should be undefined (first and second elements equal to 0)
-if raDecLimits[0] EQ 0 and raDecLimits[1] EQ 0 THEN DELVAR, raDecLimits
 
 filein, fileName
 
@@ -155,7 +152,7 @@ for idx = 0, N_ELEMENTS(allScans)-1 DO BEGIN
         
         ;; set units
         !g.s[0].units='Jy'
-        keep 
+        ;;keep 
 
         ;; process XX Pol
         ; divide off, put in data buffer 0 for scaling

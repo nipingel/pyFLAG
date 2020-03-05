@@ -31,7 +31,7 @@ from multiprocessing import Pool
 def calibrateBeam(fileName, srcStr, outFileName, sefdXVal, sefdYVal, order, chanRangeList, raDecLimitsList, beam):
 	## construct file name strings
 	fileNameStr = '%s_Beam%s_ss.fits' % (fileName, beam) 
-	outFileStr = fileNameStr.replace('.fits', '_edge.fits')
+	outFileStr = fileNameStr.replace('ss.fits', '_edge_ss.fits')
 	
 	## construct channel range, sefd, raDecLimit strings
 	chanRangeStr = " ".join(chanRangeList)
