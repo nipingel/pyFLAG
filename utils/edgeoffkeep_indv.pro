@@ -32,9 +32,10 @@ outfile = args[2]
 SEFD_X = FLOAT(args[3])
 SEFD_Y = FLOAT(args[4])
 order = FLOAT(args[5])
+factor = FLOAT(args[6])
 
 ;; construct channel range array
-FOR i=6, n_elements(args) - 5 DO BEGIN
+FOR i=7, n_elements(args) - 5 DO BEGIN
     chanRange = APPEND(chanRange, UINT(args[i]))
 ENDFOR
 
@@ -159,7 +160,7 @@ for idx = 0, N_ELEMENTS(allScans)-1 DO BEGIN
         divide, 6, 2, 0
         
         ; scale to units of Ta*
-        scale, SEFD_X*exp(0.01/sin(!g.s[0].elevation*3.14159/180.0))/0.99 ; Ta*, will default to buffer 0
+        scale, factor*SEFD_X*exp(0.01/sin(!g.s[0].elevation*3.14159/180.0))/0.99 ; Ta*, will default to buffer 0
         
         ;; set region for baseline subtraction
         nregion, chanRange

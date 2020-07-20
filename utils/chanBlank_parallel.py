@@ -23,7 +23,7 @@ import time
 from multiprocessing import Pool
 
 ## define function to call chanBlank_indv.pro for each beam
-def smoothBeam(fileName, srcStr, outFileName, beam):
+def blankBeam(fileName, srcStr, outFileName, beam):
 	
 	## construct file name str
 	fileNameStr = '%s_Beam%s.fits' % (fileName, beam) 
@@ -60,7 +60,7 @@ p = Pool()
 filePrefixList = [filePrefix for i in range(0, len(beamList))]
 outFileList  = [outFile for i in range(0, len(beamList))]
 snameList = [sname for i in range(0, len(beamList))]
-processList = list(zip(filePrefixList, snameList, outFileList, beamList)
+processList = list(zip(filePrefixList, snameList, outFileList, beamList))
 
 p.starmap(blankBeam, processList)
 

@@ -13,6 +13,7 @@ User Inputs:
 -f --order - <required> order of polynomial
 -l --raDecLimits - <optional> list of long/latitude coordinates (in deg) that define a box containing edge emission. 
                    Scans with these coordinates will use opposte edge of map to construct off spectrum
+-c --factor - <optional> list of scaling factors
 -m --beamList -<optional> list of beams ot process; defauls from 0-6. MUST BE EQUAL TO NUMBER OF sefdX and sefdY values 
 
 __email__ = "Nickolas.Pingel@anu.edu.au"
@@ -28,17 +29,17 @@ import time
 from multiprocessing import Pool
 
 ## define function to call PAF_edgeoffkeep_indv.pro to calibrate each beam
-def calibrateBeam(fileName, srcStr, outFileName, sefdXVal, sefdYVal, order, chanRangeList, raDecLimitsList, beam):
+def calibrateBeam(fileName, srcStr, outFileName, sefdXVal, sefdYVal, order, chanRangeList, raDecLimitsList, fact, beam):
 	## construct file name strings
-	fileNameStr = '%s_Beam%s_ss.fits' % (fileName, beam) 
-	outFileStr = fileNameStr.replace('ss.fits', '_edge_ss.fits')
+	fileNameStr = '%s_Beam%s_blank_ss.fits' % (fileName, beam) 
+	outFileStr = fileNameStr.replace('ss.fits', 'edge_ss.fits')
 	
 	## construct channel range, sefd, raDecLimit strings
 	chanRangeStr = " ".join(chanRangeList)
 	raDecLimitsStr = " ".join(raDecLimitsList)
-
+       
 	## make call to shell
-	os.system("gbtidl -e 'edgeoffkeep_indv' -args %s %s %s %s %s %s %s %s" % (fileNameStr, srcStr, outFileStr, sefdXVal, sefdYVal, order, chanRangeStr, raDecLimitsStr))
+	os.system("gbtidl -e 'edgeoffkeep_indv' -args %s %s %s %s %s %s %s %s %s" % (fileNameStr, srcStr, outFileStr, sefdXVal, sefdYVal, order, fact, chanRangeStr, raDecLimitsStr))
 
 	print('Finished calibrating  %s' % fileNameStr)
 
@@ -53,6 +54,7 @@ parser.add_argument("-y", "--sefdY", help = "<required> list of YY SEFD values f
 parser.add_argument("-r", "--chanRange", help = "<required> list of channels over which to fit a polynomial and subtract baseline", required = True, nargs = "+")
 parser.add_argument("-f", "--order", help = "<required> order of polynomial", required = True)
 parser.add_argument("-l", "--raDecLimits", help = "<optional> list of long/latitude coordinates (in deg) that define a box containing edge emission. Scans with these coordinates will use opposte edge of map to construct off spectrum", nargs = "+")
+parser.add_argument("-c", "--factor", help = "<optional> list of scaling factors", nargs = "+")
 parser.add_argument("-m", "--beamList", help = "<optional> list of beams ot process; defauls from 0-6. MUST BE EQUAL TO NUMBER OF sefdX and sefdY values", nargs = "+")
 
 args, unknown = parser.parse_known_args()
@@ -78,6 +80,10 @@ if args.raDecLimits:
 		sys.exit(1)
 if not args.raDecLimits:
 	raDecLimits = '0 0 0 0'
+if args.factor:
+	factorList = args.factor
+if not args.factor:
+	factorList = ['1.0', '1.0', '1.0', '1.0', '1.0', '1.0', '1.0']
 
 ## check that sefd values are equal to the number of beams requisted. If not, exit
 if len(beamList) != len(sefdX) or len(beamList) != len(sefdY):
@@ -95,7 +101,7 @@ chanRangeList = [chanRange for i in range(0, len(beamList))]
 raDecLimitsList = [raDecLimits for i in range(0, len(beamList))]
 
 ## prepare input to processing method
-processList = list(zip(filePrefixList, snameList, outFileList, sefdX, sefdY, orderList, chanRangeList, raDecLimitsList, beamList))
+processList = list(zip(filePrefixList, snameList, outFileList, sefdX, sefdY, orderList, chanRangeList, raDecLimitsList, factorList, beamList))
 
 p.starmap(calibrateBeam, processList)
 
