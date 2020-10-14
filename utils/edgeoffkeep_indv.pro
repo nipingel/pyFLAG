@@ -153,7 +153,7 @@ for idx = 0, N_ELEMENTS(allScans)-1 DO BEGIN
         
         ;; set units
         !g.s[0].units='Jy'
-        ;;keep 
+        keep 
 
         ;; process XX Pol
         ; divide off, put in data buffer 0 for scaling

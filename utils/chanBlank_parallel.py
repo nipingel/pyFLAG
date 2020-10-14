@@ -29,7 +29,7 @@ def blankBeam(fileName, srcStr, outFileName, beam):
 	fileNameStr = '%s_Beam%s.fits' % (fileName, beam) 
 	outFileStr = fileNameStr.replace('.fits', '_blank.fits')
 	## make call to shell
-	os.system("gbtidl -e 'chanBlank_indv' -args %s %s %s" % (fileNameStr, srcStr, outFileStr))
+	os.system("gbtidl -e 'chanblank_indv' -args %s %s %s" % (fileNameStr, srcStr, outFileStr))
 
 	print('Finished blanking %s' % fileNameStr)
 

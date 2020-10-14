@@ -14,6 +14,8 @@ User Inputs:
 -l --raDecLimits - <optional> list of long/latitude coordinates (in deg) that define a box containing edge emission. 
                    Scans with these coordinates will use opposte edge of map to construct off spectrum
 -c --factor - <optional> list of scaling factors
+-b --blank - <optional> set to True if smoothing is to be applied to blanked data
+-n --noSmooth - <optional> set to True if smoothing is NOT to be applied to smoothed data"
 -m --beamList -<optional> list of beams ot process; defauls from 0-6. MUST BE EQUAL TO NUMBER OF sefdX and sefdY values 
 
 __email__ = "Nickolas.Pingel@anu.edu.au"
@@ -31,8 +33,17 @@ from multiprocessing import Pool
 ## define function to call PAF_edgeoffkeep_indv.pro to calibrate each beam
 def calibrateBeam(fileName, srcStr, outFileName, sefdXVal, sefdYVal, order, chanRangeList, raDecLimitsList, fact, beam):
 	## construct file name strings
-	fileNameStr = '%s_Beam%s_blank_ss.fits' % (fileName, beam) 
-	outFileStr = fileNameStr.replace('ss.fits', 'edge_ss.fits')
+	if args.blank == True:
+		fileNameStr = '%s_Beam%s_blank.fits' % (fileName, beam) 
+	elif args.noSmooth == True:
+		fileNameStr = '%s_Beam%s.fits' % (fileName, beam)
+	elif (args.noSmooth == True) and (args.blank == True):
+		fileNameStr = '%s_Beam%s_blank.fits' % (fileName, beam)
+	elif (args.noSmooth == False) and (args.blank == True):
+		fileNameStr = '%s_Beam%s_ss_blank.fits' % (fileName, beam)
+	else:
+		fileNameStr = '%s_Beam%s_ss.fits' % (fileName, beam) 
+	outFileStr = fileNameStr.replace('Beam%s' % beam, 'Beam%s_edge' % beam)
 	
 	## construct channel range, sefd, raDecLimit strings
 	chanRangeStr = " ".join(chanRangeList)
@@ -52,9 +63,11 @@ parser.add_argument("-s", "--sourceName", help= "<required> name of source requi
 parser.add_argument("-x", "--sefdX", help = "<required> list of XX SEFD values for each beam", required = True, nargs = "+")
 parser.add_argument("-y", "--sefdY", help = "<required> list of YY SEFD values for each beam", required = True, nargs = "+")
 parser.add_argument("-r", "--chanRange", help = "<required> list of channels over which to fit a polynomial and subtract baseline", required = True, nargs = "+")
-parser.add_argument("-f", "--order", help = "<required> order of polynomial", required = True)
+parser.add_argument("-f", "--order", help = "<optional> order of polynomial")
 parser.add_argument("-l", "--raDecLimits", help = "<optional> list of long/latitude coordinates (in deg) that define a box containing edge emission. Scans with these coordinates will use opposte edge of map to construct off spectrum", nargs = "+")
 parser.add_argument("-c", "--factor", help = "<optional> list of scaling factors", nargs = "+")
+parser.add_argument("-b", "--blank", help = "<optional> set to True if calibration is to be applied to blanked data", required = False, default = False, type = bool)
+parser.add_argument("-n", "--noSmooth", help = "<optional> set to True if smoothing is NOT to be applied to smoothed data", required = False, default = True, type = bool)
 parser.add_argument("-m", "--beamList", help = "<optional> list of beams ot process; defauls from 0-6. MUST BE EQUAL TO NUMBER OF sefdX and sefdY values", nargs = "+")
 
 args, unknown = parser.parse_known_args()

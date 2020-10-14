@@ -9,6 +9,7 @@ User Inputs:
 -o --outFile - <required> name of output file prefixes (will have _ss.fits appended)
 -s --sourceName - <required> name of source required to identify relevant scans
 -k --kernel - <required> list of kernel parameters (e.g., 0.28 1 1 0.28)
+-b --blank - <optional> set to True if smoothing is to be applied to blanked data
 -m --beamList -<optional> list of beams ot process; defauls from 0-6. 
 
 __email__ = "Nickolas.Pingel@anu.edu.au"
@@ -26,8 +27,11 @@ from multiprocessing import Pool
 ## define function to call smooth_shift_indv.pro for each beam
 def smoothBeam(fileName, srcStr, outFileName, beam, kern):
 	## construct file name str
-	fileNameStr = '%s_Beam%s.fits' % (fileName, beam) 
-	outFileStr = fileNameStr.replace('.fits', '_ss.fits')
+	if args.blank == True:
+		fileNameStr = '%s_Beam%s_blank.fits' % (fileName, beam) 
+	else:
+		fileNameStr = '%s_Beam%s.fits' % (fileName, beam) 
+	outFileStr = fileNameStr.replace('Beam%s' % beam, 'Beam%s_ss' % beam)
 	kernStr = " ".join(kern)
 	## make call to shell
 	os.system("gbtidl -e 'smooth_shift_indv' -args %s %s %s %s" % (fileNameStr, srcStr, outFileStr, kernStr))
@@ -41,6 +45,7 @@ parser.add_argument("-p", "--path", help = "<required> path to SDFITS files; onl
 parser.add_argument("-o", "--outFile", help = "<required> name of output file prefixes (will have _ss.fits appended)", required = True)
 parser.add_argument("-s", "--sourceName", help= "<required> name of source required to identify relevant scans", required = True)
 parser.add_argument("-k", "--kernel", help = "<required> list of kernel parameters (e.g., 0.28 1 1 0.28)", nargs = '+', required = True)
+parser.add_argument("-b", "--blank", help = "<optional> set to True if smoothing is to be applied to blanked data", required = False, default = False, type = bool)
 parser.add_argument("-m", "--beamList",  help = "<optional> list of beams ot process; defauls from 0-6.", nargs = '+')
 
 args, unknown = parser.parse_known_args()
