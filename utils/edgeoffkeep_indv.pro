@@ -33,9 +33,15 @@ SEFD_X = FLOAT(args[3])
 SEFD_Y = FLOAT(args[4])
 order = FLOAT(args[5])
 factor = FLOAT(args[6])
+badScanLength = FIX(args[7])
+
+;; construct bad scan array
+FOR i=8, 8+badScanLength-1 DO BEGIN
+    badScans = APPEND(badScans, UINT(args[i]))
+ENDFOR
 
 ;; construct channel range array
-FOR i=7, n_elements(args) - 5 DO BEGIN
+FOR i=8+badScanLength, n_elements(args) - 5 DO BEGIN
     chanRange = APPEND(chanRange, UINT(args[i]))
 ENDFOR
 
@@ -49,6 +55,9 @@ filein, fileName
 ;; select all scans of a source that are mapping scans
 allScans=get_scan_numbers(source=sname,procedure='*Map')   
 
+;remove badscans
+goodScans=setdifference(allscans,badscans)
+
 ;;set output filename
 fileout, outfile
 
@@ -57,8 +66,8 @@ chan
 freeze
 
 ;; loop through scans to process each integration separately; first need to build the average 'off' 
-for idx = 0, N_ELEMENTS(allScans)-1 DO BEGIN
-    goodIdx=allScans(idx)
+for idx = 0, N_ELEMENTS(goodScans)-1 DO BEGIN
+    goodIdx=goodScans(idx)
 
     get, scan=goodIdx, int=0, plnum=0; call scan to get the number of intergrations
     ;; get scan info

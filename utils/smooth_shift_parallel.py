@@ -9,7 +9,7 @@ User Inputs:
 -o --outFile - <required> name of output file prefixes (will have _ss.fits appended)
 -s --sourceName - <required> name of source required to identify relevant scans
 -k --kernel - <required> list of kernel parameters (e.g., 0.28 1 1 0.28)
--b --blank - <optional> set to True if smoothing is to be applied to blanked data
+-i --blank - <optional> set to True if smoothing is to be applied to blanked data
 -m --beamList -<optional> list of beams ot process; defauls from 0-6. 
 
 __email__ = "Nickolas.Pingel@anu.edu.au"
@@ -45,7 +45,7 @@ parser.add_argument("-p", "--path", help = "<required> path to SDFITS files; onl
 parser.add_argument("-o", "--outFile", help = "<required> name of output file prefixes (will have _ss.fits appended)", required = True)
 parser.add_argument("-s", "--sourceName", help= "<required> name of source required to identify relevant scans", required = True)
 parser.add_argument("-k", "--kernel", help = "<required> list of kernel parameters (e.g., 0.28 1 1 0.28)", nargs = '+', required = True)
-parser.add_argument("-b", "--blank", help = "<optional> set to True if smoothing is to be applied to blanked data", required = False, default = False, type = bool)
+parser.add_argument("-i", "--blank", help = "<optional> set to True if smoothing is to be applied to blanked data", required = False, default = False, type = bool)
 parser.add_argument("-m", "--beamList",  help = "<optional> list of beams ot process; defauls from 0-6.", nargs = '+')
 
 args, unknown = parser.parse_known_args()

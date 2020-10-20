@@ -14,7 +14,8 @@ User Inputs:
 -l --raDecLimits - <optional> list of long/latitude coordinates (in deg) that define a box containing edge emission. 
                    Scans with these coordinates will use opposte edge of map to construct off spectrum
 -c --factor - <optional> list of scaling factors
--b --blank - <optional> set to True if smoothing is to be applied to blanked data
+-i --blank - <optional> set to True if smoothing is to be applied to blanked data
+-b --badScans - <optional> list of bad scans
 -n --noSmooth - <optional> set to True if smoothing is NOT to be applied to smoothed data"
 -m --beamList -<optional> list of beams ot process; defauls from 0-6. MUST BE EQUAL TO NUMBER OF sefdX and sefdY values 
 
@@ -31,26 +32,25 @@ import time
 from multiprocessing import Pool
 
 ## define function to call PAF_edgeoffkeep_indv.pro to calibrate each beam
-def calibrateBeam(fileName, srcStr, outFileName, sefdXVal, sefdYVal, order, chanRangeList, raDecLimitsList, fact, beam):
+def calibrateBeam(fileName, srcStr, outFileName, sefdXVal, sefdYVal, order, chanRangeList, raDecLimitsList, badScans, fact, beam):
 	## construct file name strings
-	if args.blank == True:
-		fileNameStr = '%s_Beam%s_blank.fits' % (fileName, beam) 
-	elif args.noSmooth == True:
-		fileNameStr = '%s_Beam%s.fits' % (fileName, beam)
-	elif (args.noSmooth == True) and (args.blank == True):
+	if (args.noSmooth == False) and (args.blank == True):
+		fileNameStr = '%s_Beam%s_blank_ss.fits' % (fileName, beam) 
+	elif args.noSmooth == True and (args.blank == True):
 		fileNameStr = '%s_Beam%s_blank.fits' % (fileName, beam)
-	elif (args.noSmooth == False) and (args.blank == True):
-		fileNameStr = '%s_Beam%s_ss_blank.fits' % (fileName, beam)
+	elif (args.noSmooth == False) and (args.blank == False):
+		fileNameStr = '%s_Beam%s_ss.fits' % (fileName, beam)
 	else:
-		fileNameStr = '%s_Beam%s_ss.fits' % (fileName, beam) 
+		fileNameStr = '%s_Beam%s.fits' % (fileName, beam) 
 	outFileStr = fileNameStr.replace('Beam%s' % beam, 'Beam%s_edge' % beam)
 	
 	## construct channel range, sefd, raDecLimit strings
 	chanRangeStr = " ".join(chanRangeList)
 	raDecLimitsStr = " ".join(raDecLimitsList)
-       
+	badScanStr = " ".join(badScans)
+	badScanLength = len(badScans)
 	## make call to shell
-	os.system("gbtidl -e 'edgeoffkeep_indv' -args %s %s %s %s %s %s %s %s %s" % (fileNameStr, srcStr, outFileStr, sefdXVal, sefdYVal, order, fact, chanRangeStr, raDecLimitsStr))
+	os.system("gbtidl -e 'edgeoffkeep_indv' -args %s %s %s %s %s %s %s %s %s %s %s" % (fileNameStr, srcStr, outFileStr, sefdXVal, sefdYVal, order, fact, badScanLength, badScanStr, chanRangeStr, raDecLimitsStr))
 
 	print('Finished calibrating  %s' % fileNameStr)
 
@@ -66,8 +66,9 @@ parser.add_argument("-r", "--chanRange", help = "<required> list of channels ove
 parser.add_argument("-f", "--order", help = "<optional> order of polynomial")
 parser.add_argument("-l", "--raDecLimits", help = "<optional> list of long/latitude coordinates (in deg) that define a box containing edge emission. Scans with these coordinates will use opposte edge of map to construct off spectrum", nargs = "+")
 parser.add_argument("-c", "--factor", help = "<optional> list of scaling factors", nargs = "+")
-parser.add_argument("-b", "--blank", help = "<optional> set to True if calibration is to be applied to blanked data", required = False, default = False, type = bool)
-parser.add_argument("-n", "--noSmooth", help = "<optional> set to True if smoothing is NOT to be applied to smoothed data", required = False, default = True, type = bool)
+parser.add_argument("-i", "--blank", help = "<optional> set to True if calibration is to be applied to blanked data", required = False, default = False, type = bool)
+parser.add_argument("-n", "--noSmooth", help = "<optional> set to True if smoothing is NOT to be applied to smoothed data", required = False, default = False, type = bool)
+parser.add_argument("-b", "--badScans", help = "<optional> list of bad scans", required = False, nargs = '+')
 parser.add_argument("-m", "--beamList", help = "<optional> list of beams ot process; defauls from 0-6. MUST BE EQUAL TO NUMBER OF sefdX and sefdY values", nargs = "+")
 
 args, unknown = parser.parse_known_args()
@@ -80,6 +81,7 @@ sefdY = args.sefdY
 order = args.order
 chanRange = args.chanRange
 raDecLimits = args.raDecLimits
+badScans = args.badScans
 
 ## construct beam list
 if args.beamList:
@@ -97,6 +99,10 @@ if args.factor:
 	factorList = args.factor
 if not args.factor:
 	factorList = ['1.0', '1.0', '1.0', '1.0', '1.0', '1.0', '1.0']
+if args.badScans:
+	badScans = args.badScans
+if not args.badScans:
+	badScans = '0'
 
 ## check that sefd values are equal to the number of beams requisted. If not, exit
 if len(beamList) != len(sefdX) or len(beamList) != len(sefdY):
@@ -112,9 +118,10 @@ snameList = [sname for i in range(0, len(beamList))]
 orderList = [order for i in range(0, len(beamList))]
 chanRangeList = [chanRange for i in range(0, len(beamList))]
 raDecLimitsList = [raDecLimits for i in range(0, len(beamList))]
+badScanList = [badScans for i in range(0, len(beamList))]
 
 ## prepare input to processing method
-processList = list(zip(filePrefixList, snameList, outFileList, sefdX, sefdY, orderList, chanRangeList, raDecLimitsList, factorList, beamList))
+processList = list(zip(filePrefixList, snameList, outFileList, sefdX, sefdY, orderList, chanRangeList, raDecLimitsList, badScanList, factorList, beamList))
 
 p.starmap(calibrateBeam, processList)
 
