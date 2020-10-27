@@ -357,7 +357,7 @@ def main():
     ## split project path to get project name string
     projectPathSplit = projectPath.split('/')
     projectStr = projectPathSplit[-1]
-    dataPath = '/lustre/flag/' +  projectStr + '/BF/'
+    dataPath = '/mnt/flag/' +  projectStr + '/BF/'
 
     ##Paths to ancillary FITS files
     goFitsPath = projectPath + '/GO'
