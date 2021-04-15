@@ -29,8 +29,9 @@ PRO calcSysFlux_Grid, sname, chan0, chan1, chan2, chan3, scan0
 ; Nick Pingel ----- 05/21/18
 ; Program to calculate the system equivalent flux density (SEFD) given a known calibrator.
 ; Ssrc is computed from Equation 1 in Perley & Butler (2017).
-; The SEFD is computed by determining the maximum power value in all grid scans. This is
-; effectively P_on. The uncertainty in this value is the standard deviation given by a Gaussian
+; The SEFD is computed by determining the maximum power value in all grid scans. P_on is the mean
+; of the distribution of on power values between the user defined channel regions.
+; The uncertainty in this value is the standard deviation given by a Gaussian
 ; fit to the distribution of all power values in the bandpass between user provided channels chan0 - chan3
 ; for the grid scans ONLY. P_off is the fitted mean (and associated standard deviation) from a Gaussian fit
 ; to the distribution of power values in the bandpass between user provided channels chan0 - chan3 for the 
@@ -50,6 +51,9 @@ PRO calcSysFlux_Grid, sname, chan0, chan1, chan2, chan3, scan0
 ;===============================================================================
 compile_opt idl2
 
+;; set constants
+kB = 1.3806e-23
+
 ;; global variable defined for calibrator flux equation
 freqVal = 1.420405752 ;; GHz
 
@@ -67,9 +71,11 @@ offScans = INDGEN(6)
 FOR i =0, 5 DO BEGIN
   offScans[i] = scan0 + i*6 
 ENDFOR
+
 ;;offScans = get_scan_numbers(source=sname, procedure='Track')
 ;;manually set the off scans if there are 'Track' scans that were not part of the calibration grid
 ;;offScans = offScans[19:n_elements(offScans)-1]
+
 print, 'Calibration Grid Off scans: ', offScans
 
 ;; define dictionaries to hold flux
@@ -224,14 +230,16 @@ FOR pl=0,1 DO BEGIN
     IF pl EQ 0 THEN BEGIN
         onDist_YY = APPEND(onDist_YY, bandpass[chan0:chan1]*atmosCorr)
         onDist_YY = APPEND(onDist_YY, bandpass[chan2:chan3]*atmosCorr)
-        onPower_YY = bandpass[150]
     ENDIF
     IF pl EQ 1 THEN BEGIN
         onDist_XX = APPEND(onDist_XX, bandpass[chan0:chan1]*atmosCorr)
         onDist_XX = APPEND(onDist_XX, bandpass[chan2:chan3]*atmosCorr)
-        onPower_XX = bandpass[150]
     ENDIF
 ENDFOR
+
+;; take mean value for on power values
+onPower_YY = MEAN(onDist_YY)
+onPower_XX = MEAN(onDist_XX)
 
 print, 'On Power (YY): ', onPower_YY
 print, 'On Power (XX): ', onPower_XX
@@ -282,24 +290,17 @@ FOR i=0, nint-1 DO BEGIN
         IF pl EQ 0 THEN BEGIN
             offDist_YY = APPEND(offDist_YY, bandpass[chan0:chan1]*atmosCorr)
             offDist_YY = APPEND(offDist_YY, bandpass[chan2:chan3]*atmosCorr)
-            accum, 0
         ENDIF
         IF pl EQ 1 THEN BEGIN
             offDist_XX = APPEND(offDist_XX, bandpass[chan0:chan1]*atmosCorr)
             offDist_XX = APPEND(offDist_XX, bandpass[chan2:chan3]*atmosCorr)
-            accum, 1
         ENDIF
     ENDFOR
 ENDFOR
 
 ;; take average
-ave, 0
-data = getdata()
-offPower_YY = data[150]
-
-ave, 1
-data = getdata()
-offPower_XX = data[150]
+offPower_YY = MEAN(offDist_YY)
+offPower_XX = MEAN(offDist_XX)
 
 ;; fit gaussian to the 'off' distributions to determine the mean and associated uncertainty
 HISTOGAUSS, offDist_YY, offGaussCoeff_YY
@@ -315,6 +316,24 @@ IF ABS(offPowerErr_XX) GT 100 THEN offPowerErr_XX = STDDEV(offDist_XX)
 
 print, 'Mean Off Power (YY): ', offPower_YY
 print, 'Mean Off Power (XX): ', offPower_XX
+
+;; compute YY sensitivity 
+Sens_YY = 2*kB/(1e-26*calFlux)*onPower_YY/offPower_YY
+
+;;compute YY sensitivity uncertainty
+sig_sens_YY = 2*kB*onPower_YY/(1e-26*calFlux*offPower_YY)*SQRT(onPowerErr_YY^2/onPower_YY^2 + offPowerErr_YY/offPower_YY^2 + calFluxErr^2/calFlux^2)
+
+print, 'YY Sensitivity [m^2 K^-1], ', Sens_YY
+print, '+/-', sig_sens_YY
+
+;; compute XX sensitivity 
+Sens_XX = 2*kB/(1e-26*calFlux)*onPower_XX/offPower_XX
+
+;;compute XX sensitivity uncertainty
+sig_sens_XX = 2*kB*onPower_XX/(1e-26*calFlux*offPower_XX)*SQRT(onPowerErr_XX^2/onPower_XX^2 + offPowerErr_XX/offPower_XX^2 + calFluxErr^2/calFlux^2)
+
+print, 'XX Sensitivity [m^2 K^-1], ', Sens_XX
+print, '+/-', sig_sens_XX
 
 ;; calculate YY system flux
 Ssys_YY = calFlux*offPower_YY/(onPower_YY - offPower_YY)

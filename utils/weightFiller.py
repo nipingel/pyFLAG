@@ -1,24 +1,26 @@
 #!/opt/local/bin/ipython
 """
-12/05/18
+08/19/20
 Unpacks binary files containing beamforming weights from FLAG (phased array feed for the GBT). The only user input is the path to
-the directory containing the raw binary weight files. Note that this script sorts 
+the directory containing the raw binary weight files. The weights will be output to a directory called: weight_files
+User Inputs:
+-p --path - <required> path to weight binary files
+
 Usage: 
 ipython weightFiller.py full_path_to_binaries
 Example:
 ipython weightFiller.py Users/npingel/Desktop/Research/data/GBT/GBT16B_400/AGBT16B_400_04/ 
-__author__ = "Nick Pingel"
-__version__ = "1.0"
-__email__ = ""Nickolas.Pingel@anu.edu.au"
+__email__ = "Nickolas.Pingel@anu.edu.au"
 __status__ = "Production"
 """
+
 ## imports 
 import struct
 import numpy as np
 import os
 import sys
 import glob
-
+import argparse
 from astropy.io import fits
 
 ## make beam dictionaries to map from BYU to WVU convention (e.g. BYU 0 -> WVU 1)
@@ -26,7 +28,11 @@ wvuBeamDict = {0:1, 1:2, 2:6, 3:0, 4:3, 5:5, 6:4}
 byuBeamDict = {1:0, 2:1, 6:2, 0:3, 3:4, 5:5, 4:6}
 
 ## get directory as command line argument. 
-binDir = sys.argv[1]
+parser = argparse.ArgumentParser()
+parser.add_argument("-p", "--path", help = "<required> path to weight binary files (e.g., ./AGBT16B_400_NGC6946)", required = True)
+args, unknown = parser.parse_known_args()
+
+binDir = args.path
 
 ## global values 
 floatBytes = 4
@@ -71,10 +77,13 @@ print('Using weight files: ')
 for weightFile in binList:
 	print(weightFile)
 
-## create the weight_files directory to store the output FITS files
-## inform user
-print('Creating weight_files directory to store weight FITS files...')
-os.makedirs('./weight_files')
+## create the weight_files directory to store the output FITS files. 
+## check for existence
+dirExist = os.path.isdir('./weight_files')
+if not os.path.isdir('./weight_files'):
+	os.makedirs('./weight_files')
+	## inform user
+	print('Creating weight_files directory to store weight FITS files...')
 for i in range(0,len(binList)):
 	progressBar(i,len(binList))
 	file = binList[i]

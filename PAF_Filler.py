@@ -1,19 +1,21 @@
-# coding: utf-8
+#### coding: utf-8
 """
-7/23/19
-This is the main function for the FLAG spectral line filler. It imports the I/O functionality of astropy,
-numpy, and matplotlib, gathers the necessary metadata from the GBT ancillary FITS files (e.g. Antenna, GO), and
-calls on external modules to perform the beamforming. It then collates these metadata and raw beamformed spectra into a new SDFITS format that is GBTIDL friendly.
+10/31/19
+This is the contains the main function for the FLAG spectral line filler. It gathers the necessary metadata from 
+the GBT ancillary FITS files (e.g. Antenna, GO), and calls on external modules to perform the beamforming. The beamforming
+module is called in a multi-process fashion where each core handles a BANK file. It then collates these metadata and raw 
+beamformed spectra into a new SDFITS format that is GBTIDL friendly.
+
 User Inputs:
-** Note that all list inputs should be space delimited within single quotes
-/path/to/project/directory - path to where ancillary FITS files are (e.g. /home/gbtdata/AGBT16B_400)
-/path/to/weight/FITS/files - path to weights FITS files; recommended to place '*' wild card in the place of specific bank letter identifier 
-restfreq - Rest frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary for Doppler corrections)
-centralFreq - central frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary when LO is taken out of scan coordinator)
--b 'List of bad timestamps' - (optional; default not defined) a list of bad timestamps the program should ignore (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01') 
--o 'List of objects' - a list of objects to process (e.g. '3C147 NGC6946’); defaults to all objects contained within the observational session.
--g 'List of specific time stamps' - a list of specific timestamps to process (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01’); defaults to all time stamps associated with particular observed objects.
--m 'List of beams' -  a list of beams to process (e.g. '1 2 3 4 5 6’); defaults to all beams found in associated weight files.
+
+/path/to/project/directory - <required> path to where ancillary FITS files are (e.g. /home/gbtdata/AGBT16B_400)
+/path/to/weight/FITS/files - <required> path to weights FITS files; recommended to place '*' wild card in the place of specific bank letter identifier 
+restfreq - <required> Rest frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary for Doppler corrections)
+centralFreq - <required> central frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary when LO is taken out of scan coordinator)
+-b --badTimes -<optional> a list of bad timestamps the program should ignore (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01'); no default
+-o --objectList - <optional> a list of objects to process (e.g. '3C147 NGC6946’); defaults to all objects contained within the observational session.
+-g  --goodTimes - <optional> a list of specific timestamps to process (e.g. '2018_01_15_2017_00:00:00' '2018_01_15_2017_00:00:01’); defaults to all time stamps associated with particular observed objects.
+-m --beamList - <optional> a list of beams to process (e.g. '1 2 3 4 5 6’); defaults to all beams found in associated weight files.
 A single FITS file is produced for each processed beam and is output to which ever directory the call to PAF_Filler is invoked.
 Usage:
 ipython --c="run PAF_Filler.py /path/to/project/ /path/to/weight/FITS/files restfreq [Hz] centralFreq [Hz] -b 'List of bad timestamps' -o 'List of objects' -g 'List of specific time stamps' -m 'List of beams'""
@@ -30,6 +32,9 @@ import sys
 import os
 import glob
 import pickle
+import argparse
+import time
+from multiprocessing import Pool
 from modules.metaDataModule import MetaDataModule
 from modules.beamformingModule import BeamformingModule
 import matplotlib.pyplot as pyplot
@@ -40,9 +45,20 @@ numBanks = numGPU * 2
 pwd = os.getcwd()
 pfb = False
 
-## make beam dictionary to map from BYU to WVU convention (e.g. BYU 0 -> WVU 1)
+## beam dictionaries to map from between BYU to WVU beam name conventions (e.g. BYU 0 -> WVU 1)
 wvuBeamDict = {'0':'1', '1':'2', '2':'6', '3':'0', '4':'3', '5':'5','6':'4'}
 byuBeamDict = {'1':'0', '2':'1', '6':'2', '0':'3', '3':'4', '5':'5', '4':'6'}
+
+"""
+progress bar function 
+"""
+def progressBar(value, endvalue, beam, bar_length=20):
+    beamName = str(beam)
+    percent = float(value) / endvalue
+    arrow = '-' * int(round(percent * bar_length)-1) + '>'
+    spaces = ' ' * (bar_length - len(arrow))
+    sys.stdout.write("\rPercent of integrations filled in beam "+ beamName +": [{0}] {1}%".format(arrow + spaces, int(round(percent * 100))))
+    sys.stdout.flush()  
 
 """
 Takes input lists and sorts them into a 'list-of-lists' that contains the 
@@ -123,53 +139,74 @@ def sortLists(dataXList, dataYList, allFilesList, allBanksList, allNumBanksList)
     return allSortedDataX, allSortedDataY, allSortedFiles, allSortedBanks, allSortedNumBanks
 
 """
-function to map individual BANK data (bankData)
-to the full bandpass data buffer (dataBuff) based on XID. 
+function to sort the input data arrays of shape bank X int X channel into a combined
+global data buffer of shape int X full channel range, where full channel range
+is either 25*20 = 500 or 20*160 = 3200 nased on mode
 """
-def bandpassSort(xID, dataBuff, bankData):
-    """
-    Determine the correlation mode by 
-    the number of channels stored in
-    data buff as the second element.
-    Note that the number of integrations dataBuff's first element
-    """
-    numInts = bankData.shape[0]
-    numChans = bankData.shape[1]
-    for ints in range(0, numInts):
+def bandpassSort(dataXList, dataYList, xIdList):
+
+    ## determine the number of banks
+    numBanks = len(xIdList)
+    ## determine size of input arrays
+    numInts = dataXList[0].shape[0]
+    numChans = dataXList[0].shape[1]
+
+    ## create arrays to hold data
+    sortedDataBuff_X = np.zeros([numInts, numChans * 20], dtype = 'float')
+    sortedDataBuff_Y = np.zeros([numInts, numChans * 20], dtype = 'float')
+
+    ## loop over array containing the xId and sort based on channel mode
+    for bankIdx in range(0, numBanks):
+        xID = xIdList[bankIdx]
+        ## determine mode; if 25 we are in coarse channel mode,
+        ## which requires sorting in a non-contiguous fashion
         if numChans == 25:
             
-            ## coarse channel mode
             ## position in bandpass dictated by xID
+            ## starting position in channel space is
+            ## xID*5
             bandpassStartChan = xID * 5
             bandpassEndChan = bandpassStartChan + 5
-            
+
             ## get each chunk of five contigious channels from BANK data,
             ## and place it in the proper spot in full bandpass
             for i in range(0, 5):
                 bankStartChan = i * 5
                 bankEndChan = bankStartChan + 5
                 try:
-                    dataBuff[ints, bandpassStartChan:bandpassEndChan] = bankData[ints, bankStartChan:bankEndChan]
-                
+                    sortedDataBuff_X[:, bandpassStartChan:bandpassEndChan] = dataXList[bankIdx][:, bankStartChan:bankEndChan]
+                    sortedDataBuff_Y[:, bandpassStartChan:bandpassEndChan] = dataYList[bankIdx][:, bankStartChan:bankEndChan]
+            
                 ## in early observations, sometimes an extra integration was recorded in some banks. This pass statement
-                ## will skip any extra integrations  
+                ## will skip any extra integrations 
                 except IndexError:
                     pass
-                ## increment bandpassStartChan/bandpassEndChan by 100 for proper position in full bandpass
-                bandpassStartChan += 100
-                bandpassEndChan = bandpassStartChan + 5
-        elif numChans == 160:
-            bandpassStartChan = xID * 160
-            bandpassEndChan = bandpassStartChan + 160
 
-            ## Added to avoid error where BANK data length is zero from a stall
-            if len(bankData[ints,:]) == 0:
-                dataBuff[ints, bandpassStartChan:bandpassEndChan] = np.zeros([160], dtype='float32')
-            elif ints >= len(dataBuff[:, 0]):
-                continue
-            else:    
-                dataBuff[ints, bandpassStartChan:bandpassEndChan] = bankData[ints, :]
-    return dataBuff
+                ## if a bank stalled, the integrations may not be equal to defined array size. Just skip 
+                except ValueError:
+                    pass
+                ## increment bandpassStartChan/bandpassEndChan by 100 for proper position in full bandpass
+                ## recall each chunk of five coarse channels are spaced by 100 in this mode (xId = 0; chans: 0-4, 100-104, ...)
+                bandpassStartChan += 100
+                bandpassEndChan = bandpassStartChan + 5 
+        
+        ## if 160 we are in linear fine 
+        ## frequency mode. Channels can be
+        ## sorted in linear fashion   
+        elif numChans == 160:
+
+            ## 160 fine channels are contiguous (e.g., xId = 1; chans:160-319)
+            bandpassStartChan = xID * 160
+            bandpassEndChan = bandpassStartChan + 160 
+            
+            ## try-catch to skip over stalled banks
+            try:
+                sortedDataBuff_X[:, bandpassStartChan:bandpassEndChan] = dataXList[bankIdx][:, :]
+                sortedDataBuff_Y[:, bandpassStartChan:bandpassEndChan] = dataYList[bankIdx][:, :]
+            except ValueError:
+                pass
+
+    return sortedDataBuff_X, sortedDataBuff_Y      
 
 """
 Function that generates and returns list of observed objects and the associated timestamp FITS files. 
@@ -222,20 +259,52 @@ def getScanInfo(fitsLst):
     return numInts, intLen, numChans, fitsLst
 
 """
-small function to return the index of the indicated string in the provided list. This function is used primarly to parse
-user input
+function that submits list of bank FITS files to the beamformer module for processing
+using multiprocessing's Pool object. Each Bank file is sent to the beamformer object
+using one of the available 32 cores on flag-beam.
 """
-def findIndex(elemStr, inputList):
-    try:
-        index = inputList.index(elemStr)
-        return index
-    except ValueError:
-        return None
+def multiprocessBankList(bf, bankList, bm):
+    p = Pool()
+    ## create zipped list to pass in the arguments for each BANK file
+    ## beam will always be the same
+    processList = list(zip(bankList, bm * len(bankList)))
+
+    """
+    start the jobs; result will be a list wherein the
+    first element is acess to the XX/YY beamformed spectra (in order of input);
+    that is, the first list element is always bank A and last is T. The second element
+    gives access to the XX (0-th index)/YY (index 1) spectra. For now, bank label returned
+    as index 2. 
+    """
+    result = p.starmap_async(bf.getSpectralArray, processList)
+
+    ## release worker pool
+    p.close()
+    p.join()
+
+    ## parse result
+    result = np.array(result.get())
+
+    dataXList  = []
+    dataYList = []
+    dataXArr = np.zeros([len(bankList), result[0][0].shape[0], result[0][0].shape[1]])
+    dataYArr = np.zeros([len(bankList), result[0][0].shape[0], result[0][0].shape[1]])
+    xIDReturnArray = np.zeros([len(bankList)], dtype='int')
+    for idx in range(0, len(bankList)):
+        ### ignore if no integrations (stall)
+        #if result[idx][0].shape[0] > 0:
+            #dataXArr[idx, :, :] = result[idx][0]
+            #dataYArr[idx, :, :] = result[idx][1]
+        dataXList.append(result[idx][0])
+        dataYList.append(result[idx][1])
+        xIDReturnArray[idx] = result[idx][2]
+    sortedDataBuff_X , sortedDataBuff_Y= bandpassSort(dataXList, dataYList, xIDReturnArray)
+    return sortedDataBuff_X, sortedDataBuff_Y
 
 
 """
 This is the 'main' function that drives the creation of an SDFITS file for the selected beams. After handling the user 
-input, the program processes each requested object in the GBT project by collating all necessary data and ancillary 
+input, the function processes each requested object in the GBT project by collating all necessary data and ancillary 
 FITS files. The beamformer object (bf) is called to perform the beamforming. Several processing functions within this
 main script are called to sort the returned beamform spectrum into its final data container. Once the data are correctly
 formatted, the metadata object (md) is called to correctly format and sort the metadata from the GO and Antennna ancillary
@@ -257,225 +326,130 @@ def main():
         print('Please move to a directory where you have adaquete write permissions; exiting...')
         sys.exit()
 
-    ## test for correct number of command line arguments:
-    if len(sys.argv) < 3:
-        print('Incorrect number of inputs; usage: ->ipython PAF_Filler.py /path/to/project/ /path/to/weight/FITS/files -b \'List of bad timestamps\' \
-            -o \'List of objects\' -g \'List of specific time stamps\' -m \'List of beams\'')
+    ## define arguement parser
+    parser = argparse.ArgumentParser()
 
-        sys.exit()
-    ## command line inputs
-    projectPath = sys.argv[1] ## of the form /home/gbtdata/AGBT16B_400_01
-    weightPath = sys.argv[2] + '*.FITS' ## of the form /lustre/projects/flag.old/AGBT16B_400_01/BF/weight_files/*.FITS
-    restfreq = np.float(sys.argv[3]) ## in units of Hz
-    centralfreq = np.float(sys.argv[4]) ## in units of Hz
+    ## add positional and required arguments
+    parser.add_argument("projectPath", help="<required> path to ancillary FITS files (e.g. /home/gbtdata/AGBT16B_400)")
+    parser.add_argument("weightPath", help="<required> path to weights FITS files")
+    parser.add_argument("restFreq", help="<required> rest frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary for Doppler corrections", type = float)
+    parser.add_argument("centralFreq", help="<required> central frequency in Hz (may be phased out once M&C can communicate with IF manager, but now necessary when LO is taken out of scan coordinator)", type = float)
+
+    ## add optional short options
+    parser.add_argument("-b", "--badTimes", help="<optional> a list of bad timestamps the program should ignore (e.g. -b 2018_01_15_2017_00:00:00 2018_01_15_2017_00:00:01); no default", nargs = "+")
+    parser.add_argument("-o", "--objectList", help="<optional> a list of objects to process (e.g. -o 3C147 NGC6946); defaults to all objects contained within the observational session.", nargs = "+")
+    parser.add_argument("-g", "--goodTimes", help="<optional> a list of specific timestamps to process (e.g. -g 2018_01_15_2017_00:00:00 2018_01_15_2017_00:00:01); defaults to all time stamps associated with particular observed objects", nargs = "+")
+    parser.add_argument("-m", "--beamList", help="<optional> a list of beams to process (e.g. -m 1 2 3 4 5 6); defaults to all beams found in associated weight files.", nargs = "+")
+
+    ## finally, parse arguments
+    args, unknown = parser.parse_known_args()
+
+    ## assign required command line inputs
+    projectPath = args.projectPath ## of the form /home/gbtdata/AGBT16B_400_01
+    weightPath = args.weightPath + '/*.FITS' ## of the form /lustre/projects/flag.old/AGBT16B_400_01/BF/weight_files/*.FITS
+    restfreq = args.restFreq ## in units of Hz
+    centralfreq = args.centralFreq ## in units of Hz
    
     ## check if an end '/' was given; if so, remove it
     if projectPath[-1] == '/':
         projectPath = projectPath[:-1]
+
+    ## split project path to get project name string
+    projectPathSplit = projectPath.split('/')
+    projectStr = projectPathSplit[-1]
+    dataPath = '/mnt/flag/' +  projectStr + '/BF/'
+
+    ##Paths to ancillary FITS files
+    goFitsPath = projectPath + '/GO'
 
     ## test validity of input path
     if not os.path.exists(projectPath):
         print('Incorrect path to project directory; exiting...')
         sys.exit()
 
-    ## test validitiy of the path to the weight FITS files
-    testLst = glob.glob(weightPath)
-    if len(testLst) == 0:
+    ## get weight FITS files and test validitiy of the path
+    wtFileList = glob.glob(weightPath)
+    if len(wtFileList) == 0:
         print('Incorrect path to weight FITS files; exiting...')
         sys.exit()
-    
-    """
-    the existance lists of good/bad timestamps (-g/-b flags), objects (-o flag), and beams (-m flag) needs to 
-    determinded with if none are provided. 
-    """
-    ## define list of all flags to compare to later
-    totalflagList = ['-b', '-g', '-o', '-m']
 
-    ## define list to append active flags to
-    currFlags = []
-
-    ## get index of -b flag
-    indB = findIndex('-b', sys.argv)
-    ## append to currFlags list if not None type
-    if not indB == None:
-        currFlags.append('-b')
-
-    ## get index of -g flag
-    indG = findIndex('-g', sys.argv)
-    ## append to currFlags list if not None type
-    if not indG == None:
-        currFlags.append('-g')
-
-    ## get index of -o flag 
-    indO = findIndex('-o', sys.argv)
-    ## append to currFlags list if not None type
-    if not indO == None:
-        currFlags.append('-o')
-
-    ## get index of -m flag
-    indM = findIndex('-m', sys.argv)
-    ## append to currFlags list if not None type
-    if not indM == None:
-        currFlags.append('-m')
-
-    ## place all flags indices in a list
-    indList = [indB, indG, indO, indM]
-
-    ## clean list of indices of None type
-    indList = [x for x in indList if x is not None]
-    indList.sort() ## make numeric order so the numeric order is know 
-
-    ## if indList is not empty, we have some flags to process... 
-    if not len(indList) == 0:
-        ## loop through list of flags, collect proceeding list elements between current flag and next one. 
-        ## deal with flag for bad scan timestamps
-        for i, ind in enumerate(indList):
-            
-            ## process if flag is '-b'
-            if ind == indB:
-                """
-                the bad scans will be all elements of the list between this index and the next in indList.                
-                if there is only one element of indList (only one flag was set), or we are on the last element of indList, 
-                just take remaining elments from sys.argv list
-                """
-                if i == len(indList) - 1:
-                    badScanList = sys.argv[ind + 1:]
-                else:
-                    badScanList = sys.argv[ind + 1:indList[i + 1 ]]
-
-                ## loop through and append '.fits' to each element for later ID
-                badScanList = [s + '.fits' for s in badScanList]
-                
-                ## inform user
-                if len(badScanList) == 0:
-                    print('\n')
-                    print('No bad time stamp list after \'-b\' flag; exiting...')
-                    sys.exit()
-                else:
-                    print('\n')
-                    print('Will remove following timestamps from processing: ')
-                    print('\n'.join('{}'.format(item) for item in badScanList))
-
-            ## process if flag is '-g'
-            elif ind == indG:
-                if i == len(indList) - 1:
-                    userFitsList = sys.argv[ind + 1:]
-                else:
-                    userFitsList = sys.argv[ind + 1:indList[i + 1 ]]
-
-                
-                ## inform user
-                if len(userFitsList) == 0:
-                    print('\n')
-                    print('No time stamp list after \'-g\' flag; exiting...')
-                    sys.exit()
-                else:
-                    print('\n')
-                    print('Processing following time stamps: ') 
-                    print('\n'.join('{}'.format(item) for item in userFitsList))
-
-            ## process if flag '-o'
-            elif ind == indO:
-                if i == len(indList) - 1:
-                    obsObjectList = sys.argv[ind + 1:]
-                else:
-                    obsObjectList = sys.argv[ind + 1:indList[i + 1 ]]
-                
-                ## inform user
-                if len(obsObjectList) == 0:
-                    print('\n')
-                    print('No observed objects list after \'-o\' flag; exiting...')
-                    sys.exit()
-                else:
-                    print('\n')
-                    print('Processing following observed objects: ')
-                    print('\n'.join('{}'.format(item) for item in obsObjectList))
-
-            elif ind == indM:
-                if i == len(indList) - 1:
-                    beamList = sys.argv[ind + 1:]
-                else:
-                    beamList = sys.argv[ind + 1:indList[i + 1 ]]
-                ## loop through beamList to translate from WVU convention to BYU for consistent processing
-                #byuBeamList = []
-                #for bm in beamList:
-                #   byuBeamList.append(byuBeamDict[bm])
-
-                ## inform user
-                if len(beamList) == 0:
-                    print('\n')
-                    print('No beam list after \'-m\' flag; exiting...')
-                    sys.exit()
-                else:
-                    print('\n')
-                    print('Processing following beams: ')
-                    print('\n'.join('{}'.format(bm) for bm in beamList))
-            ## if none of these flags were found, then inform user that an unrecognized flag was given and exit
-            else:
-                print("Unrecognized flag was input. Accepted flags are: -b, -g, -o, and -m. Exiting...")
-                sys.exit()
-    ## one more if block to inform user if any default settings active
-    if not '-b' in currFlags:
-        print('\n')
-        print('No bad time stamps indicated...')
-    if not '-g' in currFlags:
-        print('\n')
-        print('Processing all available scans...')
-    if not '-o' in currFlags:
-        print('\n')
-        print('Processing all observed objects in project...')
-    if not '-m' in currFlags:
-        print('\n')
-        print('Processing all available beams...')
-
-    ## split project path to get project name string
-    projectPathSplit = projectPath.split('/')
-    projectStr = projectPathSplit[-1]
-    dataPath = '/lustre/flag/' +  projectStr + '/BF/'
-
-    ##Paths to ancillary FITS files
-    goFitsPath = projectPath + '/GO'  
-    
-    ## define beamformingModuleObject
-    bf = BeamformingModule(dataPath, weightPath) ## creates beamforming module
-    
-    ## open weight file to get number of beams
-    wtFileList = glob.glob(weightPath)
-    wtFile = fits.open(wtFileList[0])
-
-    """
-    try-except to define number of beams; if beamList not defined, then 
-    get from first weight file header
-    """
-    try:
-        numBeams = int(len(beamList)) 
-    except NameError:
-        numFields = wtFile[1].header['TFIELDS']
-        numBeams = int((numFields - 2) / 2)
-        #byuBeamList = range(0, numBeams)
-        beamList = list(range(0, numBeams))
-        #for el in range(0, len(byuBeamList)):
-        #   byuBeamList[el] = np.str(el)
-        for el in range(0, len(beamList)):
-           beamList[el] = np.str(el)
- 
     ## generate object and list of FITS files in case user wishes to process all object/timestamps
     allObjList, allFitsList = generateObjAndFitsLists(goFitsPath)
+    
+    """
+    the existence of optional inputlists of good/bad timestamps (-g/-b flags), objects (-o flag), and beams (-m flag) needs to 
+    determined 
+    """
+    
+    ## check if bad time stamps were provided  (-b flag)
+    if args.badTimes:
+        badScanList = args.badTimes
 
-    """
-    if the user has already provided a list of particular objects, first test that the source was observed; if not, 
-    program exits. If the user did not provide an object list, process all observed objects. 
-    """
-    try:
-        objList = obsObjectList
-        for obj in obsObjectList: ## loop 
+        ## loop through and append '.fits' to each element for later ID
+        badScanList = [s + '.fits' for s in badScanList]
+                
+        print('\n')
+        print('Will remove following timestamps from processing: ')
+        print('\n'.join('{}'.format(item) for item in badScanList))
+
+    ## check if explicit list of time stamps were provided (-g flag)
+    if args.goodTimes:
+        userFitsList = args.goodTimes
+        print('\n')
+        print('Processing following time stamps: ') 
+        print('\n'.join('{}'.format(item) for item in userFitsList))
+
+    ## check if list of objects were provided (-o flag)
+    if args.objectList:
+        objList = args.objectList
+        """
+        if the user provides a list of particular objects, first test that the source was observed; if not, 
+        program exits. If the user did not provide an object list, process all observed objects. 
+        """
+        for obj in objList: ## loop 
             if not obj in allObjList:
                 print('Requested object, ' + obj + 'was not observed in this session. Exiting...')
                 sys.exit()
-    ## if objObjectList is not defined, we are processing all objects
-    except NameError: 
+        print('\n')
+        print('Processing following observed objects: ')
+        print('\n'.join('{}'.format(item) for item in objList))       
+
+    ## check if list of beams were provided (-m flag)
+    if args.beamList:
+        beamList = args.beamList
+        print('\n')
+        print('Processing following beams: ')
+        print('\n'.join('{}'.format(bm) for bm in beamList))
+
+    ## one more if block to inform user if any default settings are active
+    if not args.badTimes:
+        print('\n')
+        print('No bad time stamps indicated...')
+    if not args.goodTimes:
+        print('\n')
+        print('Processing all available scans...')
+    if not args.objectList:
         objList = allObjList
-        pass
+        print('\n')
+        print('Processing all observed objects in project...')
+    if not args.beamList:
+        """
+        try-except to define number of beams; if beamList not defined, then 
+        get from first weight file header
+        """
+        try:
+            numBeams = int(len(beamList)) 
+        except NameError:
+            wtFile = fits.open(wtFileList[0])
+            numFields = wtFile[1].header['TFIELDS']
+            numBeams = int((numFields - 2) / 2)
+            ## create list of beam numbers of type str
+            beamList = [str(i) for i in range(numBeams)]
+            print('\n')
+            print('Processing all available beams...')  
+    
+    ## define beamformingModuleObject
+    bf = BeamformingModule(dataPath, weightPath) ## creates beamforming module
 
     ## inform user of the inputs and objects to process
     print('\n')
@@ -498,7 +472,7 @@ def main():
         
         """
         if user has already provided a list of timestamps for processing, test that the timestamps are valid;
-        if no list was provided, continue processing all timestamps
+        if no list was provided, continue processifng all timestamps
         """
         try:
             fileList = userFitsList
@@ -509,7 +483,7 @@ def main():
         except NameError:
             fileList = allFitsList[objInd]
             pass
-	## remove bad scans from file list
+        ## remove bad scans from file list
         if 'badScanList' in locals():
             for s in badScanList:
                 fileList.remove(s)
@@ -527,7 +501,8 @@ def main():
         if tmpVar[-5:] == '.fits':
              fileList = [s[:-5] for s in fileList] 
         print('\n'.join('{}'.format(item) for item in fileList))
-        
+
+
         """
         Loop over beams to read in files for object of interest and construct a single SINGLE DISH binary FITS table
         """
@@ -545,21 +520,25 @@ def main():
             such that if type of fileList is equal to string, cast into a list
             """
             if isinstance(fileList, str):
-                 fileList = [fileList]
-
+                fileList = [fileList]
             """
             Loop over time stamps associated with current observed object to make sure
             data exists. If not, then append these time stamps to a list for removal
             """
-            removeList = []
+
+            """
+            Loop over time stamps associated with current observed object
+            and process
+            """
+            fileCnt = 0
             for dataFITSFile in fileList:
-                """ 
-                check if '.fits' is at the end of elements in fileList
-                if so, remove it
-                """
+                ## inform user of progress
+                progressBar(fileCnt, len(fileList), bm, bar_length=20)
+
                 if dataFITSFile[-5:] == '.fits':
                     dataFITSFile = dataFITSFile[:-5]
-                ## check if we have bank data for this scan
+
+                ## check if we have bank data for this scan. If not, likely scan aborted early
                 testLst = glob.glob(dataPath + dataFITSFile + '*.fits')
                 if len(testLst) == 0:
                     print('\n')
@@ -567,24 +546,11 @@ def main():
                     text_file = open("skippedScans.txt", "w")
                     text_file.write(dataFITSFile)
                     text_file.close()
-                    removeList.append(dataFITSFile)
-            ## remove any scans with no data (probably aborted early)
-            if len(removeList) > 0:
-                for replaceElem in removeList:
-                    fileList.remove(replaceElem)
+                    continue
 
-            """
-            Loop over time stamps associated with current observed object
-            and process
-            """
-            for dataFITSFile in fileList:
-                if dataFITSFile[-5:] == '.fits':
-                    dataFITSFile = dataFITSFile[:-5]
-                ## check if we have bank data for this scan
-                testLst = glob.glob(dataPath + dataFITSFile + '*.fits')
                 ## get essential info about current timestamp
                 numInts, intLen, numSpecChans, bankList = getScanInfo(testLst)
-                
+
                 """
                 initialize bank data buffers; columns are total number of spectral channels and rows are 
                 individual integrations
@@ -595,45 +561,18 @@ def main():
                 ## initialize weight data buffers in case there is analysis to be done
                 xWeightBuff =  np.zeros([numSpecChans * numBanks], dtype = 'complex64')
                 yWeightBuff =  np.zeros([numSpecChans * numBanks], dtype = 'complex64')
+                
+                sortedDataBuff_X, sortedDataBuff_Y = multiprocessBankList(bf, bankList, bm)
+            
 
-                bankCnt = 0 ## set bank counter to keep track of number of bank FITS files processed
-                """
-                Loop through list of BANK FITS files to process 1/20th of the bandpass at a time. Once information 
-                about the scan is retrieved, the 'getSpectralArray' in the bf module is called and a beamformed 
-                spectrum is returned (rows: inegrations; columns: frequency channels). The weights used in the processing
-                are also returned. The function bandpassSort is then called to place this 1/20th chunk of bandpass at the 
-                correct position in the global data buffers (that will be written in the output FITS file). 
-                """
-                for fileName in bankList:
-                    print('\n')                
-                    print('Beamforming correlations in: '+fileName[-25:]+', Beam: ' + bm) 
-                    ## bank name is ALWAYS sixth-to-last character in string
-                    bank = fileName[-6] 
-                    corrHDU = fits.open(fileName) ## grab xid from dictionary for sorting
+                ## add to global data buffers
+                globalDataBuff_X_List.append(sortedDataBuff_X)
+                globalDataBuff_Y_List.append(sortedDataBuff_Y)
+                allBanksList.extend(bankList)
+                numBanksList.append(len(bankList))
 
-                    nRows = corrHDU[1].header['NAXIS2']
-                    data = corrHDU[1].data['DATA']
-                    xID = np.int(corrHDU[0].header['XID'])
-
-                    if nRows != 0: ## to avoid an empty FITS file
-                        """
-                        Do the beamforming; returns processed BANK data (cov matrices to a beam-formed bandpass) in both
-                        XX/YY Pols; returned data are in form rows: integrations, columns: frequency channels
-                        """
-                        xData, yData = bf.getSpectralArray(fileName, data, bm, xID)
-
-                        """
-                        Sort the 1/20th chunk based on xid number for each integration. The dataBuff_X/Y variable is constantly
-                        being updated as the individual BANKS are processed
-                        """       
-                        dataBuff_X = bandpassSort(xID, dataBuff_X, xData)
-                        dataBuff_Y = bandpassSort(xID, dataBuff_Y, yData)
-                        allBanksList.append(fileName) ## append good BANK file to master list that is passed to metadataModule
-                        bankCnt += 1 ## increment bank counter
-
-                globalDataBuff_X_List.append(dataBuff_X) ## append to global buffer lists
-                globalDataBuff_Y_List.append(dataBuff_Y)
-                numBanksList.append(bankCnt) ## append bankCnt to list 
+                ## increment file counter
+                fileCnt += 1
 
             print('\n') ## make terminal output look cleaner
 
