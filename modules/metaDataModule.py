@@ -1400,14 +1400,16 @@ class MetaDataModule:
       geoRa, geoDec = pysla.slalib.sla_map(np.deg2rad(raVal), np.deg2rad(decVal), 0.0, 0.0, 0.0, velVal, 2000.0, dmjdVal)
 
       ## convert from center-of-earth to observed at GBO
-      #obsAz, obsZen, obsHA, obsDec, obsRa = pysla.slalib.sla_aop(geoRa, geoDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
+      obsAz, obsZen, obsHA, obsDec, obsRa = pysla.slalib.sla_aop(geoRa, geoDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, 299792458.0/1420.405752e6*1e6, 0.0065)
       
       ## convert from obs eq to horizontal (use local definitation of hour angle)
-      obsAz, obsEl = pysla.slalib.sla_e2h(lstStartRads[coordIdx] - geoRa, geoDec, np.deg2rad(self.GBTLAT))
+      #obsAz, obsEl = pysla.slalib.sla_e2h(lstStartRads[coordIdx] - geoRa, geoDec, np.deg2rad(self.GBTLAT))
+      obsAz, obsEl = pysla.slalib.sla_e2h(lstStartRads[coordIdx] - obsRa, obsDec, np.deg2rad(self.GBTLAT))
 
       ## apply refraction correction and beam offsets
-      newElVal = obsEl - beamElArr[coordIdx] + np.deg2rad(extRefractArr[coordIdx])
-      newAzVal = obsAz - (beamXElArr[coordIdx] / np.cos(obsEl))
+      obsEl_refract = obsEl + np.deg2rad(extRefractArr[coordIdx])
+      newElVal = obsEl_refract - beamElArr[coordIdx] 
+      newAzVal = obsAz - (beamXElArr[coordIdx] / np.cos(newElVal))
 
       ## place in arrays
       newAzArr[coordIdx] = np.rad2deg(newAzVal)
@@ -1428,9 +1430,9 @@ class MetaDataModule:
         newObsRa = lstStartRads[coordIdx] - newObsHA
 
         ## convert from observed at GBO to geocentric (center of Earth)
-        #newGeoRa, newGeoDec = pysla.slalib.sla_oap('R', newObsRa, newObsDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, waveVal, lapseVal)
+        newGeoRa, newGeoDec = pysla.slalib.sla_oap('R', newObsRa, newObsDec, dmjdVal, deltaUT, np.deg2rad(self.GBTLONG), np.deg2rad(self.GBTLAT), self.GBTHGT, polXVal, polYVal, tempVal, pressVal, humVal, 299792458.0/1420.405752e6*1e6, 0.0065)
         ## convert from geocenteric to mean
-        newRa, newDec = pysla.slalib.sla_amp(newObsRa, newObsDec, dmjdVal, 2000.0)
+        newRa, newDec = pysla.slalib.sla_amp(newGeoRa, newGeoDec, dmjdVal, 2000.0)
 
         ## convert radians to degrees
         newRaArr[coordIdx] = np.rad2deg(newRa)
