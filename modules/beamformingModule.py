@@ -29,7 +29,7 @@ class BeamformingModule:
     ## function to initialize object
     ## grabs the map from covariances to FISHFITS order and assigns path to data and weight files
     def __init__ (self, dataPath, weightPath):
-        self.mapVector = np.loadtxt('/users/npingel/FLAG/SpectralFiller/misc/gpuToNativeMap.dat', dtype='int')
+        self.mapVector = np.loadtxt('/users/npingel/FLAG/pyFLAG/misc/gpuToNativeMap.dat', dtype='int')
         self.dataPath = dataPath
         self.weightPath = weightPath
         dataPathSplit = dataPath.split('/') ## get project ID

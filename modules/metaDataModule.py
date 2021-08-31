@@ -42,7 +42,7 @@ import sys
 
 ##globalPaths
 global keywordPath
-keywordPath = '/users/npingel/FLAG/SpectralFiller/misc/sdKeywords.txt'
+keywordPath = '/users/npingel/FLAG/pyFLAG/misc/sdKeywords.txt'
 ## make beam dictionary to map from BYU to WVU convention (e.g. BYU 0 -> WVU 1)
 wvuBeamDict = {'0':'1', '1':'2', '2':'6', '3':'0', '4':'3', '5':'5','6':'4'}
 byuBeamDict = {'1':'0', '2':'1', '6':'2', '0':'3', '3':'4', '5':'5', '4':'6'}
