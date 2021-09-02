@@ -1428,7 +1428,7 @@ class MetaDataModule:
       else:
         ## remove applied refraction correction to get back into apparent az/el
         app_az_val = np.copy(newAzVal)
-        app_el_val = newElVal - np.deg2rad(extRefractArr[coordIdx])
+        app_el_val = newElVal# - np.deg2rad(extRefractArr[coordIdx])
 
         ## convert from obs horiz to eq 
         newAppHA, newAppDec = pysla.slalib.sla_h2e(app_az_val, app_el_val, np.deg2rad(self.GBTLAT))
