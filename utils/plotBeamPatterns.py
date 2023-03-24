@@ -397,17 +397,16 @@ majorXLocator = MultipleLocator(10)
 majorXFormatter = FormatStrFormatter('%d')
 minorXLocator = MultipleLocator(2)
 
-## declare figure object
-fig = pyplot.figure(figsize = (12,12))
-## loop through polarizations
+## make beam pattern plot for both polarizations
 for pl in range(0, 1):
+	## declare figure object
+	fig = pyplot.figure(figsize = (12,12))
 	## initialize array to hold interpolated grid
 	meanBeamArr = np.zeros([7, 200, 200])
 	for cnt in range(0, 7):
 		beamIndex = wvuBeamDict[np.str(cnt)]
 		## determine row location span
 		locSeq = rowLocDict[cnt]
-
 		if pl == 0:
 			## select and grid the data
 			patternAtChanXX = patternArrXX[cnt, :, chan]
@@ -460,7 +459,7 @@ for pl in range(0, 1):
 		pyplot.show(block=True)
 		pyplot.clf()
 		pyplot.close()
-	else:
+		else:
 			## select and grid the data
 			patternAtChanYY = patternArrYY[cnt, :, chan]
 			patternGrid = griddata(coordVec, 10*np.log10(patternAtChanYY), (grid_x, grid_y) , method='linear')
