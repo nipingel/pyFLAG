@@ -187,7 +187,7 @@ elems X beam X freq.
 elems X freq X pol X complex pair
 """
 weightArrXX = np.zeros([19, 7, 500], dtype = 'complex64')
-weightArrYY = np.zeros([17, 7, 500], dtype = 'complex64')
+weightArrYY = np.zeros([19, 7, 500], dtype = 'complex64')
 
 """
 The weights do not correspond to contigious frequency channels. The 
