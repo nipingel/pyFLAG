@@ -278,7 +278,6 @@ if True:
 	patternArrXX = np.zeros([7, np.size(aggArrXX, 1), np.size(aggArrXX, 2)])
 	patternArrYY = np.zeros([7, np.size(aggArrXX, 1), np.size(aggArrXX, 2)])
 
-	weightArrYY = np.zeros([16, 7, 500], dtype = 'complex64')
 	"""
 	TEST: retrieve the weights as BYU dos
 	"""
