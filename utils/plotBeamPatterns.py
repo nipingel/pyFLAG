@@ -102,8 +102,8 @@ def getWeights(xel0, el0, aggWeightFile):
 ## parse input arguments
 parser = argparse.ArgumentParser()
 parser.add_argument('-p', '--project_name', help='project name and observing session (e.g., AGBT19A_365_03)', required = True)
-parser.add_argument('-c', '--cal_type', help='<required> calibration type (i.e., seven or grid)', required = True, type = float)
-parser.add_argument('-w', '--weights_path', help='<required> path to weights FITS files', required = True, type = float)
+parser.add_argument('-c', '--cal_type', help='<required> calibration type (i.e., seven or grid)', required = True)
+parser.add_argument('-w', '--weights_path', help='<required> path to weights FITS files', required = True)
 args, unknown = parser.parse_known_args()
 
 
