@@ -398,7 +398,7 @@ majorXFormatter = FormatStrFormatter('%d')
 minorXLocator = MultipleLocator(2)
 
 ## make beam pattern plot for both polarizations
-for pl in range(0, 1):
+for pl in range(0, 2):
 	## declare figure object
 	fig = pyplot.figure(figsize = (12,12))
 	## initialize array to hold interpolated grid
