@@ -38,8 +38,8 @@ import matplotlib.pyplot as pyplot
 import matplotlib 
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter
 
-plt.rcParams['text.usetex'] = True
-plt.rcParams['font.family'] = "serif"
+pyplot.rcParams['text.usetex'] = True
+pyplot.rcParams['font.family'] = "serif"
 matplotlib.rc('xtick.major.width')
 matplotlib.rcParams['contour.negative_linestyle']= 'solid'
 matplotlib.rcParams.update({'font.size': 14})
