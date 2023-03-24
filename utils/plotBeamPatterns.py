@@ -136,9 +136,9 @@ pathToWeights = args.weights_path
 #yElemsIndices = np.array([21, 20, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38]) - 1
 ## load element mapping arrays
 proj_str = projName.split('_')[0]+'_'+projName.split('_')[1]
-elem_mapping = np.loadtxt('../misc/element_mapping_%s.txt' % (proj_str))
-xElemsIndices = elem_mapping[0, :]
-yElemsIndices = elem_mapping[1, :]
+elem_mapping = np.loadtxt('../misc/element_mapping_%s.txt' % (proj_str), dtype = 'int')
+xElemsIndices = np.array(elem_mapping[0, :]
+yElemsIndices = nelem_mapping[1, :]
 
 ## really, 8, 13, and 14 but need to provide the subsequent inices 
 badIndsYY = [9, 14, 15] 
