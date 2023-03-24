@@ -275,7 +275,7 @@ if True:
 	initialize array to hold the final pattern with dimensions beams X grid points 
 	X freq chans
 	"""
-	patternArrXX = np.zeros([7, np.size(aggArrXX, 1), np.size(aggArrXX, 2)])
+	patternArrXX = np.zeros([2, 7, np.size(aggArrXX, 1), np.size(aggArrXX, 2)])
 	patternArrYY = np.zeros([7, np.size(aggArrXX, 1), np.size(aggArrXX, 2)])
 
 	"""
@@ -402,64 +402,8 @@ for pl in range(0, 2):
 	## declare figure object
 	fig = pyplot.figure(figsize = (12,12))
 	## initialize array to hold interpolated grid
-	meanBeamArr = np.zeros([7, 200, 200])
+	meanBeamArr = np.zeros([2, 7, 200, 200])
 	if pl == 0:
-		for cnt in range(0, 7):
-			beamIndex = wvuBeamDict[np.str(cnt)]
-			## determine row location span
-			locSeq = rowLocDict[cnt]
-			## select and grid the data
-			patternAtChanXX = patternArrXX[cnt, :, chan]
-			patternGrid = griddata(coordVec, 10*np.log10(patternAtChanXX), (grid_x, grid_y) , method='linear')
-
-			## find index of maximum value so as to know where to take the cuts
-			maxInd = np.where(patternGrid == np.nanmax(patternGrid))
-			maxX = maxInd[0][0]
-			maxY = maxInd[1][0]
-
-			## extract cuts
-			elCut = patternGrid[maxX, :]
-			xelCut = patternGrid[:, maxY]
-			
-			print('Plotting beam ' + beamIndex + ', at frequency %.2f' % freqArr[chan] + ' [MHz]')
-			
-
-			##Plot gridded data
-			ax = pyplot.subplot2grid((6, 6), locSeq, colspan = 2, rowspan = 2)
-			im = ax.imshow(patternGrid, extent=extent, vmin = -40, cmap = 'viridis', aspect = 'equal')
-			
-			#im = axarr[x, y].imshow(patternGrid, extent=extent, vmin = -40, cmap = 'viridis', aspect = 'equal')
-
-			ax.contour(patternGrid, colors='black', linewidths=2, extent=extent, aspect = 'equal', levels=[-15, -10, -5, -2], origin= 'image')
-			ax.scatter(xElOff, elOff, marker = 'x', c = 'red', s = 40, linewidths = 2)
-			ax.axvline(xAxis[maxY], color = 'red', linestyle = '--', linewidth = 2)
-			ax.axhline(yAxis[maxX], color = 'red', linestyle = '--', linewidth = 2)
-
-			## place pattern in array to compute average later
-			meanBeamArr[cnt, :, :] = patternGrid 
-			ax.set_title('Beam ' + beamIndex, fontsize = 12)
-
-			ax.yaxis.set_major_locator(majorYLocator)
-			ax.yaxis.set_major_formatter(majorYFormatter)
-			ax.yaxis.set_minor_locator(minorYLocator)
-			ax.xaxis.set_major_locator(majorXLocator)
-			ax.xaxis.set_major_formatter(majorXFormatter)
-			ax.xaxis.set_minor_locator(minorXLocator)
-			ax.tick_params(axis = 'both', which='both', width=2)
-		#[left, bottom, width, height]
-		fig.subplots_adjust(right=0.9, hspace = 0.3, wspace = 0.3)
-		cbar_ax = fig.add_axes([0.92, 0.1, 0.02, 0.8])
-		cb = fig.colorbar(im, cax=cbar_ax, label = '[dB]')
-		cb.ax.tick_params(which = 'minor', length = 2)
-		cb.ax.tick_params(which = 'major', length = 4)
-		cb.ax.minorticks_on()
-		fig.text(0.5, 0.04, 'XEL Offset [arcmin]', ha='center')
-		fig.text(0.04, 0.5, 'EL Offset [arcmin]', va='center', rotation='vertical')
-		pyplot.savefig(projName + '_FormedBeamPatterns_YY.png', bbox_inches='tight')
-		pyplot.show(block=True)
-		pyplot.clf()
-		pyplot.close()
-	else:
 		for cnt in range(0, 7):
 			beamIndex = wvuBeamDict[np.str(cnt)]
 			## determine row location span
@@ -492,7 +436,63 @@ for pl in range(0, 2):
 			ax.axhline(yAxis[maxX], color = 'red', linestyle = '--', linewidth = 2)
 
 			## place pattern in array to compute average later
-			meanBeamArr[cnt, :, :] = patternGrid 
+			meanBeamArr[pl, cnt, :, :] = patternGrid 
+			ax.set_title('Beam ' + beamIndex, fontsize = 12)
+
+			ax.yaxis.set_major_locator(majorYLocator)
+			ax.yaxis.set_major_formatter(majorYFormatter)
+			ax.yaxis.set_minor_locator(minorYLocator)
+			ax.xaxis.set_major_locator(majorXLocator)
+			ax.xaxis.set_major_formatter(majorXFormatter)
+			ax.xaxis.set_minor_locator(minorXLocator)
+			ax.tick_params(axis = 'both', which='both', width=2)
+		#[left, bottom, width, height]
+		fig.subplots_adjust(right=0.9, hspace = 0.3, wspace = 0.3)
+		cbar_ax = fig.add_axes([0.92, 0.1, 0.02, 0.8])
+		cb = fig.colorbar(im, cax=cbar_ax, label = '[dB]')
+		cb.ax.tick_params(which = 'minor', length = 2)
+		cb.ax.tick_params(which = 'major', length = 4)
+		cb.ax.minorticks_on()
+		fig.text(0.5, 0.04, 'XEL Offset [arcmin]', ha='center')
+		fig.text(0.04, 0.5, 'EL Offset [arcmin]', va='center', rotation='vertical')
+		pyplot.savefig(projName + '_FormedBeamPatterns_YY.png', bbox_inches='tight')
+		pyplot.show(block=True)
+		pyplot.clf()
+		pyplot.close()
+	else:
+		for cnt in range(0, 7):
+			beamIndex = wvuBeamDict[np.str(cnt)]
+			## determine row location span
+			locSeq = rowLocDict[cnt]
+			## select and grid the data
+			patternAtChanXX = patternArrXX[cnt, :, chan]
+			patternGrid = griddata(coordVec, 10*np.log10(patternAtChanXX), (grid_x, grid_y) , method='linear')
+
+			## find index of maximum value so as to know where to take the cuts
+			maxInd = np.where(patternGrid == np.nanmax(patternGrid))
+			maxX = maxInd[0][0]
+			maxY = maxInd[1][0]
+
+			## extract cuts
+			elCut = patternGrid[maxX, :]
+			xelCut = patternGrid[:, maxY]
+			
+			print('Plotting beam ' + beamIndex + ', at frequency %.2f' % freqArr[chan] + ' [MHz]')
+			
+
+			##Plot gridded data
+			ax = pyplot.subplot2grid((6, 6), locSeq, colspan = 2, rowspan = 2)
+			im = ax.imshow(patternGrid, extent=extent, vmin = -40, cmap = 'viridis', aspect = 'equal')
+			
+			#im = axarr[x, y].imshow(patternGrid, extent=extent, vmin = -40, cmap = 'viridis', aspect = 'equal')
+
+			ax.contour(patternGrid, colors='black', linewidths=2, extent=extent, aspect = 'equal', levels=[-15, -10, -5, -2], origin= 'image')
+			ax.scatter(xElOff, elOff, marker = 'x', c = 'red', s = 40, linewidths = 2)
+			ax.axvline(xAxis[maxY], color = 'red', linestyle = '--', linewidth = 2)
+			ax.axhline(yAxis[maxX], color = 'red', linestyle = '--', linewidth = 2)
+
+			## place pattern in array to compute average later
+			meanBeamArr[pl, cnt, :, :] = patternGrid 
 			ax.set_title('Beam ' + beamIndex, fontsize = 12)
 
 			ax.yaxis.set_major_locator(majorYLocator)
@@ -534,95 +534,98 @@ majorXLocator = MultipleLocator(5)
 majorXFormatter = FormatStrFormatter('%d')
 minorXLocator = MultipleLocator(1)
 
-## declare figure object
-fig = pyplot.figure(figsize = (12,12))
+for pl in range(0, 2):
+	## declare figure object
+	fig = pyplot.figure(figsize = (12,12))
+	for cnt in range(0, 7):
+		beamIndex = wvuBeamDict[np.str(cnt)]
+		## determine row location span
+		locSeq = rowLocDict[cnt]
 
-for cnt in range(0, 7):
-	beamIndex = wvuBeamDict[np.str(cnt)]
-	## determine row location span
-	locSeq = rowLocDict[cnt]
+		## extract stored interpolated beam pattern
+		beamGridPattern = meanBeamArr[pl, cnt, :, :]
 
-	## extract stored interpolated beam pattern
-	beamGridPattern = meanBeamArr[cnt, :, :]
+		## find index of maximum value so as to know where to take the cuts
+		maxInd = np.where(beamGridPattern == np.nanmax(beamGridPattern))
+		maxX = maxInd[0][0]
+		maxY = maxInd[1][0]
 
-	## find index of maximum value so as to know where to take the cuts
-	maxInd = np.where(beamGridPattern == np.nanmax(beamGridPattern))
-	maxX = maxInd[0][0]
-	maxY = maxInd[1][0]
+		## extract EL/XEL cuts
+		elCut = beamGridPattern[maxX, :]
+		xelCut = beamGridPattern[:, maxY]
 
-	## extract EL/XEL cuts
-	elCut = beamGridPattern[maxX, :]
-	xelCut = beamGridPattern[:, maxY]
+		## these are in dB... cast to normalized linear units
 
-	## these are in dB... cast to normalized linear units
+		elCut_Linear = 10**(elCut/10)
+		xelCut_Linear = 10**(xelCut/10)
 
-	elCut_Linear = 10**(elCut/10)
-	xelCut_Linear = 10**(xelCut/10)
+		##init guesses
+		elInitInd = np.where(elCut_Linear == np.nanmax(elCut_Linear))
+		elInitMean = elCut_Linear[elInitInd]
+		xelInitInd = np.where(elCut_Linear == np.nanmax(xelCut_Linear))
+		xelInitMean = xelCut_Linear[xelInitInd]
+		sigma = 9.1
+		poptEL, pcovEL = curve_fit(Gauss1D, yAxis, np.nan_to_num(elCut_Linear))#, p0 = [1, elInitMean, sigma])
+		poptXEL, pcovXEL = curve_fit(Gauss1D, xAxis, np.nan_to_num(xelCut_Linear))#, p0 = [1, xelInitMean, sigma])
 
-	##init guesses
-	elInitInd = np.where(elCut_Linear == np.nanmax(elCut_Linear))
-	elInitMean = elCut_Linear[elInitInd]
-	xelInitInd = np.where(elCut_Linear == np.nanmax(xelCut_Linear))
-	xelInitMean = xelCut_Linear[xelInitInd]
-	sigma = 9.1
-	poptEL, pcovEL = curve_fit(Gauss1D, yAxis, np.nan_to_num(elCut_Linear))#, p0 = [1, elInitMean, sigma])
-	poptXEL, pcovXEL = curve_fit(Gauss1D, xAxis, np.nan_to_num(xelCut_Linear))#, p0 = [1, xelInitMean, sigma])
+		## compute errors
+		perrEL = np.sqrt(np.diag(pcovEL))
+		perrXEL = np.sqrt(np.diag(pcovXEL))
 
-	## compute errors
-	perrEL = np.sqrt(np.diag(pcovEL))
-	perrXEL = np.sqrt(np.diag(pcovXEL))
+		"""
+		From the returned fit, estimate the beam area by computing the average FWHM between each XEL/EL profile
+		"""
 
-	"""
-	From the returned fit, estimate the beam area by computing the average FWHM between each XEL/EL profile
-	"""
+		elFWHM = poptEL[2] * 2.355 ## arcminutes
+		xelFWHM = poptXEL[2] * 2.355 ## arcminutes
 
-	elFWHM = poptEL[2] * 2.355 ## arcminutes
-	xelFWHM = poptXEL[2] * 2.355 ## arcminutes
+		## get errors
+		elFWHMErr = perrEL[2]
+		xelFWHMErr = perrXEL[2]
 
-	## get errors
-	elFWHMErr = perrEL[2]
-	xelFWHMErr = perrXEL[2]
+		aveFWHM = (elFWHM + xelFWHM) / 2.
+		aveFWHMErr = (elFWHMErr +xelFWHMErr) / 2.
 
-	aveFWHM = (elFWHM + xelFWHM) / 2.
-	aveFWHMErr = (elFWHMErr +xelFWHMErr) / 2.
+		## compute area
+		beamArea = aveFWHM**2 * 1.1331 * 3600 ## arcseconds
+		beamAreaErr = aveFWHMErr**2 * 1.1331 * 3600 ## arcseconds
 
-	## compute area
-	beamArea = aveFWHM**2 * 1.1331 * 3600 ## arcseconds
-	beamAreaErr = aveFWHMErr**2 * 1.1331 * 3600 ## arcseconds
+		## inform user
+		print('FWHM of EL fit: %.2f' % elFWHM + '+/-%.2f' % elFWHMErr + '[arcmin]')
+		print('FWHM of XEL fit: %.2f' % xelFWHM + '+/-%.2f' % xelFWHMErr + '[arcmin]')
+		print('The area of the beam estimated from Gaussian fit of profiles: %.2f' % beamArea + '+/-%2.f' % beamAreaErr + '[sq. arcseconds]')
 
-	## inform user
-	print('FWHM of EL fit: %.2f' % elFWHM + '+/-%.2f' % elFWHMErr + '[arcmin]')
-	print('FWHM of XEL fit: %.2f' % xelFWHM + '+/-%.2f' % xelFWHMErr + '[arcmin]')
-	print('The area of the beam estimated from Gaussian fit of profiles: %.2f' % beamArea + '+/-%2.f' % beamAreaErr + '[sq. arcseconds]')
+		ax = pyplot.subplot2grid((6, 6), locSeq, colspan = 2, rowspan = 2)
 
-	ax = pyplot.subplot2grid((6, 6), locSeq, colspan = 2, rowspan = 2)
+		## overplot the profiles
+		ax.set_title('Beam ' + beamIndex, fontsize = 12)
+		ax.plot(yAxis, elCut_Linear, color = tableau20[0], label = 'EL', linewidth = 2)
+		ax.plot(xAxis, xelCut_Linear, color = tableau20[2], label = 'XEL', linewidth = 2)
+		ax.plot(yAxis, Gauss1D(yAxis, *poptEL), color = tableau20[0], label = 'EL (Fit)', linewidth = 2, linestyle = '--')
+		ax.plot(xAxis, Gauss1D(xAxis, *poptXEL), color = tableau20[2], label = 'XEL (Fit)', linewidth = 2, linestyle = '--')
+		#ax.set_ylim(0, 1.05)
+				
+		ax.yaxis.set_major_locator(majorYLocator)
+		ax.yaxis.set_major_formatter(majorYFormatter)
+		ax.yaxis.set_minor_locator(minorYLocator)
+		ax.xaxis.set_major_locator(majorXLocator)
+		ax.xaxis.set_major_formatter(majorXFormatter)
+		ax.xaxis.set_minor_locator(minorXLocator)
+		ax.tick_params(axis = 'both', which='both', width=2)
 
-	## overplot the profiles
-	ax.set_title('Beam ' + beamIndex, fontsize = 12)
-	ax.plot(yAxis, elCut_Linear, color = tableau20[0], label = 'EL', linewidth = 2)
-	ax.plot(xAxis, xelCut_Linear, color = tableau20[2], label = 'XEL', linewidth = 2)
-	ax.plot(yAxis, Gauss1D(yAxis, *poptEL), color = tableau20[0], label = 'EL (Fit)', linewidth = 2, linestyle = '--')
-	ax.plot(xAxis, Gauss1D(xAxis, *poptXEL), color = tableau20[2], label = 'XEL (Fit)', linewidth = 2, linestyle = '--')
-	#ax.set_ylim(0, 1.05)
-			
-	ax.yaxis.set_major_locator(majorYLocator)
-	ax.yaxis.set_major_formatter(majorYFormatter)
-	ax.yaxis.set_minor_locator(minorYLocator)
-	ax.xaxis.set_major_locator(majorXLocator)
-	ax.xaxis.set_major_formatter(majorXFormatter)
-	ax.xaxis.set_minor_locator(minorXLocator)
-	ax.tick_params(axis = 'both', which='both', width=2)
+		if cnt == 3:
+			ax.legend(loc=0,prop={'size':10})
 
-	if cnt == 3:
-		ax.legend(loc=0,prop={'size':10})
-
-#[left, bottom, width, height]
-fig.subplots_adjust(hspace = 0.4, wspace = 0.4)
-fig.text(0.5, 0.04, 'XEL Offset [arcmin]', ha='center')
-fig.text(0.04, 0.5, 'Normalized Response', va='center', rotation='vertical')
-pyplot.savefig(projName + '_FormedBeamProfiles.png', bbox_inches='tight')
-pyplot.show(block=True)
-pyplot.clf()
-pyplot.close()
+	#[left, bottom, width, height]
+	fig.subplots_adjust(hspace = 0.4, wspace = 0.4)
+	fig.text(0.5, 0.04, 'XEL Offset [arcmin]', ha='center')
+	fig.text(0.04, 0.5, 'Normalized Response', va='center', rotation='vertical')
+	if pl == 0:
+		pyplot.savefig(projName + '_FormedBeamProfiles_YY.png', bbox_inches='tight')
+	else:
+		pyplot.savefig(projName + '_FormedBeamProfiles_XX.png', bbox_inches='tight')
+	pyplot.show(block=True)
+	pyplot.clf()
+	pyplot.close()
 
 
