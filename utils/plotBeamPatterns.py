@@ -6,19 +6,19 @@ The script needs access to mat lab files produced by BYU. Specifically, the aggr
 each beam and XEL/EL locations. The three inputs are project value (assuming a hard coded location), calibration scan time (either grid or seven), and a path to the 
 directory that holds the weight FITS files. 
 Inputs are:
-1 - project name (e.g. AGBT16B_400_12)
-2 - calibration scan type (i.e. 'grid' or 'seven')
-3 - path to the associated weight FITS file
+-p --project_name - <required> project name and observing session (e.g., AGBT19A_365_03
+-c --cal_type - <required> calibration type (i.e., seven or grid)
+-w --weights_path - <required> path to weights FITS files
 
 
 Usage:
-ipython plotBeamPatterns.py /path/to/steering/vectorXX /path/to/steering/vectorYY /path/to/weights
+ipython plotBeamPatterns.py -p /path/to/steering/vectorXX -c /path/to/steering/vectorYY -w /path/to/weights
 
 Example:
-ipython plotBeamPatterns.py AGBT16B_400_12 grid ../../data/AGBT16B_400/AGBT16B_400_12/weight_files/fits_files/scaledWeights/
+ipython plotBeamPatterns.py -p AGBT16B_400_12 -c grid -w ../../data/AGBT16B_400/AGBT16B_400_12/weight_files/fits_files/scaledWeights/ 
 __author__ = "Nick Pingel"
 __version__ = "1.0"
-__email__ = "nipingel@mix.wvu.edu"
+__email__ = "nmpingel@wisc.edu"
 __status__ = "Production"
 """
 
@@ -26,6 +26,7 @@ __status__ = "Production"
 from astropy.io import fits 
 import scipy.io
 import numpy as np
+import argparse
 np.seterr(divide='ignore', invalid='ignore')
 import glob
 import sys
@@ -98,6 +99,14 @@ def getWeights(xel0, el0, aggWeightFile):
 	return weightVals
 
 
+## parse input arguments
+parser = argparse.ArgumentParser()
+parser.add_argument('-p', '--project_name', help='project name and observing session (e.g., AGBT19A_365_03)', required = True)
+parser.add_argument('-c', '--cal_type', help='<required> calibration type (i.e., seven or grid)', required = True, type = float)
+parser.add_argument('-w', '--weights_path', help='<required> path to weights FITS files', required = True, type = float)
+args, unknown = parser.parse_known_args()
+
+
 ## make beam dictionary to map from BYU to WVU convention (e.g. BYU 0 -> WVU 1)
 wvuBeamDict = {'0':'1', '1':'2', '2':'6', '3':'0', '4':'3', '5':'5','6':'4'}
 byuBeamDict = {'1':'0', '2':'1', '6':'2', '0':'3', '3':'4', '5':'5', '4':'6'}
@@ -108,21 +117,28 @@ rowLocDict = {0:(2,2), 1:(0,1), 2:(0,3), 3:(2,4), 4:(4,3), 5:(4,1), 6:(2,0)}
 yDict = {0:0, 1:1, 2:0, 3:1, 4:0, 5:1,6:0}
 xDict = {0:0, 1:0, 2:1, 3:1, 4:2, 5:2, 6:3}
 
-matFilePaths = '/lustre/flag/'
+matFilePaths = '/mnt/flag/'
+
+
 
 ## get project name 
-projName = sys.argv[1]
+projName = args.project_name
 
 ## calibration type 
-calType = sys.argv[2]
+calType = args.cal_type
 
 ## get path to weight files
-pathToWeights = sys.argv[3]
+pathToWeights = args.weights_path
 
 ## TODO:
 ## TAKE THIS OUT --- STUPID ELEMENT MAPPING --- MAKE IT READ FROM TXT FILE
-xElemsIndices = np.array([1, 2, 3, 4, 5, 6, 7, 35, 9, 10, 11, 12, 14, 13, 15, 16, 17, 18, 19]) - 1
-yElemsIndices = np.array([21, 20, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38]) - 1
+#xElemsIndices = np.array([1, 2, 3, 4, 5, 6, 7, 35, 9, 10, 11, 12, 14, 13, 15, 16, 17, 18, 19]) - 1
+#yElemsIndices = np.array([21, 20, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38]) - 1
+## load element mapping arrays
+proj_str = projName.split('_')[0]+'_'+proj_str.split('_')[1]
+elem_mapping = np.loadtxt('../misc/element_mapping_%s.txt%' % (proj_str))
+xElemsIndices = elem_mapping[0, :]
+yElemsIndices = elem_mapping[1, :]
 
 ## really, 8, 13, and 14 but need to provide the subsequent inices 
 badIndsYY = [9, 14, 15] 
