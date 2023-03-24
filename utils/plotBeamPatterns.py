@@ -134,7 +134,7 @@ pathToWeights = args.weights_path
 #xElemsIndices = np.array([1, 2, 3, 4, 5, 6, 7, 35, 9, 10, 11, 12, 14, 13, 15, 16, 17, 18, 19]) - 1
 #yElemsIndices = np.array([21, 20, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 36, 37, 38]) - 1
 ## load element mapping arrays
-elem_mapping = np.loadtxt('../misc/element_mapping_%s.txt' % (projName), dtype = 'int')
+elem_mapping = np.loadtxt('../misc/element_maps/element_mapping_%s.txt' % (projName), dtype = 'int')
 xElemsIndices = elem_mapping[0, :] - 1
 yElemsIndices = elem_mapping[1, :] - 1 
 
