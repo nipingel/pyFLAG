@@ -38,9 +38,8 @@ import matplotlib.pyplot as pyplot
 import matplotlib 
 from matplotlib.ticker import MultipleLocator, FormatStrFormatter
 
-matplotlib.rc('font', family='sans-serif') 
-matplotlib.rc('font', serif='Helvetica Neue') 
-matplotlib.rc('text', usetex='false') 
+plt.rcParams['text.usetex'] = True
+plt.rcParams['font.family'] = "serif"
 matplotlib.rc('xtick.major.width')
 matplotlib.rcParams['contour.negative_linestyle']= 'solid'
 matplotlib.rcParams.update({'font.size': 14})
@@ -397,12 +396,12 @@ majorXLocator = MultipleLocator(10)
 majorXFormatter = FormatStrFormatter('%d')
 minorXLocator = MultipleLocator(2)
 
+## initialize array to hold interpolated grid
+meanBeamArr = np.zeros([2, 7, 200, 200])
 ## make beam pattern plot for both polarizations
 for pl in range(0, 2):
 	## declare figure object
 	fig = pyplot.figure(figsize = (12,12))
-	## initialize array to hold interpolated grid
-	meanBeamArr = np.zeros([2, 7, 200, 200])
 	if pl == 0:
 		for cnt in range(0, 7):
 			beamIndex = wvuBeamDict[np.str(cnt)]
@@ -627,5 +626,6 @@ for pl in range(0, 2):
 	pyplot.show(block=True)
 	pyplot.clf()
 	pyplot.close()
+
 
 
