@@ -275,7 +275,7 @@ if True:
 	initialize array to hold the final pattern with dimensions beams X grid points 
 	X freq chans
 	"""
-	patternArrXX = np.zeros([2, 7, np.size(aggArrXX, 1), np.size(aggArrXX, 2)])
+	patternArrXX = np.zeros([7, np.size(aggArrXX, 1), np.size(aggArrXX, 2)])
 	patternArrYY = np.zeros([7, np.size(aggArrXX, 1), np.size(aggArrXX, 2)])
 
 	"""
