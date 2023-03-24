@@ -136,7 +136,16 @@ pathToWeights = args.weights_path
 ## load element mapping arrays
 elem_mapping = np.loadtxt('../misc/element_maps/element_mapping_%s.txt' % (projName), dtype = 'int')
 xElemsIndices = elem_mapping[0, :] - 1
-yElemsIndices = elem_mapping[1, :] - 1 
+yElemsIndices = elem_mapping[1, :] - 1
+
+## remove -1, indicating bad element
+bad_inds_x = np.where(xElemsIndices == -1)
+bad_inds_y = np.where(yElemsIndices == -1)
+if len(bad_inds_x[0]) > 0:
+	xElemsIndices = np.delete(xElemsIndices , bad_inds_x)
+if len(bad_inds_y[0]) > 0:
+	yElemsIndices = np.delete(xElemsIndices, bad_inds_y)
+
 
 ## really, 8, 13, and 14 but need to provide the subsequent inices 
 badIndsYY = [9, 14, 15] 
@@ -184,8 +193,8 @@ create global data buffer to hold the weights, which are shaped as
 elems X beam X freq. 
 elems X freq X pol X complex pair
 """
-weightArrXX = np.zeros([19, 7, 500], dtype = 'complex64')
-weightArrYY = np.zeros([19, 7, 500], dtype = 'complex64')
+weightArrXX = np.zeros([len(xElemsIndices), 7, 500], dtype = 'complex64')
+weightArrYY = np.zeros([len(yElemsIndices), 7, 500], dtype = 'complex64')
 
 """
 The weights do not correspond to contigious frequency channels. The 
@@ -321,10 +330,6 @@ if True:
 				## index values read in above
 				aXX = aggArrXX[:, pt, chan]
 				aYY = aggArrYY[:, pt, chan]
-				#if len(aXX) < 19:
-					#aXX = np.insert(aXX, badIndsXX, 0)
-				#if len(aYY) < 19:
-					#aYY = np.insert(aYY, badIndsYY, 0)
 
 
 				## select the steering value of the dipoles at that grid point and 
