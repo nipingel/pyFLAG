@@ -459,59 +459,59 @@ for pl in range(0, 1):
 		pyplot.show(block=True)
 		pyplot.clf()
 		pyplot.close()
-		else:
-			for cnt in range(0, 7):
-				## select and grid the data
-				patternAtChanYY = patternArrYY[cnt, :, chan]
-				patternGrid = griddata(coordVec, 10*np.log10(patternAtChanYY), (grid_x, grid_y) , method='linear')
+	else:
+		for cnt in range(0, 7):
+			## select and grid the data
+			patternAtChanYY = patternArrYY[cnt, :, chan]
+			patternGrid = griddata(coordVec, 10*np.log10(patternAtChanYY), (grid_x, grid_y) , method='linear')
 
-				## find index of maximum value so as to know where to take the cuts
-				maxInd = np.where(patternGrid == np.nanmax(patternGrid))
-				maxX = maxInd[0][0]
-				maxY = maxInd[1][0]
+			## find index of maximum value so as to know where to take the cuts
+			maxInd = np.where(patternGrid == np.nanmax(patternGrid))
+			maxX = maxInd[0][0]
+			maxY = maxInd[1][0]
 
-				## extract cuts
-				elCut = patternGrid[maxX, :]
-				xelCut = patternGrid[:, maxY]
-				
-				print('Plotting beam ' + beamIndex + ', at frequency %.2f' % freqArr[chan] + ' [MHz]')
-				
+			## extract cuts
+			elCut = patternGrid[maxX, :]
+			xelCut = patternGrid[:, maxY]
+			
+			print('Plotting beam ' + beamIndex + ', at frequency %.2f' % freqArr[chan] + ' [MHz]')
+			
 
-				##Plot gridded data
-				ax = pyplot.subplot2grid((6, 6), locSeq, colspan = 2, rowspan = 2)
-				im = ax.imshow(patternGrid, extent=extent, vmin = -40, cmap = 'viridis', aspect = 'equal')
-				
-				#im = axarr[x, y].imshow(patternGrid, extent=extent, vmin = -40, cmap = 'viridis', aspect = 'equal')
+			##Plot gridded data
+			ax = pyplot.subplot2grid((6, 6), locSeq, colspan = 2, rowspan = 2)
+			im = ax.imshow(patternGrid, extent=extent, vmin = -40, cmap = 'viridis', aspect = 'equal')
+			
+			#im = axarr[x, y].imshow(patternGrid, extent=extent, vmin = -40, cmap = 'viridis', aspect = 'equal')
 
-				ax.contour(patternGrid, colors='black', linewidths=2, extent=extent, aspect = 'equal', levels=[-15, -10, -5, -2], origin= 'image')
-				ax.scatter(xElOff, elOff, marker = 'x', c = 'red', s = 40, linewidths = 2)
-				ax.axvline(xAxis[maxY], color = 'red', linestyle = '--', linewidth = 2)
-				ax.axhline(yAxis[maxX], color = 'red', linestyle = '--', linewidth = 2)
+			ax.contour(patternGrid, colors='black', linewidths=2, extent=extent, aspect = 'equal', levels=[-15, -10, -5, -2], origin= 'image')
+			ax.scatter(xElOff, elOff, marker = 'x', c = 'red', s = 40, linewidths = 2)
+			ax.axvline(xAxis[maxY], color = 'red', linestyle = '--', linewidth = 2)
+			ax.axhline(yAxis[maxX], color = 'red', linestyle = '--', linewidth = 2)
 
-				## place pattern in array to compute average later
-				meanBeamArr[cnt, :, :] = patternGrid 
-				ax.set_title('Beam ' + beamIndex, fontsize = 12)
+			## place pattern in array to compute average later
+			meanBeamArr[cnt, :, :] = patternGrid 
+			ax.set_title('Beam ' + beamIndex, fontsize = 12)
 
-				ax.yaxis.set_major_locator(majorYLocator)
-				ax.yaxis.set_major_formatter(majorYFormatter)
-				ax.yaxis.set_minor_locator(minorYLocator)
-				ax.xaxis.set_major_locator(majorXLocator)
-				ax.xaxis.set_major_formatter(majorXFormatter)
-				ax.xaxis.set_minor_locator(minorXLocator)
-				ax.tick_params(axis = 'both', which='both', width=2)
-			#[left, bottom, width, height]
-			fig.subplots_adjust(right=0.9, hspace = 0.3, wspace = 0.3)
-			cbar_ax = fig.add_axes([0.92, 0.1, 0.02, 0.8])
-			cb = fig.colorbar(im, cax=cbar_ax, label = '[dB]')
-			cb.ax.tick_params(which = 'minor', length = 2)
-			cb.ax.tick_params(which = 'major', length = 4)
-			cb.ax.minorticks_on()
-			fig.text(0.5, 0.04, 'XEL Offset [arcmin]', ha='center')
-			fig.text(0.04, 0.5, 'EL Offset [arcmin]', va='center', rotation='vertical')
-			pyplot.savefig(projName + '_FormedBeamPatterns_XX.png', bbox_inches='tight')
-			pyplot.show(block=True)
-			pyplot.clf()
-			pyplot.close()		
+			ax.yaxis.set_major_locator(majorYLocator)
+			ax.yaxis.set_major_formatter(majorYFormatter)
+			ax.yaxis.set_minor_locator(minorYLocator)
+			ax.xaxis.set_major_locator(majorXLocator)
+			ax.xaxis.set_major_formatter(majorXFormatter)
+			ax.xaxis.set_minor_locator(minorXLocator)
+			ax.tick_params(axis = 'both', which='both', width=2)
+		#[left, bottom, width, height]
+		fig.subplots_adjust(right=0.9, hspace = 0.3, wspace = 0.3)
+		cbar_ax = fig.add_axes([0.92, 0.1, 0.02, 0.8])
+		cb = fig.colorbar(im, cax=cbar_ax, label = '[dB]')
+		cb.ax.tick_params(which = 'minor', length = 2)
+		cb.ax.tick_params(which = 'major', length = 4)
+		cb.ax.minorticks_on()
+		fig.text(0.5, 0.04, 'XEL Offset [arcmin]', ha='center')
+		fig.text(0.04, 0.5, 'EL Offset [arcmin]', va='center', rotation='vertical')
+		pyplot.savefig(projName + '_FormedBeamPatterns_XX.png', bbox_inches='tight')
+		pyplot.show(block=True)
+		pyplot.clf()
+		pyplot.close()		
 
 """
 Finally, loop through again to create EL/XEL profiles plots of the beams. 
