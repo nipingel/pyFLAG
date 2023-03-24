@@ -461,6 +461,9 @@ for pl in range(0, 2):
 		pyplot.close()
 	else:
 		for cnt in range(0, 7):
+			beamIndex = wvuBeamDict[np.str(cnt)]
+			## determine row location span
+			locSeq = rowLocDict[cnt]
 			## select and grid the data
 			patternAtChanYY = patternArrYY[cnt, :, chan]
 			patternGrid = griddata(coordVec, 10*np.log10(patternAtChanYY), (grid_x, grid_y) , method='linear')
